@@ -267,7 +267,6 @@ function StartMainScript(titleText)
     local kickTask = nil
     local holdHeight = 17
     local fovEnabled = false
-    local thirdPersonEnabled = false
     local originalFOV = 70
 
     local isAntiKickActive = false
@@ -846,22 +845,14 @@ function StartMainScript(titleText)
     end
 
     local function SetThirdPerson(enabled)
-        local player = LocalPlayer
         if enabled then
-            player.CameraMode = Enum.CameraMode.Classic
-            player.CameraMinZoomDistance = 10
-            player.CameraMaxZoomDistance = 15
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMaxZoomDistance = 1000
+            LocalPlayer.CameraMinZoomDistance = 0.5
         else
-            player.CameraMode = Enum.CameraMode.LockFirstPerson
-            player.CameraMinZoomDistance = 0.5
-            player.CameraMaxZoomDistance = 0.5
-        end
-        local char = player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                Workspace.CurrentCamera.CameraSubject = hum
-            end
+            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+            LocalPlayer.CameraMinZoomDistance = 0.5
         end
     end
 
@@ -878,7 +869,6 @@ function StartMainScript(titleText)
         Name = "Third Person",
         Default = false,
         Callback = function(Value)
-            thirdPersonEnabled = Value
             SetThirdPerson(Value)
         end
     })
@@ -887,7 +877,6 @@ function StartMainScript(titleText)
         task.wait(0.5)
         if antiGrabEnabled then antiGrabTask = task.spawn(AntiGrabLoop) end
         if fovEnabled then SetFOV(true) end
-        if thirdPersonEnabled then SetThirdPerson(true) end
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
 
@@ -1057,9 +1046,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ============================================================
-    -- OWNERSHIP KICK
-    -- ============================================================
     local function OwnershipKickFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target then return end
@@ -1234,9 +1220,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ============================================================
-    -- PALLET RAGDOLL
-    -- ============================================================
     local function PalletRagdollFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target or not target.Character then return end
@@ -1363,7 +1346,6 @@ function StartMainScript(titleText)
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
         if fovEnabled then SetFOV(false) fovEnabled = false end
-        if thirdPersonEnabled then SetThirdPerson(false) thirdPersonEnabled = false end
         if isAntiKickActive then
             isAntiKickActive = false
             if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
