@@ -1622,6 +1622,262 @@ function StartMainScript(titleText)
             StopAntiKickItem()
         end
     end)
+
+    -- ============================================
+    -- AUTO RESET
+    -- ============================================
+    do
+        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
+        local AutoResetCon = nil
+        
+        DefenseTab:CreateToggle({
+            Name = "Auto Reset",
+            Default = false,
+            Callback = function(Value)
+                if AutoResetCon then
+                    AutoResetCon:Disconnect()
+                    AutoResetCon = nil
+                end
+
+                if Value then
+                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                        if reason == "Flying" then
+                            local char = LocalPlayer.Character
+                            local hum = char and char:FindFirstChild("Humanoid")
+                            
+                            if hum then
+                                Library:Notify({ 
+                                    Title = "Auto Reset", 
+                                    Content = "Resetting to prevent Ban!", 
+                                    Duration = 3 
+                                })
+                                char:BreakJoints()
+                                hum.Health = 0
+                            end
+                        end
+                    end)
+                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
+    -- ============================================
+    -- AUTO PCLD BREAK
+    -- ============================================
+    do
+        local PCLD_Auto_Active = false
+
+        DefenseTab:CreateToggle({
+            Name = "Auto PCLD Break",
+            Default = false,
+            Callback = function(Value)
+                PCLD_Auto_Active = Value
+                
+                if Value then
+                    task.spawn(function()
+                        local isFirstCycle = true
+                        
+                        while PCLD_Auto_Active do
+                            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                            local hrp = char:WaitForChild("HumanoidRootPart", 5)
+                            local hum = char:WaitForChild("Humanoid", 5)
+                            
+                            if not hrp or not hum then 
+                                task.wait(0.5)
+                                continue 
+                            end
+
+                            if hum.Health <= 0 then
+                                char = LocalPlayer.CharacterAdded:Wait()
+                                hrp = char:WaitForChild("HumanoidRootPart", 5)
+                                hum = char:WaitForChild("Humanoid", 5)
+                            end
+                            
+                            if not hrp or not hum then continue end
+
+                            if isFirstCycle then
+                                local savedCFrame = hrp.CFrame
+                                
+                                hrp.CFrame = CFrame.new(hrp.Position.X, 50000, hrp.Position.Z)
+                                task.wait(0.05)
+                                hum.Health = 0
+
+                                char = LocalPlayer.CharacterAdded:Wait()
+                                if not PCLD_Auto_Active then break end
+                                
+                                hrp = char:WaitForChild("HumanoidRootPart", 5)
+                                hum = char:WaitForChild("Humanoid", 5)
+                                
+                                if hrp and hum then
+                                    task.wait(0.1)
+                                    hrp.CFrame = savedCFrame
+                                    task.wait(0.05)
+                                    hum.Health = 0
+                                end
+                                
+                                isFirstCycle = false
+                            else
+                                task.wait(0.1)
+                                if hum then
+                                    hum.Health = 0
+                                    pcall(function() char:BreakJoints() end)
+                                end
+                            end
+
+                            char = LocalPlayer.CharacterAdded:Wait()
+                            if not PCLD_Auto_Active then break end
+                            
+                            hum = char:WaitForChild("Humanoid", 5)
+
+                            if hum then
+                                hum.Died:Wait()
+                            end
+                        end
+                    end)
+                    Library:Notify({ Title = "Auto PCLD Break", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto PCLD Break", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
+    -- ============================================
+    -- ДОБАВЛЕННЫЕ УЛУЧШЕННЫЕ ФУНКЦИИ
+    -- ============================================
+
+    -- 1. Улучшенный анти-граб (с хождением)
+    local AdvancedAntiGrabBlock = DefenseTab:CreateBlock({Name = "Advanced Anti-Grab", Side = "Left"})
+    local antiGrabAdvancedActive = false
+    local antiGrabAdvancedTask = nil
+    local AGWalk = false
+
+    local function AntiGrabAdvancedLoop()
+        while antiGrabAdvancedActive do
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local head = char:FindFirstChild("Head")
+
+                if isHeld.Value then
+                    -- Спамим Struggle и Ragdoll для сброса хвата
+                    pcall(function() struggleEvent:FireServer(LocalPlayer) end)
+                    pcall(function() ragdollRemote:FireServer(hrp, 0) end)
+
+                    if hrp then
+                        hrp.Anchored = true
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                        -- Движение за счёт MoveDirection (как в XУЙ.FLING2)
+                        if hum and hum.MoveDirection.Magnitude > 0.1 then
+                            hrp.CFrame = hrp.CFrame + hum.MoveDirection * 0.43
+                        end
+                    end
+                    if hum then
+                        hum.Sit = false
+                        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                    end
+                    if head then
+                        local partOwner = head:FindFirstChild("PartOwner")
+                        if partOwner then partOwner:Destroy() end
+                    end
+                else
+                    if hrp and hrp.Anchored then 
+                        hrp.Anchored = false 
+                    end
+                    AGWalk = false
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    AdvancedAntiGrabBlock:CreateToggle({
+        Name = "Enable Advanced Anti-Grab (can walk)",
+        Default = false,
+        Callback = function(Value)
+            antiGrabAdvancedActive = Value
+            if antiGrabAdvancedTask then task.cancel(antiGrabAdvancedTask) end
+            if Value then
+                antiGrabAdvancedTask = task.spawn(AntiGrabAdvancedLoop)
+                Library:Notify({ Title = "Advanced Anti-Grab", Content = "Enabled", Duration = 2 })
+            else
+                Library:Notify({ Title = "Advanced Anti-Grab", Content = "Disabled", Duration = 2 })
+                -- Снимаем якорь при выключении
+                local char = LocalPlayer.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.Anchored = false end
+                end
+            end
+        end
+    })
+
+    -- 2. Улучшенный анти-эксплозия (не выкидывает из блодмана)
+    local AdvancedAntiExplosionBlock = DefenseTab:CreateBlock({Name = "Advanced Anti-Explosion", Side = "Right"})
+    local antiExplosionAdvancedActive = false
+    local antiExplosionAdvancedConn = nil
+
+    local function StartAdvancedAntiExplosion()
+        antiExplosionAdvancedConn = Workspace.ChildAdded:Connect(function(model)
+            if not antiExplosionAdvancedActive then return end
+            if model:IsA("BasePart") and model.Name == "Part" then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChild("Humanoid")
+                if hrp and (model.Position - hrp.Position).Magnitude <= 25 then
+                    -- Проверяем, сидим ли мы на блодмане
+                    local sittingOnBlob = false
+                    if hum and hum.SeatPart and hum.SeatPart.Parent and hum.SeatPart.Parent.Name == "CreatureBlobman" then
+                        sittingOnBlob = true
+                    end
+                    if not sittingOnBlob then
+                        pcall(function()
+                            hrp.Anchored = true
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            hrp.AssemblyAngularVelocity = Vector3.zero
+                            model:Destroy()
+                            task.wait(0.05)
+                            hrp.Anchored = false
+                            if hum then
+                                hum.PlatformStand = false
+                                hum:ChangeState(Enum.HumanoidStateType.Running)
+                            end
+                        end)
+                    else
+                        -- Если сидим на блодмане – просто удаляем взрыв
+                        pcall(function()
+                            model:Destroy()
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+
+    AdvancedAntiExplosionBlock:CreateToggle({
+        Name = "Enable Advanced Anti-Explosion (no blob eject)",
+        Default = false,
+        Callback = function(Value)
+            antiExplosionAdvancedActive = Value
+            if Value then
+                StartAdvancedAntiExplosion()
+                Library:Notify({ Title = "Advanced Anti-Explosion", Content = "Enabled", Duration = 2 })
+            else
+                if antiExplosionAdvancedConn then
+                    antiExplosionAdvancedConn:Disconnect()
+                    antiExplosionAdvancedConn = nil
+                end
+                Library:Notify({ Title = "Advanced Anti-Explosion", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
 end
 
 StartMainScript("Absolute")
