@@ -923,6 +923,44 @@ function StartMainScript(titleText)
         end
     })
 
+    do
+        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
+        local AutoResetCon = nil
+        
+        AntiKickBlock:CreateToggle({
+            Name = "Auto Reset",
+            Default = false,
+            Callback = function(Value)
+                if AutoResetCon then
+                    AutoResetCon:Disconnect()
+                    AutoResetCon = nil
+                end
+
+                if Value then
+                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                        if reason == "Flying" then
+                            local char = LocalPlayer.Character
+                            local hum = char and char:FindFirstChild("Humanoid")
+                            
+                            if hum then
+                                Library:Notify({ 
+                                    Title = "Auto Reset", 
+                                    Content = "Resetting to prevent Ban!", 
+                                    Duration = 3 
+                                })
+                                char:BreakJoints()
+                                hum.Health = 0
+                            end
+                        end
+                    end)
+                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
     local antiExplosionActive = false
     local antiExplosionConn = nil
     local function antiExplosionStart()
@@ -1609,68 +1647,10 @@ function StartMainScript(titleText)
         end
     })
 
-    LocalPlayer.CharacterAdded:Connect(function(char)
-        if antiKickItemActive then
-            MyPCLD = nil
-            local hrp = char:WaitForChild("HumanoidRootPart", 5)
-            if hrp then FindPCLD(hrp) end
-        end
-    end)
-
-    LocalPlayer.OnTeleport:Connect(function()
-        if antiKickItemActive then
-            StopAntiKickItem()
-        end
-    end)
-
-    -- ============================================
-    -- AUTO RESET
-    -- ============================================
-    do
-        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
-        local AutoResetCon = nil
-        
-        DefenseTab:CreateToggle({
-            Name = "Auto Reset",
-            Default = false,
-            Callback = function(Value)
-                if AutoResetCon then
-                    AutoResetCon:Disconnect()
-                    AutoResetCon = nil
-                end
-
-                if Value then
-                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                        if reason == "Flying" then
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum then
-                                Library:Notify({ 
-                                    Title = "Auto Reset", 
-                                    Content = "Resetting to prevent Ban!", 
-                                    Duration = 3 
-                                })
-                                char:BreakJoints()
-                                hum.Health = 0
-                            end
-                        end
-                    end)
-                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    -- ============================================
-    -- AUTO PCLD BREAK
-    -- ============================================
     do
         local PCLD_Auto_Active = false
 
-        DefenseTab:CreateToggle({
+        AntiKickItemBlock:CreateToggle({
             Name = "Auto PCLD Break",
             Default = false,
             Callback = function(Value)
@@ -1744,6 +1724,20 @@ function StartMainScript(titleText)
             end
         })
     end
+
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        if antiKickItemActive then
+            MyPCLD = nil
+            local hrp = char:WaitForChild("HumanoidRootPart", 5)
+            if hrp then FindPCLD(hrp) end
+        end
+    end)
+
+    LocalPlayer.OnTeleport:Connect(function()
+        if antiKickItemActive then
+            StopAntiKickItem()
+        end
+    end)
 end
 
 StartMainScript("Absolute")
