@@ -93,17 +93,12 @@ function StartMainScript(titleText)
     local AntiBurnBlock = DefenseTab:CreateBlock({Name = "Anti-Burn", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AutoAntiLagBlock = DefenseTab:CreateBlock({Name = "Auto Anti-Lag", Side = "Left"})
-    local AntiInputBlock = DefenseTab:CreateBlock({Name = "Anti-Input [Item]", Side = "Left"})
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-    -- Новый блок в самом конце Defense
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti-Ban (Auto Reset & PCLD Break)", Side = "Right"})
-
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
 
-    -- ========== Anti-Input ==========
+    local AntiInputBlock = DefenseTab:CreateBlock({Name = "Anti-Input [Item]", Side = "Left"})
     local antiInputActive = false
     local antiInputTask = nil
     local antiInputSpeed = 0.1
@@ -259,7 +254,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Основные переменные ==========
     local GrabEvents = RS:WaitForChild("GrabEvents")
     local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
     local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
@@ -456,7 +450,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Target List ==========
     local targetNames = {}
     local function updateList()
         targetNames = {}
@@ -538,7 +531,6 @@ function StartMainScript(titleText)
         end)
     end
 
-    -- ========== УЛУЧШЕННЫЙ АНТИ-ГРАБ (с хождением) ==========
     local function AntiGrabLoop()
         while antiGrabEnabled do
             local char = LocalPlayer.Character
@@ -547,26 +539,23 @@ function StartMainScript(titleText)
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 if isHeld.Value then
                     pcall(function() struggleEvent:FireServer(LocalPlayer) end)
-                    pcall(function() ragdollRemote:FireServer(hrp, 0) end)
                     if hrp then
                         hrp.Anchored = true
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         hrp.AssemblyAngularVelocity = Vector3.zero
-                        -- Движение за счёт MoveDirection (как в XУЙ.FLING2)
-                        if hum and hum.MoveDirection.Magnitude > 0.1 then
-                            hrp.CFrame = hrp.CFrame + hum.MoveDirection * 0.43
-                        end
                     end
                     if hum then
                         hum.Sit = false
                         hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                        hum:ChangeState(Enum.HumanoidStateType.Running)
                     end
                     local head = char:FindFirstChild("Head")
                     if head then
                         local partOwner = head:FindFirstChild("PartOwner")
                         if partOwner then partOwner:Destroy() end
                     end
+                    pcall(function()
+                        ragdollRemote:FireServer(hrp, 0)
+                    end)
                 else
                     if hrp and hrp.Anchored then hrp.Anchored = false end
                 end
@@ -575,7 +564,6 @@ function StartMainScript(titleText)
         end
     end
 
-    -- ========== Blodman Kick ==========
     local function BlodmanKickLoop()
         local target = blobmanTarget
         if not target then return end
@@ -703,7 +691,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Anti-Kick Shuriken ==========
     local function ClearShuriken()
         local inv = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
         if inv then
@@ -848,7 +835,6 @@ function StartMainScript(titleText)
         ClearShuriken()
     end
 
-    -- ========== Visual ==========
     local function SetFOV(value)
         if value then
             originalFOV = Workspace.CurrentCamera.FieldOfView
@@ -903,16 +889,15 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
-    -- ========== УЛУЧШЕННЫЙ АНТИ-ГРАБ (заменяет старую версию) ==========
     AntiGrabBlock:CreateToggle({
-        Name = "Anti-Grab (can walk)",
+        Name = "Anti-Grab",
         Default = false,
         Callback = function(Value)
             antiGrabEnabled = Value
             if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
             if Value then
                 antiGrabTask = task.spawn(AntiGrabLoop)
-                Library:Notify({ Title = "Anti-Grab", Content = "Enabled (можно ходить)", Duration = 2 })
+                Library:Notify({ Title = "Anti-Grab", Content = "Enabled", Duration = 2 })
             else
                 local char = LocalPlayer.Character
                 if char then
@@ -938,7 +923,44 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== УЛУЧШЕННЫЙ АНТИ-ЭКСПЛОЗИЯ (не выкидывает из блодмана) ==========
+    do
+        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
+        local AutoResetCon = nil
+        
+        AntiKickBlock:CreateToggle({
+            Name = "Auto Reset",
+            Default = false,
+            Callback = function(Value)
+                if AutoResetCon then
+                    AutoResetCon:Disconnect()
+                    AutoResetCon = nil
+                end
+
+                if Value then
+                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                        if reason == "Flying" then
+                            local char = LocalPlayer.Character
+                            local hum = char and char:FindFirstChild("Humanoid")
+                            
+                            if hum then
+                                Library:Notify({ 
+                                    Title = "Auto Reset", 
+                                    Content = "Resetting to prevent Ban!", 
+                                    Duration = 3 
+                                })
+                                char:BreakJoints()
+                                hum.Health = 0
+                            end
+                        end
+                    end)
+                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
     local antiExplosionActive = false
     local antiExplosionConn = nil
     local function antiExplosionStart()
@@ -950,42 +972,30 @@ function StartMainScript(titleText)
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChild("Humanoid")
                 if hrp and (model.Position - hrp.Position).Magnitude <= 25 then
-                    -- Проверяем, сидим ли мы на блодмане
-                    local sittingOnBlob = false
-                    if hum and hum.SeatPart and hum.SeatPart.Parent and hum.SeatPart.Parent.Name == "CreatureBlobman" then
-                        sittingOnBlob = true
-                    end
-                    if not sittingOnBlob then
-                        pcall(function()
-                            hrp.Anchored = true
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            hrp.AssemblyAngularVelocity = Vector3.zero
-                            model:Destroy()
-                            task.wait(0.05)
-                            hrp.Anchored = false
-                            if hum then
-                                hum.PlatformStand = false
-                                hum:ChangeState(Enum.HumanoidStateType.Running)
-                            end
-                        end)
-                    else
-                        -- Если сидим на блодмане – просто удаляем взрыв
-                        pcall(function()
-                            model:Destroy()
-                        end)
-                    end
+                    pcall(function()
+                        hrp.Anchored = true
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                        model:Destroy()
+                        task.wait(0.05)
+                        hrp.Anchored = false
+                        if hum then
+                            hum.PlatformStand = false
+                            hum:ChangeState(Enum.HumanoidStateType.Running)
+                        end
+                    end)
                 end
             end
         end)
     end
 
     AntiExplosionBlock:CreateToggle({
-        Name = "Anti-Explosion (no blob eject)",
+        Name = "Anti-Explosion",
         Default = false,
         Callback = function(Value)
             if Value then 
                 antiExplosionStart() 
-                Library:Notify({ Title = "Anti-Explosion", Content = "Enabled (без выкида из блодмана)", Duration = 2 })
+                Library:Notify({ Title = "Anti-Explosion", Content = "Enabled", Duration = 2 })
             else 
                 antiExplosionActive = false 
                 if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
@@ -994,7 +1004,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Anti-Burn ==========
     local function hookBurn(char)
         local hum = char:WaitForChild("Humanoid")
         local hrp = char:WaitForChild("HumanoidRootPart")
@@ -1047,7 +1056,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Infinite Ragdoll ==========
     local function InfiniteRagdollLoop()
         while infiniteRagdoll do
             pcall(function()
@@ -1076,7 +1084,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Ownership Kick ==========
     local function OwnershipKickFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target then return end
@@ -1251,19 +1258,16 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Pallet Ragdoll ==========
     local function PalletRagdollFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target or not target.Character then return end
         
         local skyPos = CFrame.new(0, 800000, 0)
-        
         RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("PalletLightBrown", skyPos, Vector3.zero)
         
         local pallet
         repeat
-            pallet = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys") 
-                and workspace[LocalPlayer.Name.."SpawnedInToys"]:FindFirstChild("PalletLightBrown")
+            pallet = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys") and Workspace[LocalPlayer.Name.."SpawnedInToys"]:FindFirstChild("PalletLightBrown")
             RunService.Heartbeat:Wait()
         until pallet or not ownershipRagdollActive
         
@@ -1275,23 +1279,52 @@ function StartMainScript(titleText)
         mainPart.CanCollide = false
         mainPart.Anchored = false
         
+        local SetNetworkOwner = RS:FindFirstChild("GrabEvents") and RS.GrabEvents:FindFirstChild("SetNetworkOwner")
+        local CreateGrabLine = RS:FindFirstChild("GrabEvents") and RS.GrabEvents:FindFirstChild("CreateGrabLine")
+        local DestroyGrabLine = RS:FindFirstChild("GrabEvents") and RS.GrabEvents:FindFirstChild("DestroyGrabLine")
+        local RagdollRemote = RS:FindFirstChild("CharacterEvents") and RS.CharacterEvents:FindFirstChild("RagdollRemote")
+        
         local function claim(part)
-            SetNetworkOwner:FireServer(part, part.CFrame)
-            CreateGrabLine:FireServer(part, Vector3.zero, part.Position, false)
-            DestroyGrabLine:FireServer(part)
+            if SetNetworkOwner then SetNetworkOwner:FireServer(part, part.CFrame) end
+            if CreateGrabLine then CreateGrabLine:FireServer(part, Vector3.zero, part.Position, false) end
+            if DestroyGrabLine then DestroyGrabLine:FireServer(part) end
         end
         
         claim(mainPart)
         
-        while ownershipRagdollActive do
-            for i = 1, 20 do
-                RunService.Heartbeat:Wait()
+        local function isRagdoll(char)
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("Motor6D") and not v.Enabled then
+                    return true
+                end
             end
+            return false
+        end
+        
+        local function forceRagdoll(char)
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and RagdollRemote then
+                pcall(function()
+                    RagdollRemote:FireServer(hrp, 0.5)
+                end)
+            end
+            char:BreakJoints()
+        end
+        
+        while ownershipRagdollActive do
+            task.wait(0.1)
             
             if not target or not target.Parent or not target.Character then break end
             
-            local head = target.Character:FindFirstChild("Head")
+            local char = target.Character
+            local head = char:FindFirstChild("Head")
             if not head then continue end
+            
+            if not isRagdoll(char) then
+                forceRagdoll(char)
+                task.wait(0.05)
+            end
             
             local targetPos = head.Position
             mainPart.CFrame = CFrame.new(targetPos.X, targetPos.Y + 0.2, targetPos.Z)
@@ -1301,12 +1334,11 @@ function StartMainScript(titleText)
             claim(mainPart)
             
             mainPart.CanCollide = true
-            for i = 1, 3 do
-                RunService.Heartbeat:Wait()
-            end
-            
+            task.wait(0.05)
             mainPart.CanCollide = false
+            
             mainPart.CFrame = skyPos
+            mainPart.AssemblyLinearVelocity = Vector3.zero
             mainPart.AssemblyAngularVelocity = Vector3.zero
         end
         
@@ -1314,9 +1346,7 @@ function StartMainScript(titleText)
             pcall(function()
                 RS.MenuToys.DestroyToy:FireServer(pallet)
             end)
-            if pallet.Parent then 
-                pallet:Destroy() 
-            end
+            if pallet.Parent then pallet:Destroy() end
         end
     end
 
@@ -1338,7 +1368,7 @@ function StartMainScript(titleText)
                 Library:Notify({Title = "Pallet Ragdoll", Content = "Enabled", Duration = 2})
             else
                 task.spawn(function()
-                    local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+                    local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
                     if toysFolder then
                         local pallet = toysFolder:FindFirstChild("PalletLightBrown")
                         if pallet then
@@ -1356,7 +1386,6 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== Auto refresh lists ==========
     task.spawn(function()
         while true do
             updateList()
@@ -1370,7 +1399,6 @@ function StartMainScript(titleText)
         end
     end)
 
-    -- ========== OnTeleport cleanup ==========
     LocalPlayer.OnTeleport:Connect(function()
         kickActive = false
         if kickTask then task.cancel(kickTask) kickTask = nil end
@@ -1396,7 +1424,7 @@ function StartMainScript(titleText)
         StopAutoAntiLag()
         
         task.spawn(function()
-            local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
             if toysFolder then
                 local pallet = toysFolder:FindFirstChild("PalletLightBrown")
                 if pallet then
@@ -1406,7 +1434,6 @@ function StartMainScript(titleText)
         end)
     end)
 
-    -- ========== Anti-Kick ITEM ==========
     local antiKickItemActive = false
     local antiKickItemTask = nil
     local MyPCLD = nil
@@ -1613,6 +1640,8 @@ function StartMainScript(titleText)
         end)
     end
 
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
@@ -1642,51 +1671,10 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ========== НОВЫЙ БЛОК: Anti-Ban (Auto Reset & PCLD Break) ==========
-    -- Auto Reset
-    do
-        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
-        local AutoResetCon = nil
-        
-        AntiBanBlock:CreateToggle({
-            Name = "Auto Reset",
-            Default = false,
-            Callback = function(Value)
-                if AutoResetCon then
-                    AutoResetCon:Disconnect()
-                    AutoResetCon = nil
-                end
-
-                if Value then
-                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                        if reason == "Flying" then
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum then
-                                Library:Notify({ 
-                                    Title = "Auto Reset", 
-                                    Content = "Resetting to prevent Ban!", 
-                                    Duration = 3 
-                                })
-                                char:BreakJoints()
-                                hum.Health = 0
-                            end
-                        end
-                    end)
-                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    -- Auto PCLD Break
     do
         local PCLD_Auto_Active = false
 
-        AntiBanBlock:CreateToggle({
+        AntiKickItemBlock:CreateToggle({
             Name = "Auto PCLD Break",
             Default = false,
             Callback = function(Value)
@@ -1761,7 +1749,6 @@ function StartMainScript(titleText)
         })
     end
 
-    -- ========== CharacterAdded для Anti-Kick ITEM ==========
     LocalPlayer.CharacterAdded:Connect(function(char)
         if antiKickItemActive then
             MyPCLD = nil
