@@ -1289,15 +1289,6 @@ function StartMainScript(titleText)
         
         claim(mainPart)
         
-        local function isRagdoll(char)
-            for _, v in pairs(char:GetDescendants()) do
-                if v:IsA("Motor6D") and not v.Enabled then
-                    return true
-                end
-            end
-            return false
-        end
-        
         while ownershipRagdollActive do
             for i = 1, 20 do
                 RunService.Heartbeat:Wait()
@@ -1305,21 +1296,10 @@ function StartMainScript(titleText)
             
             if not target or not target.Parent or not target.Character then break end
             
-            local char = target.Character
-            local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-            if not torso then continue end
+            local head = target.Character:FindFirstChild("Head")
+            if not head then continue end
             
-            if not isRagdoll(char) then
-                pcall(function()
-                    char:BreakJoints()
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        ragdollRemote:FireServer(hrp, 0.5)
-                    end
-                end)
-            end
-            
-            local targetPos = torso.Position
+            local targetPos = head.Position
             mainPart.CFrame = CFrame.new(targetPos.X, targetPos.Y + 0.2, targetPos.Z)
             mainPart.AssemblyLinearVelocity = Vector3.zero
             mainPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
@@ -1364,7 +1344,7 @@ function StartMainScript(titleText)
                 Library:Notify({Title = "Pallet Ragdoll", Content = "Enabled", Duration = 2})
             else
                 task.spawn(function()
-                    local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+                    local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
                     if toysFolder then
                         local pallet = toysFolder:FindFirstChild("PalletLightBrown")
                         if pallet then
@@ -1420,7 +1400,7 @@ function StartMainScript(titleText)
         StopAutoAntiLag()
         
         task.spawn(function()
-            local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
             if toysFolder then
                 local pallet = toysFolder:FindFirstChild("PalletLightBrown")
                 if pallet then
@@ -1434,7 +1414,7 @@ function StartMainScript(titleText)
     local antiKickItemTask = nil
     local MyPCLD = nil
     local pcldConn = nil
-    local SelectedToy = "SpookyCandle1"
+    local SelectedToy = "JapaneseLantern" -- ФОНАРЬ ПО УМОЛЧАНИЮ
 
     local function GetMagnitude(Part1, Part2)
         return (Part1.Position - Part2.Position).Magnitude
@@ -1603,7 +1583,8 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
-                    SoundPart.CFrame = targetPart.CFrame
+                    -- ФОНАРЬ НА 1.5 СТУДИЙ ВЫШЕ
+                    SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
                 end
@@ -1641,14 +1622,14 @@ function StartMainScript(titleText)
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
-        Default = "Spooky Candle",
+        Default = "Japanese Lantern",
         Callback = function(Value)
             local ToyList = {
                 ["Japanese Lantern"] = "JapaneseLantern",
                 ["Spray Can"] = "SprayCanWD",
                 ["Spooky Candle"] = "SpookyCandle1",
             }
-            SelectedToy = ToyList[Value] or "SpookyCandle1"
+            SelectedToy = ToyList[Value] or "JapaneseLantern"
         end
     })
 
