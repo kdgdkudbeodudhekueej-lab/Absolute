@@ -1414,7 +1414,7 @@ function StartMainScript(titleText)
     local antiKickItemTask = nil
     local MyPCLD = nil
     local pcldConn = nil
-    local SelectedToy = "JapaneseLantern" -- ФОНАРЬ ПО УМОЛЧАНИЮ
+    local SelectedToy = "SpookyCandle1"
 
     local function GetMagnitude(Part1, Part2)
         return (Part1.Position - Part2.Position).Magnitude
@@ -1583,8 +1583,12 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
-                    -- ФОНАРЬ НА 1.5 СТУДИЙ ВЫШЕ
-                    SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                    -- ТОЛЬКО ФОНАРЬ НА 1.5 СТУДИЙ ВЫШЕ
+                    if SelectedToy == "JapaneseLantern" then
+                        SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                    else
+                        SoundPart.CFrame = targetPart.CFrame
+                    end
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
                 end
@@ -1622,14 +1626,14 @@ function StartMainScript(titleText)
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
-        Default = "Japanese Lantern",
+        Default = "Spooky Candle",
         Callback = function(Value)
             local ToyList = {
                 ["Japanese Lantern"] = "JapaneseLantern",
                 ["Spray Can"] = "SprayCanWD",
                 ["Spooky Candle"] = "SpookyCandle1",
             }
-            SelectedToy = ToyList[Value] or "JapaneseLantern"
+            SelectedToy = ToyList[Value] or "SpookyCandle1"
         end
     })
 
