@@ -961,6 +961,54 @@ function StartMainScript(titleText)
         })
     end
 
+    local antiBanActive = false
+    local antiBanCon = nil
+    local warnTimestamps = {}
+
+    local function startAntiBan()
+        if antiBanCon then antiBanCon:Disconnect() end
+        
+        antiBanCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+            if reason == "Flying" then
+                local currentTime = os.clock()
+                table.insert(warnTimestamps, currentTime)
+                
+                for i = #warnTimestamps, 1, -1 do
+                    if currentTime - warnTimestamps[i] > 1 then
+                        table.remove(warnTimestamps, i)
+                    end
+                end
+                
+                if #warnTimestamps >= 3 then
+                    Library:Notify({ Title = "Anti Ban", Content = "3 warnings! Leaving...", Duration = 3 })
+                    task.wait(0.5)
+                    LocalPlayer:Kick("Anti Ban: Preventing ban.")
+                end
+            end
+        end)
+    end
+
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
+
+    AntiBanBlock:CreateToggle({
+        Name = "Anti Ban",
+        Default = false,
+        Callback = function(Value)
+            antiBanActive = Value
+            if Value then
+                startAntiBan()
+                Library:Notify({ Title = "Anti Ban", Content = "Enabled", Duration = 2 })
+            else
+                if antiBanCon then
+                    antiBanCon:Disconnect()
+                    antiBanCon = nil
+                end
+                warnTimestamps = {}
+                Library:Notify({ Title = "Anti Ban", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
     local antiExplosionActive = false
     local antiExplosionConn = nil
     local function antiExplosionStart()
