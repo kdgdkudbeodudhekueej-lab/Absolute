@@ -275,6 +275,7 @@ function StartMainScript(titleText)
     local infiniteRagdollTask = nil
     local antiBurnActive = false
     local antiBurnConnection = nil
+    local antiBurnCharAdded = nil
     local antiGrabEnabled = false
     local antiGrabTask = nil
 
@@ -1052,39 +1053,79 @@ function StartMainScript(titleText)
         end
     })
 
-    local function hookBurn(char)
-        local hum = char:WaitForChild("Humanoid")
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        char.PrimaryPart = hrp
-        if antiBurnConnection then antiBurnConnection:Disconnect() end
-        antiBurnConnection = hum.FireDebounce.Changed:Connect(function(isBurning)
-            if isBurning and antiBurnActive then
-                local me = char
-                local oldCF = hrp.CFrame
-                local plots = workspace:FindFirstChild("Plots")
-                if plots and plots:FindFirstChild("Plot2") then
-                    local plot2 = plots.Plot2
-                    local barrier = plot2:FindFirstChild("Barrier")
-                    local pb = barrier and barrier:FindFirstChild("PlotBarrier")
-                    if pb and pb:IsA("BasePart") then
-                        local safeCF = pb.CFrame * CFrame.new(0, 6, 0)
-                        me:SetPrimaryPartCFrame(safeCF)
-                        task.wait(0.05)
-                        local firePart = me:FindFirstChild("FirePlayerPart", true)
-                        if firePart then
-                            for _, obj in ipairs(firePart:GetChildren()) do
-                                if obj:IsA("Sound") then obj:Stop() end
-                                if obj:IsA("Light") or obj:IsA("ParticleEmitter") then obj.Enabled = false end
-                            end
-                            if firePart:FindFirstChild("CanBurn") then firePart.CanBurn.Value = false end
-                            if hum:FindFirstChild("FireDebounce") then hum.FireDebounce.Value = false end
-                        end
-                        task.wait(0.1)
-                        if me and me.PrimaryPart and antiBurnActive then
-                            me:SetPrimaryPartCFrame(oldCF)
-                        end
-                    end
+    -- ===== НОВЫЙ ANTI-BURN (БЕЗ ТЕЛЕПОРТА) =====
+    local function extinguishFire(char)
+        if not char then return end
+        
+        local hum = char:FindFirstChild("Humanoid")
+        if not hum then return end
+        
+        -- 1. Сбрасываем FireDebounce (главный флаг горения)
+        if hum:FindFirstChild("FireDebounce") then
+            hum.FireDebounce.Value = false
+        end
+        
+        -- 2. Убираем визуальный огонь
+        local firePart = char:FindFirstChild("FirePlayerPart", true)
+        if firePart then
+            for _, obj in pairs(firePart:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") then
+                    obj.Enabled = false
                 end
+                if obj:IsA("Light") then
+                    obj.Enabled = false
+                end
+                if obj:IsA("Sound") then
+                    obj:Stop()
+                end
+            end
+            if firePart:FindFirstChild("CanBurn") then
+                firePart.CanBurn.Value = false
+            end
+            if firePart:IsA("BasePart") then
+                firePart.Transparency = 1
+            end
+        end
+        
+        -- 3. Убираем эффект с тела
+        local burnEffect = char:FindFirstChild("BurnEffect")
+        if burnEffect then
+            burnEffect:Destroy()
+        end
+        
+        -- 4. Сбрасываем состояние Humanoid
+        if hum then
+            hum.PlatformStand = false
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
+    end
+
+    local function hookBurn(char)
+        if antiBurnConnection then 
+            antiBurnConnection:Disconnect() 
+            antiBurnConnection = nil
+        end
+        
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not hum then return end
+        
+        local fireDebounce = hum:FindFirstChild("FireDebounce")
+        if not fireDebounce then
+            fireDebounce = Instance.new("BoolValue")
+            fireDebounce.Name = "FireDebounce"
+            fireDebounce.Value = false
+            fireDebounce.Parent = hum
+        end
+        
+        antiBurnConnection = fireDebounce:GetPropertyChangedSignal("Value"):Connect(function()
+            if fireDebounce.Value and antiBurnActive then
+                task.spawn(function()
+                    extinguishFire(char)
+                    task.wait(0.1)
+                    if hum and hum:FindFirstChild("FireDebounce") then
+                        hum.FireDebounce.Value = false
+                    end
+                end)
             end
         end)
     end
@@ -1094,12 +1135,39 @@ function StartMainScript(titleText)
         Default = false,
         Callback = function(Value)
             antiBurnActive = Value
-            if Value then 
-                hookBurn(LocalPlayer.Character)
-                Library:Notify({ Title = "Anti-Burn", Content = "Enabled", Duration = 2 })
-            else 
-                if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
-                Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
+            
+            if Value then
+                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                hookBurn(char)
+                
+                if not antiBurnCharAdded then
+                    antiBurnCharAdded = LocalPlayer.CharacterAdded:Connect(function(newChar)
+                        if antiBurnActive then
+                            task.wait(0.5)
+                            hookBurn(newChar)
+                        end
+                    end)
+                end
+                
+                Library:Notify({ 
+                    Title = "Anti-Burn", 
+                    Content = "✅ Instant extinguishing ENABLED", 
+                    Duration = 2 
+                })
+            else
+                if antiBurnConnection then
+                    antiBurnConnection:Disconnect()
+                    antiBurnConnection = nil
+                end
+                if antiBurnCharAdded then
+                    antiBurnCharAdded:Disconnect()
+                    antiBurnCharAdded = nil
+                end
+                Library:Notify({ 
+                    Title = "Anti-Burn", 
+                    Content = "❌ Disabled", 
+                    Duration = 2 
+                })
             end
         end
     })
@@ -1440,6 +1508,7 @@ function StartMainScript(titleText)
         if antiBurnActive then
             antiBurnActive = false
             if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
+            if antiBurnCharAdded then antiBurnCharAdded:Disconnect() antiBurnCharAdded = nil end
         end
         infiniteRagdoll = false
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
