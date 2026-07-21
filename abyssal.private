@@ -1106,92 +1106,6 @@ function StartMainScript(titleText)
         end
     })
 
-    do
-        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
-        local AutoResetCon = nil
-        
-        AntiKickBlock:CreateToggle({
-            Name = "Auto Reset",
-            Default = false,
-            Callback = function(Value)
-                if AutoResetCon then
-                    AutoResetCon:Disconnect()
-                    AutoResetCon = nil
-                end
-
-                if Value then
-                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                        if reason == "Flying" then
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum then
-                                Library:Notify({ 
-                                    Title = "Auto Reset", 
-                                    Content = "Resetting to prevent Ban!", 
-                                    Duration = 3 
-                                })
-                                char:BreakJoints()
-                                hum.Health = 0
-                            end
-                        end
-                    end)
-                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    local antiBanActive = false
-    local antiBanCon = nil
-    local warnTimestamps = {}
-
-    local function startAntiBan()
-        if antiBanCon then antiBanCon:Disconnect() end
-        
-        antiBanCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-            if reason == "Flying" then
-                local currentTime = os.clock()
-                table.insert(warnTimestamps, currentTime)
-                
-                for i = #warnTimestamps, 1, -1 do
-                    if currentTime - warnTimestamps[i] > 1 then
-                        table.remove(warnTimestamps, i)
-                    end
-                end
-                
-                if #warnTimestamps >= 3 then
-                    Library:Notify({ Title = "Anti Ban", Content = "3 warnings! Leaving...", Duration = 3 })
-                    task.wait(0.5)
-                    LocalPlayer:Kick("Anti Ban: Preventing ban.")
-                end
-            end
-        end)
-    end
-
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
-
-    AntiBanBlock:CreateToggle({
-        Name = "Anti Ban",
-        Default = false,
-        Callback = function(Value)
-            antiBanActive = Value
-            if Value then
-                startAntiBan()
-                Library:Notify({ Title = "Anti Ban", Content = "Enabled", Duration = 2 })
-            else
-                if antiBanCon then
-                    antiBanCon:Disconnect()
-                    antiBanCon = nil
-                end
-                warnTimestamps = {}
-                Library:Notify({ Title = "Anti Ban", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
     local antiExplosionActive = false
     local antiExplosionConn = nil
     local function antiExplosionStart()
@@ -2095,6 +2009,159 @@ function StartMainScript(titleText)
                             task.wait(1)
                         end
                     end)
+                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
+    do
+        local function startAutoAntiBan()
+            local con = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                if reason == "Flying" then
+                    local char = LocalPlayer.Character
+                    local hum = char and char:FindFirstChild("Humanoid")
+                    if hum then
+                        char:BreakJoints()
+                        hum.Health = 0
+                    end
+                end
+            end)
+            return con
+        end
+
+        local function startAntiBanKick()
+            local timestamps = {}
+            local con = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                if reason == "Flying" then
+                    local currentTime = os.clock()
+                    table.insert(timestamps, currentTime)
+                    
+                    for i = #timestamps, 1, -1 do
+                        if currentTime - timestamps[i] > 1 then
+                            table.remove(timestamps, i)
+                        end
+                    end
+                    
+                    if #timestamps >= 3 then
+                        LocalPlayer:Kick("Anti-Ban: Preventing ban.")
+                    end
+                end
+            end)
+            return con
+        end
+
+        local autoResetCon = startAutoAntiBan()
+        local antiBanCon = startAntiBanKick()
+
+        local AutoResetBlock = DefenseTab:CreateBlock({Name = "Auto Reset + Anti-Ban", Side = "Left"})
+
+        AutoResetBlock:CreateToggle({
+            Name = "Auto Reset + Anti-Ban (AUTO)",
+            Default = true,
+            Callback = function(Value)
+                if not Value then
+                    if autoResetCon then
+                        autoResetCon:Disconnect()
+                        autoResetCon = nil
+                    end
+                    if antiBanCon then
+                        antiBanCon:Disconnect()
+                        antiBanCon = nil
+                    end
+                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Disabled", Duration = 2 })
+                else
+                    if not autoResetCon then
+                        autoResetCon = startAutoAntiBan()
+                    end
+                    if not antiBanCon then
+                        antiBanCon = startAntiBanKick()
+                    end
+                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Enabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
+    do
+        local blobmanSpawnActive = false
+        local blobmanSpawnTask = nil
+
+        local function SpawnBlobman()
+            local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not HRP then return end
+            
+            local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
+            if CanSpawnToy and not CanSpawnToy.Value then
+                CanSpawnToy:GetPropertyChangedSignal("Value"):Wait()
+            end
+            
+            local SpawnCFrame = HRP.CFrame * CFrame.new(0, 10, 20)
+            
+            pcall(function()
+                RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", SpawnCFrame, Vector3.zero)
+            end)
+            
+            task.wait(0.5)
+            
+            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            if inv then
+                local blobman = inv:FindFirstChild("CreatureBlobman")
+                if blobman then
+                    local seat = blobman:FindFirstChild("Seat")
+                    if seat and seat:IsA("Seat") then
+                        pcall(function()
+                            LocalPlayer.Character.Humanoid.Sit = true
+                            task.wait(0.1)
+                            LocalPlayer.Character.Humanoid:MoveTo(seat.Position)
+                            task.wait(0.3)
+                        end)
+                    end
+                end
+            end
+        end
+
+        local function autoSitLoop()
+            while blobmanSpawnActive do
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChild("Humanoid")
+                
+                if hum and not hum.SeatPart then
+                    local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+                    local blobman = inv and inv:FindFirstChild("CreatureBlobman")
+                    
+                    if not blobman then
+                        SpawnBlobman()
+                    else
+                        local seat = blobman:FindFirstChild("Seat")
+                        if seat and seat:IsA("Seat") then
+                            pcall(function()
+                                hum.Sit = true
+                                task.wait(0.1)
+                                hum:MoveTo(seat.Position)
+                                task.wait(0.3)
+                            end)
+                        end
+                    end
+                end
+                
+                task.wait(1)
+            end
+        end
+
+        local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
+
+        BlodmanAutoSitBlock:CreateToggle({
+            Name = "Auto Sit on Blodman (AUTO)",
+            Default = true,
+            Callback = function(Value)
+                blobmanSpawnActive = Value
+                if blobmanSpawnTask then task.cancel(blobmanSpawnTask) end
+                
+                if Value then
+                    blobmanSpawnTask = task.spawn(autoSitLoop)
                     Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
                 else
                     Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
