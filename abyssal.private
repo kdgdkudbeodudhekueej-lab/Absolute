@@ -1,10 +1,66 @@
--- Мини скрипт: Ownership Kick + Third Person + FOV 120
+-- Mini Absolute Menu: Ownership Kick + FOV 120 + Third Person
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local RS = game:GetService("ReplicatedStorage")
 
+-- Загружаем библиотеку Absolute
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "Ownership Kick",
+    Theme = "Night",
+    ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Ping = true },
+    ToggleKey = Enum.KeyCode.RightShift,
+})
+
+-- Украшательство как в Absolute
+local mainGui = Window.Parent
+if mainGui then
+    local bgFlag = Instance.new("Frame")
+    bgFlag.Size = UDim2.new(1, 0, 1, 0)
+    bgFlag.BackgroundTransparency = 1
+    bgFlag.Parent = mainGui
+    
+    local s1 = Instance.new("Frame")
+    s1.Size = UDim2.new(1, 0, 0.33, 0)
+    s1.Position = UDim2.new(0, 0, 0, 0)
+    s1.BackgroundColor3 = Color3.fromRGB(255, 182, 193)
+    s1.BackgroundTransparency = 0.15
+    s1.BorderSizePixel = 0
+    s1.Parent = bgFlag
+    
+    local s2 = Instance.new("Frame")
+    s2.Size = UDim2.new(1, 0, 0.33, 0)
+    s2.Position = UDim2.new(0, 0, 0.33, 0)
+    s2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    s2.BackgroundTransparency = 0.15
+    s2.BorderSizePixel = 0
+    s2.Parent = bgFlag
+    
+    local s3 = Instance.new("Frame")
+    s3.Size = UDim2.new(1, 0, 0.34, 0)
+    s3.Position = UDim2.new(0, 0, 0.66, 0)
+    s3.BackgroundColor3 = Color3.fromRGB(182, 102, 210)
+    s3.BackgroundTransparency = 0.15
+    s3.BorderSizePixel = 0
+    s3.Parent = bgFlag
+    
+    bgFlag:MoveToBeginning()
+end
+
+-- Табы
+local MainTab = Window:CreateTab("Main", true)
+local VisualTab = Window:CreateTab("Visual", true)
+
+-- Блоки
+local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
+local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
+local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+
+-- Переменные
 local selectedTarget = nil
 local kickActive = false
 local kickTask = nil
@@ -13,16 +69,14 @@ local fovEnabled = false
 local originalFOV = 70
 local thirdPersonEnabled = false
 
+-- Grab Events
 local GrabEvents = RS:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
-local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
 
--- Переменные для BodyPosition/BodyGyro
 local bodyPos = nil
 local bodyGyro = nil
 
--- Функция очистки
 local function cleanupBodies()
     pcall(function()
         if bodyPos then bodyPos:Destroy() bodyPos = nil end
@@ -30,7 +84,6 @@ local function cleanupBodies()
     end)
 end
 
--- Функция создания BodyPosition и BodyGyro для удержания цели
 local function createBodies(targetRoot, pos)
     cleanupBodies()
     for _, v in pairs(targetRoot:GetChildren()) do
@@ -40,20 +93,19 @@ local function createBodies(targetRoot, pos)
     end
     bodyPos = Instance.new("BodyPosition")
     bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bodyPos.D = 9999 -- Максимальная сила удержания
-    bodyPos.P = 9999 -- Максимальная сила притяжения
+    bodyPos.D = 99999
+    bodyPos.P = 99999
     bodyPos.Position = pos
     bodyPos.Parent = targetRoot
     
     bodyGyro = Instance.new("BodyGyro")
     bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bodyGyro.D = 9999
-    bodyGyro.P = 9999
+    bodyGyro.D = 99999
+    bodyGyro.P = 99999
     bodyGyro.CFrame = CFrame.new(pos)
     bodyGyro.Parent = targetRoot
 end
 
--- Основная функция Ownership Kick
 local function OwnershipKickFunction(targetName)
     local target = Players:FindFirstChild(targetName)
     if not target then return end
@@ -67,7 +119,6 @@ local function OwnershipKickFunction(targetName)
     local grabStartTime = 0
     local checkStartTime = 0
     
-    -- Мониторинг FPS для оптимизации спама
     local currentFPS = 60
     local fpsConnection = RunService.RenderStepped:Connect(function(dt)
         currentFPS = 1 / dt
@@ -87,7 +138,6 @@ local function OwnershipKickFunction(targetName)
         local tHum = tChar and tChar:FindFirstChild("Humanoid")
         
         if tRoot and tHum and tHum.Health > 0 and myRoot then
-            -- Начало захвата
             if not dragging then
                 myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
                 cleanupBodies()
@@ -113,13 +163,11 @@ local function OwnershipKickFunction(targetName)
                     createBodies(tRoot, lockPos.Position)
                 end
             else
-                -- Удержание цели
                 myRoot.CFrame = savedPos
                 local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
                 myRoot.AssemblyLinearVelocity = Vector3.zero
                 myRoot.AssemblyAngularVelocity = Vector3.zero
                 
-                -- Обновляем BodyPosition для жесткого удержания
                 if bodyPos and bodyPos.Parent then
                     bodyPos.Position = lockPos.Position
                     if bodyGyro then bodyGyro.CFrame = lockPos end
@@ -129,7 +177,6 @@ local function OwnershipKickFunction(targetName)
                 
                 tHum.PlatformStand = true
                 
-                -- Спамим SetNetworkOwner для удержания контроля
                 pcall(function()
                     if currentFPS > 200 then
                         SetNetworkOwner:FireServer(tRoot, lockPos)
@@ -141,7 +188,6 @@ local function OwnershipKickFunction(targetName)
                         SetNetworkOwner:FireServer(tRoot, lockPos)
                         DestroyGrabLine:FireServer(tRoot)
                     else
-                        -- При низком FPS спамим больше
                         for i = 1, 5 do
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                         end
@@ -149,7 +195,6 @@ local function OwnershipKickFunction(targetName)
                     end
                 end)
                 
-                -- Проверка, не сбежала ли цель
                 if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
                     local currentDist = (tRoot.Position - lockPos.Position).Magnitude
                     if currentDist > 10 then
@@ -205,215 +250,121 @@ local function SetThirdPerson(enabled)
     end
 end
 
--- Обработка выбора цели
+-- Список целей
 local targetNames = {}
 local function updateList()
     targetNames = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
-            table.insert(targetNames, p.Name)
+            local displayName = p.DisplayName or p.Name
+            table.insert(targetNames, displayName .. " (" .. p.Name .. ")")
         end
     end
 end
 
--- Функция для GUI (упрощенный вариант без библиотеки)
-local function CreateSimpleGUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    screenGui.ResetOnSpawn = false
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 400)
-    frame.Position = UDim2.new(0.5, -175, 0.5, -200)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    frame.BackgroundTransparency = 0.15
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-    
-    -- Заголовок
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Text = "Ownership Kick"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextScaled = true
-    title.BackgroundTransparency = 1
-    title.Parent = frame
-    
-    -- Выбор цели
-    local targetLabel = Instance.new("TextLabel")
-    targetLabel.Size = UDim2.new(1, 0, 0, 25)
-    targetLabel.Position = UDim2.new(0, 0, 0, 45)
-    targetLabel.Text = "Target:"
-    targetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    targetLabel.TextScaled = true
-    targetLabel.BackgroundTransparency = 1
-    targetLabel.Parent = frame
-    
-    local targetDropdown = Instance.new("TextBox")
-    targetDropdown.Size = UDim2.new(1, -20, 0, 30)
-    targetDropdown.Position = UDim2.new(0, 10, 0, 70)
-    targetDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    targetDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-    targetDropdown.Text = "Select Target"
-    targetDropdown.Parent = frame
-    
-    -- Кнопка обновления списка
-    local refreshBtn = Instance.new("TextButton")
-    refreshBtn.Size = UDim2.new(1, -20, 0, 30)
-    refreshBtn.Position = UDim2.new(0, 10, 0, 105)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    refreshBtn.Text = "Refresh List"
-    refreshBtn.Parent = frame
-    
-    -- Список игроков
-    local playerList = Instance.new("ScrollingFrame")
-    playerList.Size = UDim2.new(1, -20, 0, 80)
-    playerList.Position = UDim2.new(0, 10, 0, 140)
-    playerList.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    playerList.Parent = frame
-    
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Parent = playerList
-    
-    local function UpdatePlayerList()
-        for _, child in pairs(playerList:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-        
-        updateList()
-        for _, name in pairs(targetNames) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, 0, 0, 25)
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Text = name
-            btn.Parent = playerList
-            
-            btn.MouseButton1Click:Connect(function()
-                targetDropdown.Text = name
-                selectedTarget = Players:FindFirstChild(name)
-                targetLabel.Text = "Target: " .. name
-            end)
-        end
+local function getPlayerFromSelection(selection)
+    if not selection or selection == "" then return nil end
+    local username = selection:match("%((.-)%)")
+    if username then
+        return Players:FindFirstChild(username)
     end
-    
-    refreshBtn.MouseButton1Click:Connect(UpdatePlayerList)
-    UpdatePlayerList()
-    
-    -- Настройки
-    local settingsLabel = Instance.new("TextLabel")
-    settingsLabel.Size = UDim2.new(1, 0, 0, 25)
-    settingsLabel.Position = UDim2.new(0, 0, 0, 225)
-    settingsLabel.Text = "Settings:"
-    settingsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    settingsLabel.TextScaled = true
-    settingsLabel.BackgroundTransparency = 1
-    settingsLabel.Parent = frame
-    
-    -- Hold Height
-    local heightLabel = Instance.new("TextLabel")
-    heightLabel.Size = UDim2.new(0.5, 0, 0, 25)
-    heightLabel.Position = UDim2.new(0, 0, 0, 250)
-    heightLabel.Text = "Height: 17"
-    heightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    heightLabel.BackgroundTransparency = 1
-    heightLabel.Parent = frame
-    
-    local heightSlider = Instance.new("TextButton")
-    heightSlider.Size = UDim2.new(0.4, 0, 0, 25)
-    heightSlider.Position = UDim2.new(0.5, 10, 0, 250)
-    heightSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    heightSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
-    heightSlider.Text = "- 17 +"
-    heightSlider.Parent = frame
-    
-    local heightValue = 17
-    heightSlider.MouseButton1Click:Connect(function()
-        heightValue = heightValue + 1
-        if heightValue > 40 then heightValue = 5 end
-        holdHeight = heightValue
-        heightLabel.Text = "Height: " .. heightValue
-    end)
-    
-    -- Toggle: Ownership Kick
-    local kickToggle = Instance.new("TextButton")
-    kickToggle.Size = UDim2.new(1, -20, 0, 30)
-    kickToggle.Position = UDim2.new(0, 10, 0, 280)
-    kickToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    kickToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    kickToggle.Text = "Enable Ownership Kick"
-    kickToggle.Parent = frame
-    
-    kickToggle.MouseButton1Click:Connect(function()
-        if not kickActive then
+    return nil
+end
+
+-- Создание GUI элементов
+local TargetDropdown = TargetBlock:CreateDropdown({
+    Name = "Select Target",
+    Items = targetNames,
+    Default = "",
+    Callback = function(v)
+        selectedTarget = getPlayerFromSelection(v)
+        Library:Notify({ Title = "Target", Content = "Selected: " .. (selectedTarget and selectedTarget.Name or "None"), Duration = 2 })
+    end
+})
+
+TargetBlock:CreateButton({
+    Name = "Refresh List",
+    Callback = function()
+        updateList()
+        TargetDropdown:Refresh(targetNames, true)
+        Library:Notify({ Title = "Target", Content = "List Refreshed", Duration = 1 })
+    end
+})
+
+-- Настройки кика
+KickBlock:CreateSlider({
+    Name = "Hold Height",
+    Min = 5,
+    Max = 40,
+    Default = 17,
+    Rounding = 0,
+    Suffix = "studs",
+    Callback = function(Value)
+        holdHeight = Value
+    end
+})
+
+-- Toggle кика
+KickBlock:CreateToggle({
+    Name = "Enable Ownership Kick",
+    Default = false,
+    Callback = function(Value)
+        if Value then
             if not selectedTarget then
+                Library:Notify({ Title = "Error", Content = "Select target first!", Duration = 3 })
                 return
             end
             kickActive = true
             if kickTask then task.cancel(kickTask) kickTask = nil end
             kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
-            kickToggle.Text = "Disable Ownership Kick"
-            kickToggle.BackgroundColor3 = Color3.fromRGB(80, 50, 50)
+            Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
         else
             kickActive = false
             if kickTask then task.cancel(kickTask) kickTask = nil end
             cleanupBodies()
-            kickToggle.Text = "Enable Ownership Kick"
-            kickToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+            Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
         end
-    end)
-    
-    -- Toggle: FOV 120
-    local fovToggle = Instance.new("TextButton")
-    fovToggle.Size = UDim2.new(0.48, -10, 0, 30)
-    fovToggle.Position = UDim2.new(0, 10, 0, 315)
-    fovToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    fovToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fovToggle.Text = "FOV 120"
-    fovToggle.Parent = frame
-    
-    fovToggle.MouseButton1Click:Connect(function()
-        fovEnabled = not fovEnabled
-        SetFOV(fovEnabled)
-        fovToggle.Text = fovEnabled and "FOV 120 ✓" or "FOV 120"
-        fovToggle.BackgroundColor3 = fovEnabled and Color3.fromRGB(50, 80, 50) or Color3.fromRGB(60, 60, 80)
-    end)
-    
-    -- Toggle: Third Person
-    local thirdPersonToggle = Instance.new("TextButton")
-    thirdPersonToggle.Size = UDim2.new(0.48, -10, 0, 30)
-    thirdPersonToggle.Position = UDim2.new(0.52, 0, 0, 315)
-    thirdPersonToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    thirdPersonToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    thirdPersonToggle.Text = "Third Person"
-    thirdPersonToggle.Parent = frame
-    
-    thirdPersonToggle.MouseButton1Click:Connect(function()
-        thirdPersonEnabled = not thirdPersonEnabled
-        SetThirdPerson(thirdPersonEnabled)
-        thirdPersonToggle.Text = thirdPersonEnabled and "Third Person ✓" or "Third Person"
-        thirdPersonToggle.BackgroundColor3 = thirdPersonEnabled and Color3.fromRGB(50, 80, 50) or Color3.fromRGB(60, 60, 80)
-    end)
-    
-    -- Закрыть
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0.3, 0, 0, 30)
-    closeBtn.Position = UDim2.new(0.35, 0, 0, 355)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 40)
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.Text = "Close"
-    closeBtn.Parent = frame
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-        kickActive = false
-        if kickTask then task.cancel(kickTask) kickTask = nil end
-        cleanupBodies()
-        if fovEnabled then SetFOV(false) end
-        if thirdPersonEnabled then SetThirdPerson(false) end
-    end)
-end
+    end
+})
 
--- Запуск
-CreateSimpleGUI()
+-- Visual настройки
+VisualBlock:CreateToggle({
+    Name = "FOV 120",
+    Default = false,
+    Callback = function(Value)
+        fovEnabled = Value
+        SetFOV(Value)
+        Library:Notify({ Title = "FOV", Content = Value and "FOV 120 Enabled" or "FOV Restored", Duration = 2 })
+    end
+})
+
+VisualBlock:CreateToggle({
+    Name = "Third Person",
+    Default = false,
+    Callback = function(Value)
+        thirdPersonEnabled = Value
+        SetThirdPerson(Value)
+        Library:Notify({ Title = "Camera", Content = Value and "Third Person Enabled" or "First Person Enabled", Duration = 2 })
+    end
+})
+
+-- Автообновление списка
+task.spawn(function()
+    while true do
+        task.wait(5)
+        updateList()
+        pcall(function() TargetDropdown:Refresh(targetNames, true) end)
+    end
+end)
+
+-- Очистка при телепорте
+LocalPlayer.OnTeleport:Connect(function()
+    kickActive = false
+    if kickTask then task.cancel(kickTask) kickTask = nil end
+    cleanupBodies()
+    if fovEnabled then SetFOV(false) end
+    if thirdPersonEnabled then SetThirdPerson(false) end
+end)
+
+print("✅ Mini Absolute Menu Loaded!")
+print("F1 - Open/Close Menu")
