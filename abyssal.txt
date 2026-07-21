@@ -80,6 +80,7 @@ function StartMainScript(titleText)
     local DefenseTab = Window:CreateTab("Defense", true)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
+    local ServerTab = Window:CreateTab("Server", true)
 
     local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
     local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
@@ -275,7 +276,6 @@ function StartMainScript(titleText)
     local infiniteRagdollTask = nil
     local antiBurnActive = false
     local antiBurnConnection = nil
-    local antiBurnCharAdded = nil
     local antiGrabEnabled = false
     local antiGrabTask = nil
 
@@ -1053,79 +1053,39 @@ function StartMainScript(titleText)
         end
     })
 
-    -- ===== НОВЫЙ ANTI-BURN (БЕЗ ТЕЛЕПОРТА) =====
-    local function extinguishFire(char)
-        if not char then return end
-        
-        local hum = char:FindFirstChild("Humanoid")
-        if not hum then return end
-        
-        -- 1. Сбрасываем FireDebounce (главный флаг горения)
-        if hum:FindFirstChild("FireDebounce") then
-            hum.FireDebounce.Value = false
-        end
-        
-        -- 2. Убираем визуальный огонь
-        local firePart = char:FindFirstChild("FirePlayerPart", true)
-        if firePart then
-            for _, obj in pairs(firePart:GetDescendants()) do
-                if obj:IsA("ParticleEmitter") then
-                    obj.Enabled = false
-                end
-                if obj:IsA("Light") then
-                    obj.Enabled = false
-                end
-                if obj:IsA("Sound") then
-                    obj:Stop()
-                end
-            end
-            if firePart:FindFirstChild("CanBurn") then
-                firePart.CanBurn.Value = false
-            end
-            if firePart:IsA("BasePart") then
-                firePart.Transparency = 1
-            end
-        end
-        
-        -- 3. Убираем эффект с тела
-        local burnEffect = char:FindFirstChild("BurnEffect")
-        if burnEffect then
-            burnEffect:Destroy()
-        end
-        
-        -- 4. Сбрасываем состояние Humanoid
-        if hum then
-            hum.PlatformStand = false
-            hum:ChangeState(Enum.HumanoidStateType.Running)
-        end
-    end
-
     local function hookBurn(char)
-        if antiBurnConnection then 
-            antiBurnConnection:Disconnect() 
-            antiBurnConnection = nil
-        end
-        
-        local hum = char:WaitForChild("Humanoid", 5)
-        if not hum then return end
-        
-        local fireDebounce = hum:FindFirstChild("FireDebounce")
-        if not fireDebounce then
-            fireDebounce = Instance.new("BoolValue")
-            fireDebounce.Name = "FireDebounce"
-            fireDebounce.Value = false
-            fireDebounce.Parent = hum
-        end
-        
-        antiBurnConnection = fireDebounce:GetPropertyChangedSignal("Value"):Connect(function()
-            if fireDebounce.Value and antiBurnActive then
-                task.spawn(function()
-                    extinguishFire(char)
-                    task.wait(0.1)
-                    if hum and hum:FindFirstChild("FireDebounce") then
-                        hum.FireDebounce.Value = false
+        local hum = char:WaitForChild("Humanoid")
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        char.PrimaryPart = hrp
+        if antiBurnConnection then antiBurnConnection:Disconnect() end
+        antiBurnConnection = hum.FireDebounce.Changed:Connect(function(isBurning)
+            if isBurning and antiBurnActive then
+                local me = char
+                local oldCF = hrp.CFrame
+                local plots = workspace:FindFirstChild("Plots")
+                if plots and plots:FindFirstChild("Plot2") then
+                    local plot2 = plots.Plot2
+                    local barrier = plot2:FindFirstChild("Barrier")
+                    local pb = barrier and barrier:FindFirstChild("PlotBarrier")
+                    if pb and pb:IsA("BasePart") then
+                        local safeCF = pb.CFrame * CFrame.new(0, 6, 0)
+                        me:SetPrimaryPartCFrame(safeCF)
+                        task.wait(0.05)
+                        local firePart = me:FindFirstChild("FirePlayerPart", true)
+                        if firePart then
+                            for _, obj in ipairs(firePart:GetChildren()) do
+                                if obj:IsA("Sound") then obj:Stop() end
+                                if obj:IsA("Light") or obj:IsA("ParticleEmitter") then obj.Enabled = false end
+                            end
+                            if firePart:FindFirstChild("CanBurn") then firePart.CanBurn.Value = false end
+                            if hum:FindFirstChild("FireDebounce") then hum.FireDebounce.Value = false end
+                        end
+                        task.wait(0.1)
+                        if me and me.PrimaryPart and antiBurnActive then
+                            me:SetPrimaryPartCFrame(oldCF)
+                        end
                     end
-                end)
+                end
             end
         end)
     end
@@ -1135,39 +1095,12 @@ function StartMainScript(titleText)
         Default = false,
         Callback = function(Value)
             antiBurnActive = Value
-            
-            if Value then
-                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                hookBurn(char)
-                
-                if not antiBurnCharAdded then
-                    antiBurnCharAdded = LocalPlayer.CharacterAdded:Connect(function(newChar)
-                        if antiBurnActive then
-                            task.wait(0.5)
-                            hookBurn(newChar)
-                        end
-                    end)
-                end
-                
-                Library:Notify({ 
-                    Title = "Anti-Burn", 
-                    Content = "✅ Instant extinguishing ENABLED", 
-                    Duration = 2 
-                })
-            else
-                if antiBurnConnection then
-                    antiBurnConnection:Disconnect()
-                    antiBurnConnection = nil
-                end
-                if antiBurnCharAdded then
-                    antiBurnCharAdded:Disconnect()
-                    antiBurnCharAdded = nil
-                end
-                Library:Notify({ 
-                    Title = "Anti-Burn", 
-                    Content = "❌ Disabled", 
-                    Duration = 2 
-                })
+            if Value then 
+                hookBurn(LocalPlayer.Character)
+                Library:Notify({ Title = "Anti-Burn", Content = "Enabled", Duration = 2 })
+            else 
+                if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
+                Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1508,7 +1441,6 @@ function StartMainScript(titleText)
         if antiBurnActive then
             antiBurnActive = false
             if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
-            if antiBurnCharAdded then antiBurnCharAdded:Disconnect() antiBurnCharAdded = nil end
         end
         infiniteRagdoll = false
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
@@ -1854,6 +1786,154 @@ function StartMainScript(titleText)
         if antiKickItemActive then
             StopAntiKickItem()
         end
+    end)
+
+    local lineLagActive = false
+    local lineLagTask = nil
+    local lineLagIntensity = 150
+    local hideOwnLines = false
+    local lineCleanupConnection = nil
+    local spamCount = 0
+
+    local function StartLineCleanup()
+        if lineCleanupConnection then lineCleanupConnection:Disconnect() end
+        lineCleanupConnection = RunService.Heartbeat:Connect(function()
+            if not lineLagActive or not hideOwnLines then return end
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
+                    local creator = obj:FindFirstChild("Creator") or obj:FindFirstChild("Player")
+                    if creator and creator.Value == LocalPlayer then
+                        obj.Transparency = 1
+                        obj.Enabled = false
+                        if obj:IsA("Beam") then
+                            obj.Width0 = 0
+                            obj.Width1 = 0
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function StartLineLag()
+        if lineLagTask then task.cancel(lineLagTask) end
+        lineLagTask = task.spawn(function()
+            spamCount = 0
+            while lineLagActive do
+                for _ = 1, lineLagIntensity do
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player.Character then
+                            local torso = player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso")
+                            if torso then
+                                pcall(function()
+                                    CreateGrabLine:FireServer(torso, torso.CFrame)
+                                end)
+                                spamCount = spamCount + 1
+                            end
+                        end
+                    end
+                end
+                if spamCount > 10 then
+                    task.spawn(function()
+                        for _, obj in ipairs(Workspace:GetDescendants()) do
+                            if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") then
+                                if hideOwnLines then
+                                    local creator = obj:FindFirstChild("Creator") or obj:FindFirstChild("Player")
+                                    if creator and creator.Value == LocalPlayer then
+                                        obj:Destroy()
+                                    end
+                                else
+                                    obj:Destroy()
+                                end
+                            end
+                        end
+                    end)
+                    spamCount = 0
+                end
+                task.wait(1)
+            end
+        end)
+    end
+
+    local function StopLineLag()
+        lineLagActive = false
+        if lineLagTask then task.cancel(lineLagTask) lineLagTask = nil end
+        if lineCleanupConnection then lineCleanupConnection:Disconnect() lineCleanupConnection = nil end
+        task.spawn(function()
+            task.wait(0.5)
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end)
+    end
+
+    local LineLagBlock = ServerTab:CreateBlock({Name = "Line Lag", Side = "Left"})
+
+    LineLagBlock:CreateSlider({
+        Name = "Intensity (1 - 1000)",
+        Min = 1,
+        Max = 1000,
+        Default = 150,
+        Rounding = 0,
+        Callback = function(Value)
+            lineLagIntensity = Value
+            if lineLagActive then
+                StopLineLag()
+                task.wait(0.1)
+                lineLagActive = true
+                StartLineLag()
+            end
+        end
+    })
+
+    LineLagBlock:CreateToggle({
+        Name = "Hide Own Lines",
+        Default = false,
+        Callback = function(Value)
+            hideOwnLines = Value
+            if Value and lineLagActive then
+                StartLineCleanup()
+            elseif not Value and lineCleanupConnection then
+                lineCleanupConnection:Disconnect()
+                lineCleanupConnection = nil
+            end
+        end
+    })
+
+    LineLagBlock:CreateToggle({
+        Name = "Enable Line Lag",
+        Default = false,
+        Callback = function(Value)
+            if Value then
+                lineLagActive = true
+                if hideOwnLines then StartLineCleanup() end
+                StartLineLag()
+                Library:Notify({ Title = "Line Lag", Content = "Enabled (Intensity: " .. lineLagIntensity .. ")", Duration = 2 })
+            else
+                StopLineLag()
+                Library:Notify({ Title = "Line Lag", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    LineLagBlock:CreateButton({
+        Name = "Clear All Lines",
+        Callback = function()
+            local count = 0
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
+                    pcall(function() obj:Destroy() end)
+                    count = count + 1
+                end
+            end
+            Library:Notify({ Title = "Line Lag", Content = "Cleared " .. count .. " lines", Duration = 2 })
+        end
+    })
+
+    LocalPlayer.OnTeleport:Connect(function()
+        StopLineLag()
     end)
 end
 
