@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
-local TouchEnabled = UserInputService.TouchEnabled
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Absolute_Startup"
@@ -97,6 +96,8 @@ function StartMainScript(titleText)
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
+    local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK v2", Side = "Left"})
+    local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings v2", Side = "Right"})
 
     local AntiInputBlock = DefenseTab:CreateBlock({Name = "Anti-Input [Item]", Side = "Left"})
     local antiInputActive = false
@@ -283,6 +284,12 @@ function StartMainScript(titleText)
     local blobmanTarget = nil
     local blobmanGrabInterval = 0.001
     local blobmanHoldHeight = 15
+
+    local blobmanV2Target = nil
+    local blobmanV2KickActive = false
+    local blobmanV2KickTask = nil
+    local blobmanV2GrabInterval = 0.001
+    local blobmanV2HoldHeight = 15
 
     local ownershipRagdollActive = false
     local ownershipRagdollTask = nil
@@ -687,6 +694,182 @@ function StartMainScript(titleText)
                 Library:Notify({ Title = "BLODMAN KICK", Content = "Enabled", Duration = 2 })
             else
                 Library:Notify({ Title = "BLODMAN KICK", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    local BlobmanV2TargetDropdown = BlodmanV2Block:CreateDropdown({
+        Name = "Select Target",
+        Options = targetNames,
+        Callback = function(v)
+            blobmanV2Target = getPlayerFromSelection(v)
+        end
+    })
+
+    BlodmanV2Block:CreateButton({
+        Name = "Refresh List",
+        Callback = function()
+            updateList()
+            BlobmanV2TargetDropdown:Refresh(targetNames, true)
+        end
+    })
+
+    BlodmanV2SettingsBlock:CreateSlider({
+        Name = "Interval (0.001 - 0.05)",
+        Min = 0.001,
+        Max = 0.05,
+        Default = 0.001,
+        Rounding = 3,
+        Callback = function(Value)
+            blobmanV2GrabInterval = Value
+        end
+    })
+
+    BlodmanV2SettingsBlock:CreateSlider({
+        Name = "Hold Height",
+        Min = 5,
+        Max = 40,
+        Default = 15,
+        Rounding = 0,
+        Callback = function(Value)
+            blobmanV2HoldHeight = Value
+        end
+    })
+
+    local function BlobmanV2KickLoop()
+        local target = blobmanV2Target
+        if not target then return end
+
+        local GE = RS:WaitForChild("GrabEvents")
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+
+        local savedPos = myRoot.CFrame
+        local currentHoldHeight = blobmanV2HoldHeight
+        local dragging = false
+        local grabStartTime = 0
+        local spamCounter = 0
+
+        local hum = myChar and myChar:FindFirstChild("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat or seat.Parent.Name ~= "CreatureBlobman" then
+            Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+            return
+        end
+
+        local blob = seat.Parent
+        local remoteFolder = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+        local grab = remoteFolder and remoteFolder:FindFirstChild("CreatureGrab")
+        local release = remoteFolder and remoteFolder:FindFirstChild("CreatureRelease")
+        local R_Det = blob:FindFirstChild("RightDetector")
+        local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
+
+        if not (grab and release and R_Det and R_Weld) then
+            Library:Notify({ Title = "Error", Content = "Blobman components not found", Duration = 3 })
+            return
+        end
+
+        while blobmanV2KickActive do
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then break end
+
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local tChar = currentTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+
+            if tRoot and tHum and tHum.Health > 0 and myRoot and seat then
+                tRoot.AssemblyLinearVelocity = Vector3.zero
+                tRoot.Velocity = Vector3.zero
+
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame
+                    if GE then
+                        pcall(function()
+                            tHum.PlatformStand = true
+                            GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
+                            GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                        end)
+                    end
+                    
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.3 then
+                        dragging = true
+                        grabStartTime = 0
+                    end
+                else
+                    local lockPos = savedPos * CFrame.new(0, currentHoldHeight, 0)
+                    myRoot.CFrame = savedPos
+                    tRoot.CFrame = lockPos
+                    
+                    spamCounter = spamCounter + 1
+                    
+                    pcall(function()
+                        grab:FireServer(R_Det, tRoot, R_Weld)
+                    end)
+                    
+                    if spamCounter % 2 == 0 then
+                        pcall(function()
+                            release:FireServer(R_Weld)
+                        end)
+                    end
+                    
+                    if GE then
+                        pcall(function()
+                            tHum.PlatformStand = true
+                            GE.SetNetworkOwner:FireServer(tRoot, lockPos)
+                            GE.DestroyGrabLine:FireServer(tRoot)
+                            GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                        end)
+                    end
+                end
+            else
+                dragging = false
+                grabStartTime = 0
+                spamCounter = 0
+                task.wait(0.1)
+            end
+            
+            task.wait(blobmanV2GrabInterval)
+        end
+
+        if myRoot then
+            myRoot.CFrame = savedPos
+        end
+        blobmanV2KickActive = false
+    end
+
+    BlodmanV2Block:CreateToggle({
+        Name = "BLODMAN KICK v2 (Grab+Blob)",
+        Default = false,
+        Callback = function(Value)
+            blobmanV2KickActive = Value
+            if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
+
+            if Value then
+                if not blobmanV2Target then
+                    Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
+                    return
+                end
+
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChild("Humanoid")
+                if not hum or not hum.SeatPart then
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    return
+                end
+
+                if hum.SeatPart.Parent.Name ~= "CreatureBlobman" then
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    return
+                end
+
+                blobmanV2KickTask = task.spawn(BlobmanV2KickLoop)
+                Library:Notify({ Title = "BLODMAN KICK v2", Content = "Enabled", Duration = 2 })
+            else
+                Library:Notify({ Title = "BLODMAN KICK v2", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1419,6 +1602,9 @@ function StartMainScript(titleText)
             if BlobmanTargetDropdown then
                 pcall(function() BlobmanTargetDropdown:Refresh(targetNames, true) end)
             end
+            if BlobmanV2TargetDropdown then
+                pcall(function() BlobmanV2TargetDropdown:Refresh(targetNames, true) end)
+            end
             task.wait(5)
         end
     end)
@@ -1445,6 +1631,8 @@ function StartMainScript(titleText)
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
         blobmanKickActive = false
         if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
+        blobmanV2KickActive = false
+        if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
         StopAutoAntiLag()
         
         task.spawn(function()
