@@ -32,6 +32,7 @@ local blobmanV2Target = nil
 local blobmanV2KickActive = false
 local blobmanV2KickTask = nil
 local blobmanV2GrabInterval = 0.05
+local blobmanV2HoldHeight = 15
 local fovEnabled = false
 local originalFOV = 70
 
@@ -72,13 +73,24 @@ BlodmanV2Block:CreateButton({
 })
 
 BlodmanV2SettingsBlock:CreateSlider({
-    Name = "Interval V2 (0.01 - 0.1)",
-    Min = 0.01,
-    Max = 0.1,
-    Default = 0.05,
+    Name = "Interval V2 (0.001 - 0.05)",
+    Min = 0.001,
+    Max = 0.05,
+    Default = 0.001,
     Rounding = 3,
     Callback = function(Value)
         blobmanV2GrabInterval = Value
+    end
+})
+
+BlodmanV2SettingsBlock:CreateSlider({
+    Name = "Hold Height",
+    Min = 5,
+    Max = 40,
+    Default = 15,
+    Rounding = 0,
+    Callback = function(Value)
+        blobmanV2HoldHeight = Value
     end
 })
 
@@ -145,7 +157,7 @@ local function BlobmanV2KickLoop()
                     grabStartTime = 0
                 end
             else
-                local lockPos = savedPos * CFrame.new(0, 17, 0)
+                local lockPos = savedPos * CFrame.new(0, blobmanV2HoldHeight, 0)
                 myRoot.CFrame = savedPos
                 tRoot.CFrame = lockPos
                 
