@@ -80,7 +80,6 @@ function StartMainScript(titleText)
     local DefenseTab = Window:CreateTab("Defense", true)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
-    local ServerTab = Window:CreateTab("Server", true)
 
     local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
     local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
@@ -98,6 +97,8 @@ function StartMainScript(titleText)
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
+    local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK V2", Side = "Left"})
+    local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings V2", Side = "Right"})
 
     local AntiInputBlock = DefenseTab:CreateBlock({Name = "Anti-Input [Item]", Side = "Left"})
     local antiInputActive = false
@@ -284,6 +285,11 @@ function StartMainScript(titleText)
     local blobmanTarget = nil
     local blobmanGrabInterval = 0.001
     local blobmanHoldHeight = 15
+
+    local blobmanV2Target = nil
+    local blobmanV2KickActive = false
+    local blobmanV2KickTask = nil
+    local blobmanV2GrabInterval = 0.05
 
     local ownershipRagdollActive = false
     local ownershipRagdollTask = nil
@@ -688,6 +694,187 @@ function StartMainScript(titleText)
                 Library:Notify({ Title = "BLODMAN KICK", Content = "Enabled", Duration = 2 })
             else
                 Library:Notify({ Title = "BLODMAN KICK", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    local BlobmanV2TargetDropdown = BlodmanV2Block:CreateDropdown({
+        Name = "Select Target V2",
+        Options = targetNames,
+        Callback = function(v)
+            blobmanV2Target = getPlayerFromSelection(v)
+        end
+    })
+
+    BlodmanV2Block:CreateButton({
+        Name = "Refresh List V2",
+        Callback = function()
+            updateList()
+            BlobmanV2TargetDropdown:Refresh(targetNames, true)
+        end
+    })
+
+    BlodmanV2SettingsBlock:CreateSlider({
+        Name = "Interval V2 (0.01 - 0.1)",
+        Min = 0.01,
+        Max = 0.1,
+        Default = 0.05,
+        Rounding = 3,
+        Callback = function(Value)
+            blobmanV2GrabInterval = Value
+        end
+    })
+
+    local function BlobmanV2KickLoop()
+        local target = blobmanV2Target
+        if not target then return end
+
+        local GE = RS:WaitForChild("GrabEvents")
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+
+        local savedPos = myRoot.CFrame
+        local packetTimer = 0
+
+        local hum = myChar and myChar:FindFirstChild("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat or seat.Parent.Name ~= "CreatureBlobman" then
+            Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+            return
+        end
+
+        local blob = seat.Parent
+        local blobRoot = blob:FindFirstChild("HumanoidRootPart") or blob.PrimaryPart
+        local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+        local CG = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+        local CD = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
+        local R_Det = blob:FindFirstChild("RightDetector")
+        local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChildWhichIsA("Weld"))
+
+        if not (CG and CD and R_Det and R_Weld and blobRoot) then
+            Library:Notify({ Title = "Error", Content = "Blobman components not found", Duration = 3 })
+            return
+        end
+
+        local tChar = target.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        if tRoot and blobRoot then
+            local bringStart = tick()
+            while tick() - bringStart < 0.35 do
+                if not blobmanV2KickActive then break end
+                blobRoot.CFrame = tRoot.CFrame
+                blobRoot.AssemblyLinearVelocity = Vector3.zero
+                pcall(function()
+                    if CG and R_Det then
+                        CG:FireServer(R_Det, tRoot, R_Weld)
+                    end
+                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                    GE.SetNetworkOwner:FireServer(tRoot, blobRoot.CFrame)
+                end)
+                task.wait(0.05)
+            end
+            blobRoot.CFrame = savedPos
+            blobRoot.AssemblyLinearVelocity = Vector3.zero
+            task.wait(0.05)
+        end
+
+        while blobmanV2KickActive do
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then break end
+
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            tChar = currentTarget.Character
+            tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+
+            if tRoot and tHum and tHum.Health > 0 and blobRoot then
+                tRoot.AssemblyLinearVelocity = Vector3.zero
+                tRoot.AssemblyAngularVelocity = Vector3.zero
+                tRoot.Velocity = Vector3.zero
+
+                blobRoot.CFrame = savedPos
+                blobRoot.AssemblyLinearVelocity = Vector3.zero
+                blobRoot.AssemblyAngularVelocity = Vector3.zero
+
+                local lockPos = savedPos * CFrame.new(0, 17, 0)
+                tRoot.CFrame = lockPos
+                tRoot.Velocity = Vector3.zero
+                tRoot.RotVelocity = Vector3.zero
+
+                if tick() - packetTimer > blobmanV2GrabInterval then
+                    packetTimer = tick()
+                    pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        
+                        GE.SetNetworkOwner:FireServer(tRoot, lockPos)
+                        GE.DestroyGrabLine:FireServer(tRoot)
+                        
+                        if R_Det and R_Weld then
+                            CG:FireServer(R_Det, tRoot, R_Weld)
+                        end
+                        
+                        GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                    end)
+                end
+            else
+                if tRoot then
+                    pcall(function()
+                        GE.DestroyGrabLine:FireServer(tRoot)
+                    end)
+                end
+                task.wait(0.1)
+            end
+
+            task.wait(blobmanV2GrabInterval)
+        end
+
+        if blobRoot then
+            blobRoot.CFrame = savedPos
+            blobRoot.AssemblyLinearVelocity = Vector3.zero
+            blobRoot.AssemblyAngularVelocity = Vector3.zero
+        end
+
+        if tRoot then
+            pcall(function()
+                GE.DestroyGrabLine:FireServer(tRoot)
+            end)
+        end
+
+        blobmanV2KickActive = false
+    end
+
+    BlodmanV2Block:CreateToggle({
+        Name = "BLODMAN KICK V2 (Grab+Blob)",
+        Default = false,
+        Callback = function(Value)
+            blobmanV2KickActive = Value
+            if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
+
+            if Value then
+                if not blobmanV2Target then
+                    Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
+                    return
+                end
+
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChild("Humanoid")
+                if not hum or not hum.SeatPart then
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    return
+                end
+
+                if hum.SeatPart.Parent.Name ~= "CreatureBlobman" then
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    return
+                end
+
+                blobmanV2KickTask = task.spawn(BlobmanV2KickLoop)
+                Library:Notify({ Title = "BLODMAN KICK V2", Content = "Enabled", Duration = 2 })
+            else
+                Library:Notify({ Title = "BLODMAN KICK V2", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1420,6 +1607,9 @@ function StartMainScript(titleText)
             if BlobmanTargetDropdown then
                 pcall(function() BlobmanTargetDropdown:Refresh(targetNames, true) end)
             end
+            if BlobmanV2TargetDropdown then
+                pcall(function() BlobmanV2TargetDropdown:Refresh(targetNames, true) end)
+            end
             task.wait(5)
         end
     end)
@@ -1446,6 +1636,8 @@ function StartMainScript(titleText)
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
         blobmanKickActive = false
         if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
+        blobmanV2KickActive = false
+        if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
         StopAutoAntiLag()
         
         task.spawn(function()
@@ -1786,154 +1978,6 @@ function StartMainScript(titleText)
         if antiKickItemActive then
             StopAntiKickItem()
         end
-    end)
-
-    local lineLagActive = false
-    local lineLagTask = nil
-    local lineLagIntensity = 150
-    local hideOwnLines = false
-    local lineCleanupConnection = nil
-    local spamCount = 0
-
-    local function StartLineCleanup()
-        if lineCleanupConnection then lineCleanupConnection:Disconnect() end
-        lineCleanupConnection = RunService.Heartbeat:Connect(function()
-            if not lineLagActive or not hideOwnLines then return end
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
-                    local creator = obj:FindFirstChild("Creator") or obj:FindFirstChild("Player")
-                    if creator and creator.Value == LocalPlayer then
-                        obj.Transparency = 1
-                        obj.Enabled = false
-                        if obj:IsA("Beam") then
-                            obj.Width0 = 0
-                            obj.Width1 = 0
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function StartLineLag()
-        if lineLagTask then task.cancel(lineLagTask) end
-        lineLagTask = task.spawn(function()
-            spamCount = 0
-            while lineLagActive do
-                for _ = 1, lineLagIntensity do
-                    for _, player in pairs(Players:GetPlayers()) do
-                        if player.Character then
-                            local torso = player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso")
-                            if torso then
-                                pcall(function()
-                                    CreateGrabLine:FireServer(torso, torso.CFrame)
-                                end)
-                                spamCount = spamCount + 1
-                            end
-                        end
-                    end
-                end
-                if spamCount > 10 then
-                    task.spawn(function()
-                        for _, obj in ipairs(Workspace:GetDescendants()) do
-                            if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") then
-                                if hideOwnLines then
-                                    local creator = obj:FindFirstChild("Creator") or obj:FindFirstChild("Player")
-                                    if creator and creator.Value == LocalPlayer then
-                                        obj:Destroy()
-                                    end
-                                else
-                                    obj:Destroy()
-                                end
-                            end
-                        end
-                    end)
-                    spamCount = 0
-                end
-                task.wait(1)
-            end
-        end)
-    end
-
-    local function StopLineLag()
-        lineLagActive = false
-        if lineLagTask then task.cancel(lineLagTask) lineLagTask = nil end
-        if lineCleanupConnection then lineCleanupConnection:Disconnect() lineCleanupConnection = nil end
-        task.spawn(function()
-            task.wait(0.5)
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
-                    pcall(function() obj:Destroy() end)
-                end
-            end
-        end)
-    end
-
-    local LineLagBlock = ServerTab:CreateBlock({Name = "Line Lag", Side = "Left"})
-
-    LineLagBlock:CreateSlider({
-        Name = "Intensity (1 - 1000)",
-        Min = 1,
-        Max = 1000,
-        Default = 150,
-        Rounding = 0,
-        Callback = function(Value)
-            lineLagIntensity = Value
-            if lineLagActive then
-                StopLineLag()
-                task.wait(0.1)
-                lineLagActive = true
-                StartLineLag()
-            end
-        end
-    })
-
-    LineLagBlock:CreateToggle({
-        Name = "Hide Own Lines",
-        Default = false,
-        Callback = function(Value)
-            hideOwnLines = Value
-            if Value and lineLagActive then
-                StartLineCleanup()
-            elseif not Value and lineCleanupConnection then
-                lineCleanupConnection:Disconnect()
-                lineCleanupConnection = nil
-            end
-        end
-    })
-
-    LineLagBlock:CreateToggle({
-        Name = "Enable Line Lag",
-        Default = false,
-        Callback = function(Value)
-            if Value then
-                lineLagActive = true
-                if hideOwnLines then StartLineCleanup() end
-                StartLineLag()
-                Library:Notify({ Title = "Line Lag", Content = "Enabled (Intensity: " .. lineLagIntensity .. ")", Duration = 2 })
-            else
-                StopLineLag()
-                Library:Notify({ Title = "Line Lag", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    LineLagBlock:CreateButton({
-        Name = "Clear All Lines",
-        Callback = function()
-            local count = 0
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("LineHandleAdornment") or obj.Name:lower():find("line") then
-                    pcall(function() obj:Destroy() end)
-                    count = count + 1
-                end
-            end
-            Library:Notify({ Title = "Line Lag", Content = "Cleared " .. count .. " lines", Duration = 2 })
-        end
-    })
-
-    LocalPlayer.OnTeleport:Connect(function()
-        StopLineLag()
     end)
 end
 
