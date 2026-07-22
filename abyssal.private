@@ -275,7 +275,11 @@ function StartMainScript(titleText)
     local infiniteRagdoll = false
     local infiniteRagdollTask = nil
     local antiBurnActive = false
-    local antiBurnConnection = nil
+    local antiBurnTask = nil
+    local fireExtinguisher = nil
+    local antiBurnConn = nil
+    local isBurning = false
+    local SKY_HEIGHT = 100000
     local antiGrabEnabled = false
     local antiGrabTask = nil
 
@@ -300,11 +304,52 @@ function StartMainScript(titleText)
     local antiLagActive = false
     local autoAntiLagActive = false
     local autoAntiLagTask = nil
-    local autoAntiLagSensitivity = 10
+    local autoAntiLagSensitivity = 8
     local autoAntiLagWasActive = false
 
     local createGrabLineCopy = nil
     local extendGrabLineCopy = nil
+    local grabFolder = RS:FindFirstChild("GrabEvents")
+    local createGrabLineOriginal = nil
+    local extendGrabLineOriginal = nil
+    local originalCharMoveStates = {}
+
+    if grabFolder then
+        createGrabLineOriginal = grabFolder:FindFirstChild("CreateGrabLine")
+        extendGrabLineOriginal = grabFolder:FindFirstChild("ExtendGrabLine")
+        if createGrabLineOriginal then
+            createGrabLineCopy = createGrabLineOriginal:Clone()
+        end
+        if extendGrabLineOriginal then
+            extendGrabLineCopy = extendGrabLineOriginal:Clone()
+        end
+    end
+
+    local function SaveCharacterMoveStates()
+        originalCharMoveStates = {}
+        for _, player in pairs(Players:GetPlayers()) do
+            local scripts = player:FindFirstChild("PlayerScripts")
+            if scripts then
+                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
+                if charMove then
+                    originalCharMoveStates[player] = charMove.Enabled
+                end
+            end
+        end
+    end
+
+    local function RestoreCharacterMoveStates()
+        for player, state in pairs(originalCharMoveStates) do
+            local scripts = player:FindFirstChild("PlayerScripts")
+            if scripts then
+                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
+                if charMove then
+                    charMove.Enabled = state
+                end
+            end
+        end
+        originalCharMoveStates = {}
+    end
 
     local function EnableAntiLag()
         for _, player in pairs(Players:GetPlayers()) do
@@ -312,50 +357,58 @@ function StartMainScript(titleText)
             if scripts then
                 local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
                 if charMove then
+                    if not originalCharMoveStates[player] then
+                        originalCharMoveStates[player] = charMove.Enabled
+                    end
                     charMove.Enabled = false
                 end
             end
         end
 
-        local grabFolder = RS:FindFirstChild("GrabEvents")
         if grabFolder then
             local createLine = grabFolder:FindFirstChild("CreateGrabLine")
             local extendLine = grabFolder:FindFirstChild("ExtendGrabLine")
             
-            if createLine and not createGrabLineCopy then
-                createGrabLineCopy = createLine:Clone()
+            if createLine and createLine ~= createGrabLineOriginal and createLine.Parent then
                 createLine:Destroy()
             end
-            if extendLine and not extendGrabLineCopy then
-                extendGrabLineCopy = extendLine:Clone()
+            if extendLine and extendLine ~= extendGrabLineOriginal and extendLine.Parent then
                 extendLine:Destroy()
+            end
+            
+            if createGrabLineCopy and not grabFolder:FindFirstChild("CreateGrabLine") then
+                createGrabLineCopy:Clone().Parent = grabFolder
+            end
+            if extendGrabLineCopy and not grabFolder:FindFirstChild("ExtendGrabLine") then
+                extendGrabLineCopy:Clone().Parent = grabFolder
             end
         end
     end
 
     local function DisableAntiLag()
-        local grabFolder = RS:FindFirstChild("GrabEvents")
         if grabFolder then
-            if createGrabLineCopy and not grabFolder:FindFirstChild("CreateGrabLine") then
-                createGrabLineCopy:Clone().Parent = grabFolder
-                createGrabLineCopy = nil
+            local currentCreate = grabFolder:FindFirstChild("CreateGrabLine")
+            local currentExtend = grabFolder:FindFirstChild("ExtendGrabLine")
+            
+            if currentCreate and currentCreate ~= createGrabLineOriginal then
+                currentCreate:Destroy()
             end
-            if extendGrabLineCopy and not grabFolder:FindFirstChild("ExtendGrabLine") then
-                extendGrabLineCopy:Clone().Parent = grabFolder
-                extendGrabLineCopy = nil
+            if currentExtend and currentExtend ~= extendGrabLineOriginal then
+                currentExtend:Destroy()
+            end
+            
+            if createGrabLineOriginal and not grabFolder:FindFirstChild("CreateGrabLine") then
+                createGrabLineOriginal:Clone().Parent = grabFolder
+            end
+            if extendGrabLineOriginal and not grabFolder:FindFirstChild("ExtendGrabLine") then
+                extendGrabLineOriginal:Clone().Parent = grabFolder
             end
         end
 
-        for _, player in pairs(Players:GetPlayers()) do
-            local scripts = player:FindFirstChild("PlayerScripts")
-            if scripts then
-                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
-                if charMove then
-                    charMove.Enabled = true
-                end
-            end
-        end
+        RestoreCharacterMoveStates()
     end
+
+    SaveCharacterMoveStates()
 
     local function StartAutoAntiLag()
         if autoAntiLagTask then task.cancel(autoAntiLagTask) end
@@ -381,7 +434,9 @@ function StartMainScript(titleText)
                     if avgFPS < autoAntiLagSensitivity then
                         if not autoAntiLagWasActive then
                             autoAntiLagWasActive = true
-                            EnableAntiLag()
+                            if not antiLagActive then
+                                EnableAntiLag()
+                            end
                             Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS dropped below " .. autoAntiLagSensitivity .. "! Protection ON", Duration = 3 })
                         end
                     else
@@ -435,7 +490,7 @@ function StartMainScript(titleText)
         Name = "Auto Anti-Lag Sensitivity (FPS)",
         Min = 1,
         Max = 20,
-        Default = 10,
+        Default = 8,
         Rounding = 0,
         Callback = function(Value)
             autoAntiLagSensitivity = Value
@@ -1106,6 +1161,92 @@ function StartMainScript(titleText)
         end
     })
 
+    do
+        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
+        local AutoResetCon = nil
+        
+        AntiKickBlock:CreateToggle({
+            Name = "Auto Reset",
+            Default = false,
+            Callback = function(Value)
+                if AutoResetCon then
+                    AutoResetCon:Disconnect()
+                    AutoResetCon = nil
+                end
+
+                if Value then
+                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+                        if reason == "Flying" then
+                            local char = LocalPlayer.Character
+                            local hum = char and char:FindFirstChild("Humanoid")
+                            
+                            if hum then
+                                Library:Notify({ 
+                                    Title = "Auto Reset", 
+                                    Content = "Resetting to prevent Ban!", 
+                                    Duration = 3 
+                                })
+                                char:BreakJoints()
+                                hum.Health = 0
+                            end
+                        end
+                    end)
+                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
+                else
+                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
+                end
+            end
+        })
+    end
+
+    local antiBanActive = false
+    local antiBanCon = nil
+    local warnTimestamps = {}
+
+    local function startAntiBan()
+        if antiBanCon then antiBanCon:Disconnect() end
+        
+        antiBanCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
+            if reason == "Flying" then
+                local currentTime = os.clock()
+                table.insert(warnTimestamps, currentTime)
+                
+                for i = #warnTimestamps, 1, -1 do
+                    if currentTime - warnTimestamps[i] > 1 then
+                        table.remove(warnTimestamps, i)
+                    end
+                end
+                
+                if #warnTimestamps >= 3 then
+                    Library:Notify({ Title = "Anti Ban", Content = "3 warnings! Leaving...", Duration = 3 })
+                    task.wait(0.5)
+                    LocalPlayer:Kick("Anti Ban: Preventing ban.")
+                end
+            end
+        end)
+    end
+
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
+
+    AntiBanBlock:CreateToggle({
+        Name = "Anti Ban",
+        Default = false,
+        Callback = function(Value)
+            antiBanActive = Value
+            if Value then
+                startAntiBan()
+                Library:Notify({ Title = "Anti Ban", Content = "Enabled", Duration = 2 })
+            else
+                if antiBanCon then
+                    antiBanCon:Disconnect()
+                    antiBanCon = nil
+                end
+                warnTimestamps = {}
+                Library:Notify({ Title = "Anti Ban", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
     local antiExplosionActive = false
     local antiExplosionConn = nil
     local function antiExplosionStart()
@@ -1149,54 +1290,163 @@ function StartMainScript(titleText)
         end
     })
 
-    local function hookBurn(char)
-        local hum = char:WaitForChild("Humanoid")
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        char.PrimaryPart = hrp
-        if antiBurnConnection then antiBurnConnection:Disconnect() end
-        antiBurnConnection = hum.FireDebounce.Changed:Connect(function(isBurning)
-            if isBurning and antiBurnActive then
-                local me = char
-                local oldCF = hrp.CFrame
-                local plots = workspace:FindFirstChild("Plots")
-                if plots and plots:FindFirstChild("Plot2") then
-                    local plot2 = plots.Plot2
-                    local barrier = plot2:FindFirstChild("Barrier")
-                    local pb = barrier and barrier:FindFirstChild("PlotBarrier")
-                    if pb and pb:IsA("BasePart") then
-                        local safeCF = pb.CFrame * CFrame.new(0, 6, 0)
-                        me:SetPrimaryPartCFrame(safeCF)
-                        task.wait(0.05)
-                        local firePart = me:FindFirstChild("FirePlayerPart", true)
-                        if firePart then
-                            for _, obj in ipairs(firePart:GetChildren()) do
-                                if obj:IsA("Sound") then obj:Stop() end
-                                if obj:IsA("Light") or obj:IsA("ParticleEmitter") then obj.Enabled = false end
-                            end
-                            if firePart:FindFirstChild("CanBurn") then firePart.CanBurn.Value = false end
-                            if hum:FindFirstChild("FireDebounce") then hum.FireDebounce.Value = false end
-                        end
-                        task.wait(0.1)
-                        if me and me.PrimaryPart and antiBurnActive then
-                            me:SetPrimaryPartCFrame(oldCF)
-                        end
+    local function DestroyAntiBurnItem()
+        if not fireExtinguisher then return end
+        pcall(function()
+            local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+            if destroyToy then
+                destroyToy:FireServer(fireExtinguisher)
+            end
+            if fireExtinguisher and fireExtinguisher.Parent then
+                fireExtinguisher:Destroy()
+            end
+        end)
+        fireExtinguisher = nil
+    end
+
+    local function SpawnFireExtinguisher()
+        DestroyAntiBurnItem()
+        
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return nil end
+        
+        local SpawnCF = CFrame.new(0, SKY_HEIGHT, 0)
+        
+        pcall(function()
+            local menuToys = RS:FindFirstChild("MenuToys")
+            local spawnRemote = menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction")
+            if spawnRemote then
+                spawnRemote:InvokeServer("FireExtinguisher", SpawnCF, Vector3.zero)
+            end
+        end)
+        
+        local inv = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+        if inv then
+            local item = inv:FindFirstChild("FireExtinguisher")
+            if item then
+                for _, v in pairs(item:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = false
+                        v.CanTouch = false
+                        v.Massless = true
                     end
                 end
+                item.Name = "AntiBurnItem"
+                return item
+            end
+        end
+        return nil
+    end
+
+    local function TeleportExtinguisherToSky(part)
+        pcall(function()
+            if part and part.Parent then
+                part.CFrame = CFrame.new(0, SKY_HEIGHT, 0)
+                part.AssemblyLinearVelocity = Vector3.zero
+                part.AssemblyAngularVelocity = Vector3.zero
+                part.Velocity = Vector3.zero
+                part.RotVelocity = Vector3.zero
             end
         end)
     end
 
+    local function TeleportExtinguisherToPlayer(part)
+        pcall(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and part and part.Parent then
+                part.CFrame = hrp.CFrame * CFrame.new(0, -2, 0)
+                part.AssemblyLinearVelocity = Vector3.zero
+                part.AssemblyAngularVelocity = Vector3.zero
+                part.Velocity = Vector3.zero
+                part.RotVelocity = Vector3.zero
+            end
+        end)
+    end
+
+    local function StartAntiBurn()
+        if antiBurnTask then task.cancel(antiBurnTask) end
+        
+        antiBurnTask = task.spawn(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            
+            antiBurnActive = true
+            isBurning = false
+            fireExtinguisher = SpawnFireExtinguisher()
+            
+            if not fireExtinguisher then
+                Library:Notify({ Title = "Anti-Burn", Content = "Failed to spawn Fire Extinguisher", Duration = 3 })
+                antiBurnActive = false
+                return
+            end
+            
+            local mainPart = fireExtinguisher:FindFirstChild("MainPart") or fireExtinguisher:FindFirstChild("Handle")
+            if not mainPart then
+                mainPart = fireExtinguisher:FindFirstChildWhichIsA("BasePart")
+            end
+            
+            if not mainPart then
+                DestroyAntiBurnItem()
+                antiBurnActive = false
+                return
+            end
+            
+            TeleportExtinguisherToSky(mainPart)
+            
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if hum then
+                if antiBurnConn then antiBurnConn:Disconnect() end
+                antiBurnConn = hum.FireDebounce.Changed:Connect(function(val)
+                    isBurning = val
+                    
+                    if val then
+                        TeleportExtinguisherToPlayer(mainPart)
+                    else
+                        TeleportExtinguisherToSky(mainPart)
+                    end
+                end)
+            end
+            
+            local lastBurnState = false
+            while antiBurnActive and task.wait(0.05) do
+                local currentHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not currentHrp then 
+                    task.wait(0.5)
+                    continue 
+                end
+                
+                if isBurning then
+                    TeleportExtinguisherToPlayer(mainPart)
+                else
+                    if not lastBurnState then
+                        TeleportExtinguisherToSky(mainPart)
+                    end
+                end
+                lastBurnState = isBurning
+            end
+        end)
+    end
+
+    local function StopAntiBurn()
+        antiBurnActive = false
+        if antiBurnTask then task.cancel(antiBurnTask) antiBurnTask = nil end
+        if antiBurnConn then antiBurnConn:Disconnect() antiBurnConn = nil end
+        isBurning = false
+        
+        DestroyAntiBurnItem()
+        
+        Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
+    end
+
     AntiBurnBlock:CreateToggle({
-        Name = "Anti-Burn",
+        Name = "Anti-Burn [Fire Extinguisher]",
         Default = false,
         Callback = function(Value)
-            antiBurnActive = Value
             if Value then 
-                hookBurn(LocalPlayer.Character)
+                StartAntiBurn() 
                 Library:Notify({ Title = "Anti-Burn", Content = "Enabled", Duration = 2 })
             else 
-                if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
-                Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
+                StopAntiBurn() 
             end
         end
     })
@@ -1539,7 +1789,9 @@ function StartMainScript(titleText)
         end
         if antiBurnActive then
             antiBurnActive = false
-            if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
+            if antiBurnConn then antiBurnConn:Disconnect() antiBurnConn = nil end
+            DestroyAntiBurnItem()
+            if antiBurnTask then task.cancel(antiBurnTask) antiBurnTask = nil end
         end
         infiniteRagdoll = false
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
@@ -1548,6 +1800,10 @@ function StartMainScript(titleText)
         blobmanV2KickActive = false
         if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
         StopAutoAntiLag()
+        if antiLagActive then
+            antiLagActive = false
+            DisableAntiLag()
+        end
         
         task.spawn(function()
             local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
@@ -1870,301 +2126,6 @@ function StartMainScript(titleText)
                     Library:Notify({ Title = "Auto PCLD Break", Content = "Enabled", Duration = 2 })
                 else
                     Library:Notify({ Title = "Auto PCLD Break", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    do
-        local autoResetActive = false
-        local autoResetCon = nil
-        local autoResetWarnTimestamps = {}
-
-        local function startAutoResetAntiBan()
-            if autoResetCon then autoResetCon:Disconnect() end
-            
-            autoResetCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                if reason == "Flying" then
-                    local currentTime = os.clock()
-                    table.insert(autoResetWarnTimestamps, currentTime)
-                    
-                    for i = #autoResetWarnTimestamps, 1, -1 do
-                        if currentTime - autoResetWarnTimestamps[i] > 1 then
-                            table.remove(autoResetWarnTimestamps, i)
-                        end
-                    end
-                    
-                    if #autoResetWarnTimestamps >= 3 then
-                        LocalPlayer:Kick("Auto Anti-Ban: Preventing ban.")
-                    elseif #autoResetWarnTimestamps >= 1 then
-                        local char = LocalPlayer.Character
-                        local hum = char and char:FindFirstChild("Humanoid")
-                        if hum then
-                            char:BreakJoints()
-                            hum.Health = 0
-                        end
-                    end
-                end
-            end)
-        end
-
-        local function stopAutoResetAntiBan()
-            if autoResetCon then
-                autoResetCon:Disconnect()
-                autoResetCon = nil
-            end
-            autoResetWarnTimestamps = {}
-        end
-
-        local AutoResetBlock = DefenseTab:CreateBlock({Name = "Auto Reset + Anti-Ban", Side = "Left"})
-
-        AutoResetBlock:CreateToggle({
-            Name = "Auto Reset + Anti-Ban",
-            Default = false,
-            Callback = function(Value)
-                autoResetActive = Value
-                if Value then
-                    startAutoResetAntiBan()
-                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Enabled", Duration = 2 })
-                else
-                    stopAutoResetAntiBan()
-                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    do
-        local blobmanSpawnActive = false
-        local blobmanSpawnTask = nil
-
-        local function SpawnBlobman()
-            local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not HRP then return end
-            
-            local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
-            if CanSpawnToy and not CanSpawnToy.Value then
-                CanSpawnToy:GetPropertyChangedSignal("Value"):Wait()
-            end
-            
-            local SpawnCFrame = HRP.CFrame * CFrame.new(0, 10, 20)
-            
-            pcall(function()
-                RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", SpawnCFrame, Vector3.zero)
-            end)
-            
-            task.wait(0.5)
-            
-            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-            if inv then
-                local blobman = inv:FindFirstChild("CreatureBlobman")
-                if blobman then
-                    local seat = blobman:FindFirstChild("Seat")
-                    if seat and seat:IsA("Seat") then
-                        pcall(function()
-                            LocalPlayer.Character.Humanoid.Sit = true
-                            task.wait(0.1)
-                            LocalPlayer.Character.Humanoid:MoveTo(seat.Position)
-                            task.wait(0.3)
-                        end)
-                    end
-                end
-            end
-        end
-
-        local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
-
-        BlodmanAutoSitBlock:CreateToggle({
-            Name = "Auto Sit on Blodman",
-            Default = false,
-            Callback = function(Value)
-                blobmanSpawnActive = Value
-                if blobmanSpawnTask then task.cancel(blobmanSpawnTask) end
-                
-                if Value then
-                    blobmanSpawnTask = task.spawn(function()
-                        while blobmanSpawnActive do
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum and not hum.SeatPart then
-                                local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-                                local blobman = inv and inv:FindFirstChild("CreatureBlobman")
-                                
-                                if not blobman then
-                                    SpawnBlobman()
-                                else
-                                    local seat = blobman:FindFirstChild("Seat")
-                                    if seat and seat:IsA("Seat") then
-                                        pcall(function()
-                                            hum.Sit = true
-                                            task.wait(0.1)
-                                            hum:MoveTo(seat.Position)
-                                            task.wait(0.3)
-                                        end)
-                                    end
-                                end
-                            end
-                            
-                            task.wait(1)
-                        end
-                    end)
-                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    do
-        local function startAutoAntiBan()
-            local con = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                if reason == "Flying" then
-                    local char = LocalPlayer.Character
-                    local hum = char and char:FindFirstChild("Humanoid")
-                    if hum then
-                        char:BreakJoints()
-                        hum.Health = 0
-                    end
-                end
-            end)
-            return con
-        end
-
-        local function startAntiBanKick()
-            local timestamps = {}
-            local con = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                if reason == "Flying" then
-                    local currentTime = os.clock()
-                    table.insert(timestamps, currentTime)
-                    
-                    for i = #timestamps, 1, -1 do
-                        if currentTime - timestamps[i] > 1 then
-                            table.remove(timestamps, i)
-                        end
-                    end
-                    
-                    if #timestamps >= 3 then
-                        LocalPlayer:Kick("Anti-Ban: Preventing ban.")
-                    end
-                end
-            end)
-            return con
-        end
-
-        local autoResetCon = startAutoAntiBan()
-        local antiBanCon = startAntiBanKick()
-
-        local AutoResetBlock = DefenseTab:CreateBlock({Name = "Auto Reset + Anti-Ban", Side = "Left"})
-
-        AutoResetBlock:CreateToggle({
-            Name = "Auto Reset + Anti-Ban (AUTO)",
-            Default = true,
-            Callback = function(Value)
-                if not Value then
-                    if autoResetCon then
-                        autoResetCon:Disconnect()
-                        autoResetCon = nil
-                    end
-                    if antiBanCon then
-                        antiBanCon:Disconnect()
-                        antiBanCon = nil
-                    end
-                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Disabled", Duration = 2 })
-                else
-                    if not autoResetCon then
-                        autoResetCon = startAutoAntiBan()
-                    end
-                    if not antiBanCon then
-                        antiBanCon = startAntiBanKick()
-                    end
-                    Library:Notify({ Title = "Auto Reset + Anti-Ban", Content = "Enabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    do
-        local blobmanSpawnActive = false
-        local blobmanSpawnTask = nil
-
-        local function SpawnBlobman()
-            local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not HRP then return end
-            
-            local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
-            if CanSpawnToy and not CanSpawnToy.Value then
-                CanSpawnToy:GetPropertyChangedSignal("Value"):Wait()
-            end
-            
-            local SpawnCFrame = HRP.CFrame * CFrame.new(0, 10, 20)
-            
-            pcall(function()
-                RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", SpawnCFrame, Vector3.zero)
-            end)
-            
-            task.wait(0.5)
-            
-            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-            if inv then
-                local blobman = inv:FindFirstChild("CreatureBlobman")
-                if blobman then
-                    local seat = blobman:FindFirstChild("Seat")
-                    if seat and seat:IsA("Seat") then
-                        pcall(function()
-                            LocalPlayer.Character.Humanoid.Sit = true
-                            task.wait(0.1)
-                            LocalPlayer.Character.Humanoid:MoveTo(seat.Position)
-                            task.wait(0.3)
-                        end)
-                    end
-                end
-            end
-        end
-
-        local function autoSitLoop()
-            while blobmanSpawnActive do
-                local char = LocalPlayer.Character
-                local hum = char and char:FindFirstChild("Humanoid")
-                
-                if hum and not hum.SeatPart then
-                    local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-                    local blobman = inv and inv:FindFirstChild("CreatureBlobman")
-                    
-                    if not blobman then
-                        SpawnBlobman()
-                    else
-                        local seat = blobman:FindFirstChild("Seat")
-                        if seat and seat:IsA("Seat") then
-                            pcall(function()
-                                hum.Sit = true
-                                task.wait(0.1)
-                                hum:MoveTo(seat.Position)
-                                task.wait(0.3)
-                            end)
-                        end
-                    end
-                end
-                
-                task.wait(1)
-            end
-        end
-
-        local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
-
-        BlodmanAutoSitBlock:CreateToggle({
-            Name = "Auto Sit on Blodman (AUTO)",
-            Default = true,
-            Callback = function(Value)
-                blobmanSpawnActive = Value
-                if blobmanSpawnTask then task.cancel(blobmanSpawnTask) end
-                
-                if Value then
-                    blobmanSpawnTask = task.spawn(autoSitLoop)
-                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
                 end
             end
         })
