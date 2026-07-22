@@ -89,20 +89,15 @@ function StartMainScript(titleText)
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
     local AntiExplosionBlock = DefenseTab:CreateBlock({Name = "Anti-Explosion", Side = "Right"})
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
-    local AntiBurnBlock = DefenseTab:CreateBlock({Name = "Anti-Burn", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AutoAntiLagBlock = DefenseTab:CreateBlock({Name = "Auto Anti-Lag", Side = "Left"})
+    local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
     local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK v2", Side = "Left"})
     local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings v2", Side = "Right"})
-
-    local AntiInputBlock = DefenseTab:CreateBlock({Name = "Anti-Input [Item]", Side = "Left"})
-    local antiInputActive = false
-    local antiInputTask = nil
-    local antiInputSpeed = 0.1
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -121,6 +116,9 @@ function StartMainScript(titleText)
     }
 
     local SelectedInputToy = "CupMugWhite"
+    local antiInputActive = false
+    local antiInputTask = nil
+    local antiInputSpeed = 0.1
 
     local InputDropdownValues = {}
     for name, _ in pairs(InputToyList) do
@@ -128,7 +126,7 @@ function StartMainScript(titleText)
     end
     table.sort(InputDropdownValues)
 
-    AntiInputBlock:CreateDropdown({
+    AntiInputLagBlock:CreateDropdown({
         Name = "Select Item",
         Items = InputDropdownValues,
         Default = "White Mug",
@@ -138,7 +136,7 @@ function StartMainScript(titleText)
         end
     })
 
-    AntiInputBlock:CreateSlider({
+    AntiInputLagBlock:CreateSlider({
         Name = "Cycle Speed (0.02 - 0.5 sec)",
         Min = 0.02,
         Max = 0.5,
@@ -240,7 +238,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    AntiInputBlock:CreateToggle({
+    AntiInputLagBlock:CreateToggle({
         Name = "Anti-Input (Protection from input lag)",
         Default = false,
         Callback = function(Value)
@@ -274,8 +272,6 @@ function StartMainScript(titleText)
     local antiKickTask = nil
     local infiniteRagdoll = false
     local infiniteRagdollTask = nil
-    local antiBurnActive = false
-    local antiBurnConnection = nil
     local antiGrabEnabled = false
     local antiGrabTask = nil
 
@@ -300,11 +296,52 @@ function StartMainScript(titleText)
     local antiLagActive = false
     local autoAntiLagActive = false
     local autoAntiLagTask = nil
-    local autoAntiLagSensitivity = 10
+    local autoAntiLagSensitivity = 8
     local autoAntiLagWasActive = false
 
     local createGrabLineCopy = nil
     local extendGrabLineCopy = nil
+    local grabFolder = RS:FindFirstChild("GrabEvents")
+    local createGrabLineOriginal = nil
+    local extendGrabLineOriginal = nil
+    local originalCharMoveStates = {}
+
+    if grabFolder then
+        createGrabLineOriginal = grabFolder:FindFirstChild("CreateGrabLine")
+        extendGrabLineOriginal = grabFolder:FindFirstChild("ExtendGrabLine")
+        if createGrabLineOriginal then
+            createGrabLineCopy = createGrabLineOriginal:Clone()
+        end
+        if extendGrabLineOriginal then
+            extendGrabLineCopy = extendGrabLineOriginal:Clone()
+        end
+    end
+
+    local function SaveCharacterMoveStates()
+        originalCharMoveStates = {}
+        for _, player in pairs(Players:GetPlayers()) do
+            local scripts = player:FindFirstChild("PlayerScripts")
+            if scripts then
+                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
+                if charMove then
+                    originalCharMoveStates[player] = charMove.Enabled
+                end
+            end
+        end
+    end
+
+    local function RestoreCharacterMoveStates()
+        for player, state in pairs(originalCharMoveStates) do
+            local scripts = player:FindFirstChild("PlayerScripts")
+            if scripts then
+                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
+                if charMove then
+                    charMove.Enabled = state
+                end
+            end
+        end
+        originalCharMoveStates = {}
+    end
 
     local function EnableAntiLag()
         for _, player in pairs(Players:GetPlayers()) do
@@ -312,50 +349,58 @@ function StartMainScript(titleText)
             if scripts then
                 local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
                 if charMove then
+                    if not originalCharMoveStates[player] then
+                        originalCharMoveStates[player] = charMove.Enabled
+                    end
                     charMove.Enabled = false
                 end
             end
         end
 
-        local grabFolder = RS:FindFirstChild("GrabEvents")
         if grabFolder then
             local createLine = grabFolder:FindFirstChild("CreateGrabLine")
             local extendLine = grabFolder:FindFirstChild("ExtendGrabLine")
             
-            if createLine and not createGrabLineCopy then
-                createGrabLineCopy = createLine:Clone()
+            if createLine and createLine ~= createGrabLineOriginal and createLine.Parent then
                 createLine:Destroy()
             end
-            if extendLine and not extendGrabLineCopy then
-                extendGrabLineCopy = extendLine:Clone()
+            if extendLine and extendLine ~= extendGrabLineOriginal and extendLine.Parent then
                 extendLine:Destroy()
+            end
+            
+            if createGrabLineCopy and not grabFolder:FindFirstChild("CreateGrabLine") then
+                createGrabLineCopy:Clone().Parent = grabFolder
+            end
+            if extendGrabLineCopy and not grabFolder:FindFirstChild("ExtendGrabLine") then
+                extendGrabLineCopy:Clone().Parent = grabFolder
             end
         end
     end
 
     local function DisableAntiLag()
-        local grabFolder = RS:FindFirstChild("GrabEvents")
         if grabFolder then
-            if createGrabLineCopy and not grabFolder:FindFirstChild("CreateGrabLine") then
-                createGrabLineCopy:Clone().Parent = grabFolder
-                createGrabLineCopy = nil
+            local currentCreate = grabFolder:FindFirstChild("CreateGrabLine")
+            local currentExtend = grabFolder:FindFirstChild("ExtendGrabLine")
+            
+            if currentCreate and currentCreate ~= createGrabLineOriginal then
+                currentCreate:Destroy()
             end
-            if extendGrabLineCopy and not grabFolder:FindFirstChild("ExtendGrabLine") then
-                extendGrabLineCopy:Clone().Parent = grabFolder
-                extendGrabLineCopy = nil
+            if currentExtend and currentExtend ~= extendGrabLineOriginal then
+                currentExtend:Destroy()
+            end
+            
+            if createGrabLineOriginal and not grabFolder:FindFirstChild("CreateGrabLine") then
+                createGrabLineOriginal:Clone().Parent = grabFolder
+            end
+            if extendGrabLineOriginal and not grabFolder:FindFirstChild("ExtendGrabLine") then
+                extendGrabLineOriginal:Clone().Parent = grabFolder
             end
         end
 
-        for _, player in pairs(Players:GetPlayers()) do
-            local scripts = player:FindFirstChild("PlayerScripts")
-            if scripts then
-                local charMove = scripts:FindFirstChild("CharacterAndBeamMove")
-                if charMove then
-                    charMove.Enabled = true
-                end
-            end
-        end
+        RestoreCharacterMoveStates()
     end
+
+    SaveCharacterMoveStates()
 
     local function StartAutoAntiLag()
         if autoAntiLagTask then task.cancel(autoAntiLagTask) end
@@ -381,7 +426,9 @@ function StartMainScript(titleText)
                     if avgFPS < autoAntiLagSensitivity then
                         if not autoAntiLagWasActive then
                             autoAntiLagWasActive = true
-                            EnableAntiLag()
+                            if not antiLagActive then
+                                EnableAntiLag()
+                            end
                             Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS dropped below " .. autoAntiLagSensitivity .. "! Protection ON", Duration = 3 })
                         end
                     else
@@ -435,7 +482,7 @@ function StartMainScript(titleText)
         Name = "Auto Anti-Lag Sensitivity (FPS)",
         Min = 1,
         Max = 20,
-        Default = 10,
+        Default = 8,
         Rounding = 0,
         Callback = function(Value)
             autoAntiLagSensitivity = Value
@@ -1235,58 +1282,6 @@ function StartMainScript(titleText)
         end
     })
 
-    local function hookBurn(char)
-        local hum = char:WaitForChild("Humanoid")
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        char.PrimaryPart = hrp
-        if antiBurnConnection then antiBurnConnection:Disconnect() end
-        antiBurnConnection = hum.FireDebounce.Changed:Connect(function(isBurning)
-            if isBurning and antiBurnActive then
-                local me = char
-                local oldCF = hrp.CFrame
-                local plots = workspace:FindFirstChild("Plots")
-                if plots and plots:FindFirstChild("Plot2") then
-                    local plot2 = plots.Plot2
-                    local barrier = plot2:FindFirstChild("Barrier")
-                    local pb = barrier and barrier:FindFirstChild("PlotBarrier")
-                    if pb and pb:IsA("BasePart") then
-                        local safeCF = pb.CFrame * CFrame.new(0, 6, 0)
-                        me:SetPrimaryPartCFrame(safeCF)
-                        task.wait(0.05)
-                        local firePart = me:FindFirstChild("FirePlayerPart", true)
-                        if firePart then
-                            for _, obj in ipairs(firePart:GetChildren()) do
-                                if obj:IsA("Sound") then obj:Stop() end
-                                if obj:IsA("Light") or obj:IsA("ParticleEmitter") then obj.Enabled = false end
-                            end
-                            if firePart:FindFirstChild("CanBurn") then firePart.CanBurn.Value = false end
-                            if hum:FindFirstChild("FireDebounce") then hum.FireDebounce.Value = false end
-                        end
-                        task.wait(0.1)
-                        if me and me.PrimaryPart and antiBurnActive then
-                            me:SetPrimaryPartCFrame(oldCF)
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    AntiBurnBlock:CreateToggle({
-        Name = "Anti-Burn",
-        Default = false,
-        Callback = function(Value)
-            antiBurnActive = Value
-            if Value then 
-                hookBurn(LocalPlayer.Character)
-                Library:Notify({ Title = "Anti-Burn", Content = "Enabled", Duration = 2 })
-            else 
-                if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
-                Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
     local function InfiniteRagdollLoop()
         while infiniteRagdoll do
             pcall(function()
@@ -1623,10 +1618,6 @@ function StartMainScript(titleText)
             if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
             ClearShuriken()
         end
-        if antiBurnActive then
-            antiBurnActive = false
-            if antiBurnConnection then antiBurnConnection:Disconnect() antiBurnConnection = nil end
-        end
         infiniteRagdoll = false
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
         blobmanKickActive = false
@@ -1634,6 +1625,10 @@ function StartMainScript(titleText)
         blobmanV2KickActive = false
         if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
         StopAutoAntiLag()
+        if antiLagActive then
+            antiLagActive = false
+            DisableAntiLag()
+        end
         
         task.spawn(function()
             local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
