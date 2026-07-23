@@ -301,6 +301,9 @@ function StartMainScript(titleText)
     local autoAntiLagSensitivity = 8
     local autoAntiLagWasActive = false
 
+    local autoSitBlodmanActive = false
+    local autoSitBlodmanTask = nil
+
     local createGrabLineCopy = nil
     local extendGrabLineCopy = nil
     local grabFolder = RS:FindFirstChild("GrabEvents")
@@ -515,6 +518,68 @@ function StartMainScript(titleText)
             end
         end
     end
+
+    local function AutoSitBlodmanLoop()
+        while autoSitBlodmanActive do
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if hrp and hum then
+                if not hum.SeatPart then
+                    local folderName = LocalPlayer.Name .. "SpawnedInToys"
+                    local folder = workspace:FindFirstChild(folderName)
+                    local blob = folder and folder:FindFirstChild("CreatureBlobman")
+                    
+                    if not blob then
+                        task.spawn(function()
+                            pcall(function()
+                                RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", hrp.CFrame * CFrame.new(0, 5, 5), Vector3.zero)
+                            end)
+                        end)
+                        
+                        if not folder then
+                            folder = workspace:WaitForChild(folderName, 5)
+                        end
+                        if folder then
+                            blob = folder:WaitForChild("CreatureBlobman", 5)
+                        end
+                    end
+                    
+                    if blob then
+                        local seat = blob:FindFirstChildWhichIsA("VehicleSeat")
+                        if seat then
+                            local t = tick()
+                            repeat
+                                if not hum.SeatPart then
+                                    hrp.CFrame = seat.CFrame + Vector3.new(0, 1, 0)
+                                    hrp.Velocity = Vector3.zero
+                                    seat:Sit(hum)
+                                end
+                                RunService.Heartbeat:Wait()
+                            until hum.SeatPart == seat or tick() - t > 1.5 or not autoSitBlodmanActive
+                        end
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end
+
+    BlodmanAutoSitBlock:CreateToggle({
+        Name = "Auto Sit Blodman",
+        Default = false,
+        Callback = function(Value)
+            autoSitBlodmanActive = Value
+            if autoSitBlodmanTask then task.cancel(autoSitBlodmanTask) end
+            if Value then
+                autoSitBlodmanTask = task.spawn(AutoSitBlodmanLoop)
+                Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
+            else
+                Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
 
     local targetNames = {}
     local function updateList()
@@ -929,55 +994,6 @@ function StartMainScript(titleText)
                 Library:Notify({ Title = "BLODMAN KICK v2", Content = "Enabled", Duration = 2 })
             else
                 Library:Notify({ Title = "BLODMAN KICK v2", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    BlodmanAutoSitBlock:CreateToggle({
-        Name = "Auto Sit Blodman",
-        Default = false,
-        Callback = function(Value)
-            if Value then
-                task.spawn(function()
-                    while GetToggleState("Auto Sit Blodman") do
-                        local Char = LocalPlayer.Character
-                        local Hum = Char and Char:FindFirstChildOfClass("Humanoid")
-                        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
-                        if Hum and Root and not Hum.SeatPart then
-                            local folder = workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                            local blob = folder and folder:FindFirstChild("CreatureBlobman")
-
-                            if not blob then
-                                pcall(function()
-                                    RS.MenuToys.SpawnToyRemoteFunction:InvokeServer(
-                                        "CreatureBlobman",
-                                        Root.CFrame * CFrame.new(0, 5, 5),
-                                        Vector3.zero
-                                    )
-                                end)
-                                local t0 = tick()
-                                repeat
-                                    RunService.Heartbeat:Wait()
-                                    folder = workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                                    blob = folder and folder:FindFirstChild("CreatureBlobman")
-                                until blob or tick() - t0 > 5 or not GetToggleState("Auto Sit Blodman")
-                            end
-
-                            if blob then
-                                local seat = blob:FindFirstChildWhichIsA("VehicleSeat")
-                                if seat then
-                                    Root.CFrame = seat.CFrame * CFrame.new(0, 1, 0)
-                                    Root.Velocity = Vector3.zero
-                                    seat:Sit(Hum)
-                                end
-                            end
-                        end
-                        task.wait(0.1)
-                    end
-                end)
-                Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
             end
         end
     })
