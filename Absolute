@@ -98,6 +98,7 @@ function StartMainScript(titleText)
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
     local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK v2", Side = "Left"})
     local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings v2", Side = "Right"})
+    local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -294,10 +295,14 @@ function StartMainScript(titleText)
     local bodyGyro = nil
 
     local antiLagActive = false
+    local antiLagToggleRef = nil
     local autoAntiLagActive = false
     local autoAntiLagTask = nil
     local autoAntiLagSensitivity = 8
     local autoAntiLagWasActive = false
+
+    local autoSitBlodmanActive = false
+    local autoSitBlodmanTask = nil
 
     local createGrabLineCopy = nil
     local extendGrabLineCopy = nil
@@ -402,6 +407,50 @@ function StartMainScript(titleText)
 
     SaveCharacterMoveStates()
 
+    local antiLagToggle = AntiLagBlock:CreateToggle({
+        Name = "Anti-Lag",
+        Default = false,
+        Callback = function(Value)
+            antiLagActive = Value
+            if Value then
+                EnableAntiLag()
+                Library:Notify({ Title = "Anti-Lag", Content = "Enabled", Duration = 2 })
+            else
+                if not autoAntiLagWasActive then
+                    DisableAntiLag()
+                end
+                Library:Notify({ Title = "Anti-Lag", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+    antiLagToggleRef = antiLagToggle
+
+    AutoAntiLagBlock:CreateSlider({
+        Name = "Auto Anti-Lag Sensitivity (FPS)",
+        Min = 1,
+        Max = 20,
+        Default = 8,
+        Rounding = 0,
+        Callback = function(Value)
+            autoAntiLagSensitivity = Value
+        end
+    })
+
+    AutoAntiLagBlock:CreateToggle({
+        Name = "Auto Anti-Lag",
+        Default = false,
+        Callback = function(Value)
+            autoAntiLagActive = Value
+            if Value then
+                StartAutoAntiLag()
+                Library:Notify({ Title = "Auto Anti-Lag", Content = "Enabled (sensitivity: " .. autoAntiLagSensitivity .. " FPS)", Duration = 2 })
+            else
+                StopAutoAntiLag()
+                Library:Notify({ Title = "Auto Anti-Lag", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
     local function StartAutoAntiLag()
         if autoAntiLagTask then task.cancel(autoAntiLagTask) end
         autoAntiLagTask = task.spawn(function()
@@ -428,6 +477,9 @@ function StartMainScript(titleText)
                             autoAntiLagWasActive = true
                             if not antiLagActive then
                                 EnableAntiLag()
+                                if antiLagToggleRef then
+                                    antiLagToggleRef:Set(true)
+                                end
                             end
                             Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS dropped below " .. autoAntiLagSensitivity .. "! Protection ON", Duration = 3 })
                         end
@@ -436,6 +488,9 @@ function StartMainScript(titleText)
                             autoAntiLagWasActive = false
                             if not antiLagActive then
                                 DisableAntiLag()
+                                if antiLagToggleRef then
+                                    antiLagToggleRef:Set(false)
+                                end
                             end
                             Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS restored! Protection OFF", Duration = 3 })
                         end
@@ -457,49 +512,71 @@ function StartMainScript(titleText)
             autoAntiLagWasActive = false
             if not antiLagActive then
                 DisableAntiLag()
+                if antiLagToggleRef then
+                    antiLagToggleRef:Set(false)
+                end
             end
         end
     end
 
-    AntiLagBlock:CreateToggle({
-        Name = "Anti-Lag",
-        Default = false,
-        Callback = function(Value)
-            antiLagActive = Value
-            if Value then
-                EnableAntiLag()
-                Library:Notify({ Title = "Anti-Lag", Content = "Enabled", Duration = 2 })
-            else
-                if not autoAntiLagWasActive then
-                    DisableAntiLag()
+    local function AutoSitBlodmanLoop()
+        while autoSitBlodmanActive do
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if hrp and hum then
+                if not hum.SeatPart then
+                    local folderName = LocalPlayer.Name .. "SpawnedInToys"
+                    local folder = workspace:FindFirstChild(folderName)
+                    local blob = folder and folder:FindFirstChild("CreatureBlobman")
+                    
+                    if not blob then
+                        task.spawn(function()
+                            pcall(function()
+                                RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", hrp.CFrame * CFrame.new(0, 5, 5), Vector3.zero)
+                            end)
+                        end)
+                        
+                        if not folder then
+                            folder = workspace:WaitForChild(folderName, 5)
+                        end
+                        if folder then
+                            blob = folder:WaitForChild("CreatureBlobman", 5)
+                        end
+                    end
+                    
+                    if blob then
+                        local seat = blob:FindFirstChildWhichIsA("VehicleSeat")
+                        if seat then
+                            local t = tick()
+                            repeat
+                                if not hum.SeatPart then
+                                    hrp.CFrame = seat.CFrame + Vector3.new(0, 1, 0)
+                                    hrp.Velocity = Vector3.zero
+                                    seat:Sit(hum)
+                                end
+                                RunService.Heartbeat:Wait()
+                            until hum.SeatPart == seat or tick() - t > 1.5 or not autoSitBlodmanActive
+                        end
+                    end
                 end
-                Library:Notify({ Title = "Anti-Lag", Content = "Disabled", Duration = 2 })
             end
+            task.wait(0.5)
         end
-    })
+    end
 
-    AutoAntiLagBlock:CreateSlider({
-        Name = "Auto Anti-Lag Sensitivity (FPS)",
-        Min = 1,
-        Max = 20,
-        Default = 8,
-        Rounding = 0,
-        Callback = function(Value)
-            autoAntiLagSensitivity = Value
-        end
-    })
-
-    AutoAntiLagBlock:CreateToggle({
-        Name = "Auto Anti-Lag",
+    BlodmanAutoSitBlock:CreateToggle({
+        Name = "Auto Sit Blodman",
         Default = false,
         Callback = function(Value)
-            autoAntiLagActive = Value
+            autoSitBlodmanActive = Value
+            if autoSitBlodmanTask then task.cancel(autoSitBlodmanTask) end
             if Value then
-                StartAutoAntiLag()
-                Library:Notify({ Title = "Auto Anti-Lag", Content = "Enabled (sensitivity: " .. autoAntiLagSensitivity .. " FPS)", Duration = 2 })
+                autoSitBlodmanTask = task.spawn(AutoSitBlodmanLoop)
+                Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
             else
-                StopAutoAntiLag()
-                Library:Notify({ Title = "Auto Anti-Lag", Content = "Disabled", Duration = 2 })
+                Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
             end
         end
     })
