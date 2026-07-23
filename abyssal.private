@@ -90,7 +90,6 @@ function StartMainScript(titleText)
     local AntiExplosionBlock = DefenseTab:CreateBlock({Name = "Anti-Explosion", Side = "Right"})
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
-    local AutoAntiLagBlock = DefenseTab:CreateBlock({Name = "Auto Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
     
@@ -295,11 +294,6 @@ function StartMainScript(titleText)
     local bodyGyro = nil
 
     local antiLagActive = false
-    local antiLagToggleRef = nil
-    local autoAntiLagActive = false
-    local autoAntiLagTask = nil
-    local autoAntiLagSensitivity = 15
-    local autoAntiLagWasActive = false
 
     local autoSitBlodmanActive = false
     local autoSitBlodmanTask = nil
@@ -407,7 +401,7 @@ function StartMainScript(titleText)
 
     SaveCharacterMoveStates()
 
-    local antiLagToggle = AntiLagBlock:CreateToggle({
+    AntiLagBlock:CreateToggle({
         Name = "Anti-Lag",
         Default = false,
         Callback = function(Value)
@@ -416,109 +410,11 @@ function StartMainScript(titleText)
                 EnableAntiLag()
                 Library:Notify({ Title = "Anti-Lag", Content = "Enabled", Duration = 2 })
             else
-                if not autoAntiLagWasActive then
-                    DisableAntiLag()
-                end
+                DisableAntiLag()
                 Library:Notify({ Title = "Anti-Lag", Content = "Disabled", Duration = 2 })
             end
         end
     })
-    antiLagToggleRef = antiLagToggle
-
-    AutoAntiLagBlock:CreateSlider({
-        Name = "Auto Anti-Lag Sensitivity (FPS)",
-        Min = 5,
-        Max = 60,
-        Default = 15,
-        Rounding = 0,
-        Callback = function(Value)
-            autoAntiLagSensitivity = Value
-        end
-    })
-
-    AutoAntiLagBlock:CreateToggle({
-        Name = "Auto Anti-Lag",
-        Default = false,
-        Callback = function(Value)
-            autoAntiLagActive = Value
-            if Value then
-                StartAutoAntiLag()
-                Library:Notify({ Title = "Auto Anti-Lag", Content = "Enabled (sensitivity: " .. autoAntiLagSensitivity .. " FPS)", Duration = 2 })
-            else
-                StopAutoAntiLag()
-                Library:Notify({ Title = "Auto Anti-Lag", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    local function StartAutoAntiLag()
-        if autoAntiLagTask then task.cancel(autoAntiLagTask) end
-        autoAntiLagTask = task.spawn(function()
-            local fpsValues = {}
-            local lastTime = tick()
-            local frameCount = 0
-            local checkInterval = 0.5
-            
-            while autoAntiLagActive do
-                frameCount = frameCount + 1
-                local currentTime = tick()
-                local delta = currentTime - lastTime
-                
-                if delta >= checkInterval then
-                    local currentFPS = frameCount / delta
-                    table.insert(fpsValues, currentFPS)
-                    if #fpsValues > 5 then table.remove(fpsValues, 1) end
-                    
-                    local avgFPS = 0
-                    for _, v in pairs(fpsValues) do avgFPS = avgFPS + v end
-                    avgFPS = avgFPS / #fpsValues
-                    
-                    if avgFPS < autoAntiLagSensitivity then
-                        if not autoAntiLagWasActive then
-                            autoAntiLagWasActive = true
-                            if not antiLagActive then
-                                EnableAntiLag()
-                                if antiLagToggleRef then
-                                    antiLagToggleRef:Set(true)
-                                end
-                            end
-                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS: " .. string.format("%.1f", avgFPS) .. " - Protection ON", Duration = 2 })
-                        end
-                    else
-                        if autoAntiLagWasActive then
-                            autoAntiLagWasActive = false
-                            if not antiLagActive then
-                                DisableAntiLag()
-                                if antiLagToggleRef then
-                                    antiLagToggleRef:Set(false)
-                                end
-                            end
-                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS: " .. string.format("%.1f", avgFPS) .. " - Protection OFF", Duration = 2 })
-                        end
-                    end
-                    
-                    frameCount = 0
-                    lastTime = currentTime
-                end
-                
-                task.wait(0.05)
-            end
-        end)
-    end
-
-    local function StopAutoAntiLag()
-        autoAntiLagActive = false
-        if autoAntiLagTask then task.cancel(autoAntiLagTask) autoAntiLagTask = nil end
-        if autoAntiLagWasActive then
-            autoAntiLagWasActive = false
-            if not antiLagActive then
-                DisableAntiLag()
-                if antiLagToggleRef then
-                    antiLagToggleRef:Set(false)
-                end
-            end
-        end
-    end
 
     local function AutoSitBlodmanLoop()
         while autoSitBlodmanActive do
@@ -1702,7 +1598,6 @@ function StartMainScript(titleText)
         if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
         blobmanV2KickActive = false
         if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
-        StopAutoAntiLag()
         if antiLagActive then
             antiLagActive = false
             DisableAntiLag()
