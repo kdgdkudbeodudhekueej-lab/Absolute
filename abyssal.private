@@ -298,7 +298,7 @@ function StartMainScript(titleText)
     local antiLagToggleRef = nil
     local autoAntiLagActive = false
     local autoAntiLagTask = nil
-    local autoAntiLagSensitivity = 8
+    local autoAntiLagSensitivity = 15
     local autoAntiLagWasActive = false
 
     local autoSitBlodmanActive = false
@@ -427,9 +427,9 @@ function StartMainScript(titleText)
 
     AutoAntiLagBlock:CreateSlider({
         Name = "Auto Anti-Lag Sensitivity (FPS)",
-        Min = 1,
-        Max = 20,
-        Default = 8,
+        Min = 5,
+        Max = 60,
+        Default = 15,
         Rounding = 0,
         Callback = function(Value)
             autoAntiLagSensitivity = Value
@@ -457,16 +457,17 @@ function StartMainScript(titleText)
             local fpsValues = {}
             local lastTime = tick()
             local frameCount = 0
+            local checkInterval = 0.5
             
             while autoAntiLagActive do
                 frameCount = frameCount + 1
                 local currentTime = tick()
                 local delta = currentTime - lastTime
                 
-                if delta >= 1 then
+                if delta >= checkInterval then
                     local currentFPS = frameCount / delta
                     table.insert(fpsValues, currentFPS)
-                    if #fpsValues > 10 then table.remove(fpsValues, 1) end
+                    if #fpsValues > 5 then table.remove(fpsValues, 1) end
                     
                     local avgFPS = 0
                     for _, v in pairs(fpsValues) do avgFPS = avgFPS + v end
@@ -481,7 +482,7 @@ function StartMainScript(titleText)
                                     antiLagToggleRef:Set(true)
                                 end
                             end
-                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS dropped below " .. autoAntiLagSensitivity .. "! Protection ON", Duration = 3 })
+                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS: " .. string.format("%.1f", avgFPS) .. " - Protection ON", Duration = 2 })
                         end
                     else
                         if autoAntiLagWasActive then
@@ -492,7 +493,7 @@ function StartMainScript(titleText)
                                     antiLagToggleRef:Set(false)
                                 end
                             end
-                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS restored! Protection OFF", Duration = 3 })
+                            Library:Notify({ Title = "Auto Anti-Lag", Content = "FPS: " .. string.format("%.1f", avgFPS) .. " - Protection OFF", Duration = 2 })
                         end
                     end
                     
@@ -500,7 +501,7 @@ function StartMainScript(titleText)
                     lastTime = currentTime
                 end
                 
-                task.wait(0.1)
+                task.wait(0.05)
             end
         end)
     end
