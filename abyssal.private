@@ -1,504 +1,337 @@
--- ============================================
--- MINI ABSOLUTE SCRIPT - SUPER OWNERSHIP KICK
--- ============================================
+-- Мини-скрипт: Third Person, FOV 120, Ownership Kick
+-- Основано на Absolute, но только нужные функции
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local RS = ReplicatedStorage
+local TouchEnabled = UserInputService.TouchEnabled
 
--- Создаём GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Mini_Absolute"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Загружаем библиотеку
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
+function StartMiniScript(titleText)
+    local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+    local RS = ReplicatedStorage
 
--- Создаём окно
-local Window = Library:CreateWindow({
-    Title = "Mini Absolute",
-    Theme = "Night",
-    ShowWatermark = { Enabled = true, Title = true, FPS = true, Ping = true },
-    ToggleKey = Enum.KeyCode.RightShift,
-})
+    local Window = Library:CreateWindow({
+        Title = titleText,
+        Theme = "Night",
+        ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
+        ToggleKey = Enum.KeyCode.RightShift,
+    })
 
--- Делаем красивый фон
-local mainGui = Window.Parent
-if mainGui then
-    local bgFlag = Instance.new("Frame")
-    bgFlag.Size = UDim2.new(1, 1, 1, 1)
-    bgFlag.BackgroundTransparency = 1
-    bgFlag.Parent = mainGui
-    
-    -- Полоски
-    local colors = {
-        Color3.fromRGB(255, 182, 193),
-        Color3.fromRGB(255, 255, 255),
-        Color3.fromRGB(182, 102, 210)
-    }
-    for i = 1, 3 do
-        local s = Instance.new("Frame")
-        s.Size = UDim2.new(1, 0, 0.33, 0)
-        s.Position = UDim2.new(0, 0, (i-1) * 0.33, 0)
-        s.BackgroundColor3 = colors[i]
-        s.BackgroundTransparency = 0.15
-        s.BorderSizePixel = 0
-        s.Parent = bgFlag
-    end
-    bgFlag:MoveToBeginning()
-end
+    local MainTab = Window:CreateTab("Main", true)
+    local VisualTab = Window:CreateTab("Visual", true)
 
--- Создаём вкладки
-local MainTab = Window:CreateTab("Main", true)
-local VisualTab = Window:CreateTab("Visual", true)
+    local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
+    local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
+    local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
 
--- Блоки
-local KickBlock = MainTab:CreateBlock({Name = "Super Ownership Kick", Side = "Left"})
-local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
-local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Right"})
-local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+    local selectedTarget = nil
+    local kickActive = false
+    local kickTask = nil
+    local holdHeight = 17
+    local fovEnabled = false
+    local originalFOV = 70
 
--- Переменные
-local selectedTarget = nil
-local kickActive = false
-local kickTask = nil
-local holdHeight = 17
-local fovEnabled = false
-local originalFOV = 70
+    local GrabEvents = RS:WaitForChild("GrabEvents")
+    local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+    local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
+    local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
 
--- Получаем события граба
-local GrabEvents = RS:WaitForChild("GrabEvents")
-local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
-local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
-local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
-
--- --- СПИСОК ИГРОКОВ ---
-local targetNames = {}
-local function updateList()
-    targetNames = {}
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local displayName = p.DisplayName or p.Name
-            table.insert(targetNames, displayName .. " (" .. p.Name .. ")")
-        end
-    end
-end
-
-local function getPlayerFromSelection(selection)
-    if not selection or selection == "" then return nil end
-    local username = selection:match("%((.-)%)")
-    if username then
-        return Players:FindFirstChild(username)
-    end
-    return nil
-end
-
--- --- СУПЕР ОWNSERSHIP KICK (МЁРТВАЯ ХВАТКА) ---
-local function SuperOwnershipKickLoop(targetName)
-    local target = Players:FindFirstChild(targetName)
-    if not target then 
-        Library:Notify({ Title = "Error", Content = "Target not found", Duration = 2 })
-        return 
-    end
-    
-    local myChar = LocalPlayer.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then 
-        Library:Notify({ Title = "Error", Content = "Character not found", Duration = 2 })
-        return 
-    end
-    
-    local savedPos = myRoot.CFrame 
-    local isActive = true
-    local loopTask = nil
-    
-    -- --- ФУНКЦИЯ СОЗДАНИЯ СУПЕР-БОДИ ---
-    local function createSuperBodies(targetRoot, lockPos)
-        -- Удаляем старые
-        for _, v in pairs(targetRoot:GetChildren()) do
-            if v:IsA("BodyPosition") or v:IsA("BodyGyro") or v:IsA("BodyVelocity") or 
-               v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-                v:Destroy()
+    local targetNames = {}
+    local function updateList()
+        targetNames = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local displayName = p.DisplayName or p.Name
+                table.insert(targetNames, displayName .. " (" .. p.Name .. ")")
             end
         end
-        
-        local bp = Instance.new("BodyPosition")
-        bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bp.D = 9999
-        bp.P = 50000
-        bp.Position = lockPos
-        bp.Parent = targetRoot
-        
-        local bg = Instance.new("BodyGyro")
-        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bg.D = 9999
-        bg.P = 50000
-        bg.CFrame = CFrame.new(lockPos)
-        bg.Parent = targetRoot
-        
-        local align = Instance.new("AlignPosition")
-        align.MaxForce = 9e9
-        align.MaxVelocity = math.huge
-        align.ReactionForceEnabled = false
-        align.Responsiveness = 200
-        align.Attachment0 = Instance.new("Attachment", targetRoot)
-        align.Attachment1 = Instance.new("Attachment", targetRoot)
-        align.Attachment1.Position = lockPos - targetRoot.Position
-        align.Parent = targetRoot
-        
-        return bp, bg, align
     end
-    
-    -- --- ФУНКЦИЯ СПАМА СЕТИ ---
-    local function spamNetwork(targetRoot, lockPos)
-        if not targetRoot then return end
-        pcall(function()
-            -- Множественные вызовы для захвата контроля
-            for i = 1, 5 do
-                SetNetworkOwner:FireServer(targetRoot, lockPos)
-                task.wait(0.001)
-            end
-            DestroyGrabLine:FireServer(targetRoot)
-            CreateGrabLine:FireServer(targetRoot, Vector3.zero, lockPos, false)
-            CreateGrabLine:FireServer(targetRoot, Vector3.zero, lockPos, false)
-        end)
-    end
-    
-    -- --- ОСНОВНОЙ ЦИКЛ ---
-    local function kickLoop()
-        local tRoot = nil
-        local tHum = nil
-        local isLocked = false
-        local bp, bg, align = nil, nil, nil
-        local reconnectAttempts = 0
-        
-        while isActive and target and target.Parent do
-            myChar = LocalPlayer.Character
-            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            
-            if not myRoot then 
-                task.wait(0.5)
-                continue 
-            end
-            
-            local currentTarget = Players:FindFirstChild(target.Name)
-            if not currentTarget or not currentTarget.Character then
-                isLocked = false
-                reconnectAttempts = reconnectAttempts + 1
-                if reconnectAttempts > 10 then break end
-                task.wait(0.1)
-                continue
-            end
-            
-            reconnectAttempts = 0
-            tRoot = currentTarget.Character:FindFirstChild("HumanoidRootPart")
-            tHum = currentTarget.Character:FindFirstChild("Humanoid")
-            
-            if not tRoot or not tHum or tHum.Health <= 0 then
-                isLocked = false
-                task.wait(0.1)
-                continue
-            end
-            
-            -- --- ФАЗА ЗАХВАТА ---
-            if not isLocked then
-                -- Сброс скорости
-                tRoot.AssemblyLinearVelocity = Vector3.zero
-                tRoot.AssemblyAngularVelocity = Vector3.zero
-                
-                -- Отключение анимаций
-                tHum.PlatformStand = true
-                tHum.Sit = true
-                
-                -- Первичный захват
-                pcall(function()
-                    for i = 1, 3 do
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        task.wait(0.005)
-                    end
-                    DestroyGrabLine:FireServer(tRoot)
-                end)
-                
-                -- Телепорт к цели
-                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
-                
-                task.wait(0.1)
-                
-                -- Фиксация
-                isLocked = true
-                local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                bp, bg, align = createSuperBodies(tRoot, lockPos.Position)
-                spamNetwork(tRoot, lockPos)
-                
-                Library:Notify({ Title = "Super Kick", Content = "Target LOCKED!", Duration = 1 })
-                continue
-            end
-            
-            -- --- ФАЗА УДЕРЖАНИЯ ---
-            if isLocked then
-                local targetPos = savedPos * CFrame.new(0, holdHeight, 0)
-                local targetPosVector = targetPos.Position
-                
-                -- 1. Фиксация игрока
-                myRoot.CFrame = savedPos
-                myRoot.AssemblyLinearVelocity = Vector3.zero
-                myRoot.AssemblyAngularVelocity = Vector3.zero
-                
-                -- 2. Обновление боди
-                if bp and bp.Parent then
-                    bp.Position = targetPosVector
-                else
-                    bp, bg, align = createSuperBodies(tRoot, targetPosVector)
-                end
-                
-                if bg and bg.Parent then
-                    bg.CFrame = targetPos
-                end
-                
-                if align and align.Parent and align.Attachment1 then
-                    align.Attachment1.Position = targetPosVector - tRoot.Position
-                end
-                
-                -- 3. Удержание цели
-                tHum.PlatformStand = true
-                tHum.Sit = true
-                tRoot.AssemblyLinearVelocity = Vector3.zero
-                tRoot.AssemblyAngularVelocity = Vector3.zero
-                
-                -- 4. Спам сети каждый кадр
-                pcall(function()
-                    for i = 1, 4 do
-                        SetNetworkOwner:FireServer(tRoot, targetPos)
-                    end
-                    DestroyGrabLine:FireServer(tRoot)
-                    CreateGrabLine:FireServer(tRoot, Vector3.zero, targetPosVector, false)
-                end)
-                
-                -- 5. Проверка отклонения
-                local dist = (tRoot.Position - targetPosVector).Magnitude
-                if dist > 5 then
-                    isLocked = false
-                    if bp then bp:Destroy() bp = nil end
-                    if bg then bg:Destroy() bg = nil end
-                    if align then align:Destroy() align = nil end
-                    
-                    pcall(function()
-                        DestroyGrabLine:FireServer(tRoot)
-                        tRoot.AssemblyLinearVelocity = Vector3.zero
-                    end)
-                    
-                    Library:Notify({ Title = "Super Kick", Content = "Re-locking...", Duration = 1 })
-                end
-                
-                -- 6. Притяжение вниз (анти-полёт)
-                if tRoot.Position.Y > targetPosVector.Y + 10 then
-                    local downForce = Instance.new("BodyVelocity")
-                    downForce.MaxForce = Vector3.new(0, 9e9, 0)
-                    downForce.Velocity = Vector3.new(0, -100, 0)
-                    downForce.Parent = tRoot
-                    task.wait(0.05)
-                    downForce:Destroy()
-                end
-            end
-            
-            RunService.Heartbeat:Wait()
+
+    local function getPlayerFromSelection(selection)
+        if not selection or selection == "" then return nil end
+        local username = selection:match("%((.-)%)")
+        if username then
+            return Players:FindFirstChild(username)
         end
-        
-        -- ОЧИСТКА
-        if bp then bp:Destroy() end
-        if bg then bg:Destroy() end
-        if align then align:Destroy() end
-        
-        if myRoot then myRoot.CFrame = savedPos end
-        
-        if target and target.Character then
-            local root = target.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                pcall(function()
-                    DestroyGrabLine:FireServer(root)
-                    root.AssemblyLinearVelocity = Vector3.zero
-                end)
-                for _, v in pairs(root:GetChildren()) do
-                    if v:IsA("BodyPosition") or v:IsA("BodyGyro") or v:IsA("BodyVelocity") or 
-                       v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-                        v:Destroy()
-                    end
-                end
-            end
+        return nil
+    end
+
+    local TargetDropdown = TargetBlock:CreateDropdown({
+        Name = "Select Target",
+        Options = targetNames,
+        Callback = function(v)
+            selectedTarget = getPlayerFromSelection(v)
         end
-        
-        isActive = false
-        Library:Notify({ Title = "Super Kick", Content = "Disabled", Duration = 2 })
-    end
-    
-    loopTask = task.spawn(kickLoop)
-    
-    return function()
-        isActive = false
-        if loopTask then 
-            task.cancel(loopTask) 
-            loopTask = nil 
+    })
+
+    TargetBlock:CreateButton({
+        Name = "Refresh List",
+        Callback = function()
+            updateList()
+            TargetDropdown:Refresh(targetNames, true)
         end
-    end
-end
+    })
 
--- --- СОЗДАНИЕ ЭЛЕМЕНТОВ GUI ---
-
--- Целевой дропдаун
-local TargetDropdown = TargetBlock:CreateDropdown({
-    Name = "Select Target",
-    Options = targetNames,
-    Callback = function(v)
-        selectedTarget = getPlayerFromSelection(v)
-    end
-})
-
--- Кнопка обновления списка
-TargetBlock:CreateButton({
-    Name = "Refresh List",
-    Callback = function()
-        updateList()
-        TargetDropdown:Refresh(targetNames, true)
-    end
-})
-
--- Настройка высоты удержания
-SettingsBlock:CreateSlider({
-    Name = "Hold Height",
-    Min = 5,
-    Max = 40,
-    Default = 17,
-    Rounding = 0,
-    Callback = function(Value) 
-        holdHeight = Value 
-        Library:Notify({ Title = "Settings", Content = "Height: " .. Value, Duration = 1 })
-    end
-})
-
--- КНОПКА SUPER OWNERSHIP KICK (ГЛАВНАЯ)
-KickBlock:CreateToggle({
-    Name = "Enable Super Ownership Kick",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            if not selectedTarget then
-                Library:Notify({ Title = "Error", Content = "Select target first!", Duration = 3 })
-                return
-            end
-            
-            kickActive = true
-            if kickTask then task.cancel(kickTask) kickTask = nil end
-            
-            kickTask = task.spawn(function() 
-                local stopFunction = SuperOwnershipKickLoop(selectedTarget.Name)
-                if stopFunction then
-                    _G._stopKick = stopFunction
-                end
-            end)
-            
-            Library:Notify({ Title = "Super Kick", Content = "ACTIVATED (Mega Lock)", Duration = 2 })
-        else
-            kickActive = false
-            if kickTask then 
-                task.cancel(kickTask) 
-                kickTask = nil 
-            end
-            
-            if _G._stopKick then
-                _G._stopKick()
-                _G._stopKick = nil
-            end
-            
-            -- Очистка
-            if selectedTarget and selectedTarget.Character then
-                local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-                if tRoot then
-                    for _, v in pairs(tRoot:GetChildren()) do
-                        if v:IsA("BodyPosition") or v:IsA("BodyGyro") or v:IsA("BodyVelocity") or 
-                           v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-                            pcall(function() v:Destroy() end)
-                        end
-                    end
-                    pcall(function()
-                        tRoot.AssemblyLinearVelocity = Vector3.zero
-                        tRoot.AssemblyAngularVelocity = Vector3.zero
-                        DestroyGrabLine:FireServer(tRoot)
-                    end)
-                end
-            end
-            
-            Library:Notify({ Title = "Super Kick", Content = "DEACTIVATED", Duration = 2 })
-        end
-    end
-})
-
--- --- ВИЗУАЛЬНЫЕ НАСТРОЙКИ ---
-
--- FOV 120
-VisualBlock:CreateToggle({
-    Name = "FOV 120",
-    Default = false,
-    Callback = function(Value)
-        fovEnabled = Value
-        if Value then
+    local function SetFOV(value)
+        if value then
+            originalFOV = Workspace.CurrentCamera.FieldOfView
             Workspace.CurrentCamera.FieldOfView = 120
-            Library:Notify({ Title = "FOV", Content = "Set to 120", Duration = 2 })
         else
-            Workspace.CurrentCamera.FieldOfView = 70
-            Library:Notify({ Title = "FOV", Content = "Reset to 70", Duration = 2 })
+            Workspace.CurrentCamera.FieldOfView = originalFOV
         end
     end
-})
 
--- Third Person
-VisualBlock:CreateToggle({
-    Name = "Third Person",
-    Default = false,
-    Callback = function(Value)
-        if Value then
+    local function SetThirdPerson(enabled)
+        if enabled then
             LocalPlayer.CameraMode = Enum.CameraMode.Classic
             LocalPlayer.CameraMaxZoomDistance = 1000
             LocalPlayer.CameraMinZoomDistance = 0.5
-            Library:Notify({ Title = "Camera", Content = "Third Person", Duration = 2 })
         else
             LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
             LocalPlayer.CameraMaxZoomDistance = 0.5
             LocalPlayer.CameraMinZoomDistance = 0.5
-            Library:Notify({ Title = "Camera", Content = "First Person", Duration = 2 })
         end
     end
-})
 
--- Восстановление FOV при телепорте
-LocalPlayer.OnTeleport:Connect(function()
-    if fovEnabled then
-        task.wait(1)
-        Workspace.CurrentCamera.FieldOfView = 120
-    end
-end)
-
--- --- АВТООБНОВЛЕНИЕ СПИСКА ---
-task.spawn(function()
-    while true do
-        updateList()
-        if TargetDropdown then
-            pcall(function() TargetDropdown:Refresh(targetNames, true) end)
+    VisualBlock:CreateToggle({
+        Name = "FOV 120",
+        Default = false,
+        Callback = function(Value)
+            fovEnabled = Value
+            SetFOV(Value)
         end
-        task.wait(5)
+    })
+
+    VisualBlock:CreateToggle({
+        Name = "Third Person",
+        Default = false,
+        Callback = function(Value)
+            SetThirdPerson(Value)
+        end
+    })
+
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if fovEnabled then SetFOV(true) end
+    end)
+
+    local bodyPos = nil
+    local bodyGyro = nil
+
+    local function cleanupBodies()
+        pcall(function()
+            if bodyPos then bodyPos:Destroy() bodyPos = nil end
+            if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+        end)
     end
-end)
 
--- --- УВЕДОМЛЕНИЕ О ЗАПУСКЕ ---
-Library:Notify({ 
-    Title = "Mini Absolute", 
-    Content = "Loaded! Select target and enable Super Kick", 
-    Duration = 5 
-})
+    local function OwnershipKickFunction(targetName)
+        local target = Players:FindFirstChild(targetName)
+        if not target then return end
+        
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
 
-print("✅ Mini Absolute Script loaded successfully!")
-print("🎯 Select a target and enable Super Ownership Kick for MEGA LOCK!")
+        local savedPos = myRoot.CFrame 
+        local dragging = false
+        local grabStartTime = 0
+        local checkStartTime = 0
+        
+        local currentFPS = 60
+        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
+            currentFPS = 1 / dt
+        end)
+
+        local function createBodies(targetRoot, pos)
+            cleanupBodies()
+            for _, v in pairs(targetRoot:GetChildren()) do
+                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
+            bodyPos = Instance.new("BodyPosition")
+            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyPos.D = 100
+            bodyPos.Position = pos
+            bodyPos.Parent = targetRoot
+            bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro.D = 100
+            bodyGyro.CFrame = CFrame.new(pos)
+            bodyGyro.Parent = targetRoot
+        end
+
+        while kickActive do
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then 
+                cleanupBodies()
+                break 
+            end
+            
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local tChar = currentTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+            
+            if tRoot and tHum and tHum.Health > 0 and myRoot then
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    cleanupBodies()
+                    checkStartTime = 0
+                    pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.35 then
+                        dragging = true
+                        grabStartTime = 0
+                        checkStartTime = tick()
+                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                else
+                    myRoot.CFrame = savedPos
+                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    if bodyPos and bodyPos.Parent then
+                        bodyPos.Position = lockPos.Position
+                        if bodyGyro then bodyGyro.CFrame = lockPos end
+                    else
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                    tHum.PlatformStand = true
+                    pcall(function()
+                        if currentFPS > 200 then
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        elseif currentFPS >= 155 and currentFPS <= 200 then
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        else
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        end
+                    end)
+                    if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                        if currentDist > 10 then
+                            dragging = false
+                            grabStartTime = 0
+                            checkStartTime = 0
+                            cleanupBodies()
+                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                        else
+                            checkStartTime = tick()
+                        end
+                    end
+                end
+            else
+                dragging = false
+                grabStartTime = 0
+                checkStartTime = 0
+                cleanupBodies()
+            end
+            RunService.Heartbeat:Wait()
+        end
+        
+        fpsConnection:Disconnect()
+        cleanupBodies()
+        if myRoot then myRoot.CFrame = savedPos end
+        if target and target.Character then
+            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+            end
+        end
+    end
+
+    KickBlock:CreateToggle({
+        Name = "Enable Ownership Kick",
+        Default = false,
+        Callback = function(Value)
+            if Value then
+                if not selectedTarget then
+                    Library:Notify({ Title = "Error", Content = "Select target", Duration = 3 })
+                    return
+                end
+                kickActive = true
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
+                Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
+            else
+                kickActive = false
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                cleanupBodies()
+                if selectedTarget and selectedTarget.Character then
+                    local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        for _, v in pairs(tRoot:GetChildren()) do
+                            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                                pcall(function() v:Destroy() end)
+                            end
+                        end
+                        pcall(function()
+                            tRoot.AssemblyLinearVelocity = Vector3.zero
+                            tRoot.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                    end
+                end
+                Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    KickBlock:CreateSlider({
+        Name = "Hold Height",
+        Min = 5,
+        Max = 40,
+        Default = 17,
+        Rounding = 0,
+        Callback = function(Value) holdHeight = Value end
+    })
+
+    task.spawn(function()
+        while true do
+            updateList()
+            if TargetDropdown then
+                pcall(function() TargetDropdown:Refresh(targetNames, true) end)
+            end
+            task.wait(5)
+        end
+    end)
+
+    LocalPlayer.OnTeleport:Connect(function()
+        kickActive = false
+        if kickTask then task.cancel(kickTask) kickTask = nil end
+        cleanupBodies()
+        if fovEnabled then SetFOV(false) fovEnabled = false end
+    end)
+end
+
+StartMiniScript("Mini Absolute")
