@@ -1,11 +1,9 @@
--- Мини-скрипт: Third Person, FOV 120, Ownership Kick
--- Основано на Absolute, но только нужные функции
+-- Мини-скрипт: Ownership Kick (с Attachment/Align), Third Person, FOV 120
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
-local TouchEnabled = UserInputService.TouchEnabled
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Mini_Absolute"
@@ -45,7 +43,6 @@ function StartMiniScript(titleText)
     local GrabEvents = RS:WaitForChild("GrabEvents")
     local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
     local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
-    local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
 
     local targetNames = {}
     local function updateList()
@@ -126,14 +123,77 @@ function StartMiniScript(titleText)
         if fovEnabled then SetFOV(true) end
     end)
 
-    local bodyPos = nil
-    local bodyGyro = nil
+    -- Функция для создания Attachment и Align объектов
+    local function CreateKickAttachments(targetRoot, targetHead, lockPos)
+        -- Очищаем старые объекты
+        for _, child in pairs(targetRoot:GetChildren()) do
+            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                child:Destroy()
+            end
+        end
+        
+        -- Создаем Attachment на корне цели
+        local targetAttach = Instance.new("Attachment")
+        targetAttach.Name = "KickAttachment"
+        targetAttach.Parent = targetRoot
+        targetAttach.Position = Vector3.new(0, 0, 0)
+        targetAttach.WorldPosition = lockPos.Position
+        
+        -- Создаем Attachment на голове (для привязки позиции)
+        local headAttach = Instance.new("Attachment")
+        headAttach.Name = "KickAttachment"
+        headAttach.Parent = targetHead
+        headAttach.Position = Vector3.new(0, 0, 0)
+        
+        -- AlignPosition для удержания на месте
+        local alignPos = Instance.new("AlignPosition")
+        alignPos.Name = "KickAlignPosition"
+        alignPos.Parent = targetRoot
+        alignPos.Attachment0 = targetAttach
+        alignPos.Attachment1 = headAttach
+        alignPos.Enabled = true
+        alignPos.ReactionForceEnabled = false
+        alignPos.Responsiveness = 500
+        alignPos.MaxForce = 9e9
+        alignPos.MaxVelocity = 500
+        
+        -- AlignOrientation для контроля вращения
+        local alignOri = Instance.new("AlignOrientation")
+        alignOri.Name = "KickAlignOrientation"
+        alignOri.Parent = targetRoot
+        alignOri.Attachment0 = targetAttach
+        alignOri.Attachment1 = headAttach
+        alignOri.Enabled = true
+        alignOri.ReactionTorqueEnabled = false
+        alignOri.Responsiveness = 500
+        alignOri.MaxTorque = 9e9
+        
+        return targetAttach, headAttach, alignPos, alignOri
+    end
 
-    local function cleanupBodies()
-        pcall(function()
-            if bodyPos then bodyPos:Destroy() bodyPos = nil end
-            if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
-        end)
+    local function CleanupKick(target)
+        if not target then return end
+        local char = target.Character
+        if not char then return end
+        
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        
+        if root then
+            for _, child in pairs(root:GetChildren()) do
+                if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                    child:Destroy()
+                end
+            end
+        end
+        
+        if head then
+            for _, child in pairs(head:GetChildren()) do
+                if child:IsA("Attachment") then
+                    child:Destroy()
+                end
+            end
+        end
     end
 
     local function OwnershipKickFunction(targetName)
@@ -154,29 +214,12 @@ function StartMiniScript(titleText)
             currentFPS = 1 / dt
         end)
 
-        local function createBodies(targetRoot, pos)
-            cleanupBodies()
-            for _, v in pairs(targetRoot:GetChildren()) do
-                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                    v:Destroy()
-                end
-            end
-            bodyPos = Instance.new("BodyPosition")
-            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            bodyPos.D = 100
-            bodyPos.Position = pos
-            bodyPos.Parent = targetRoot
-            bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bodyGyro.D = 100
-            bodyGyro.CFrame = CFrame.new(pos)
-            bodyGyro.Parent = targetRoot
-        end
+        local targetAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
 
         while kickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
             if not currentTarget or not currentTarget.Parent then 
-                cleanupBodies()
+                CleanupKick(target)
                 break 
             end
             
@@ -184,12 +227,13 @@ function StartMiniScript(titleText)
             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
             local tChar = currentTarget.Character
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHead = tChar and tChar:FindFirstChild("Head")
             local tHum = tChar and tChar:FindFirstChild("Humanoid")
             
-            if tRoot and tHum and tHum.Health > 0 and myRoot then
+            if tRoot and tHead and tHum and tHum.Health > 0 and myRoot then
                 if not dragging then
                     myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                    cleanupBodies()
+                    CleanupKick(target)
                     checkStartTime = 0
                     pcall(function()
                         tHum.PlatformStand = true
@@ -206,19 +250,27 @@ function StartMiniScript(titleText)
                         grabStartTime = 0
                         checkStartTime = tick()
                         local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                        createBodies(tRoot, lockPos.Position)
+                        targetAttach, headAttach, alignPos, alignOri = CreateKickAttachments(tRoot, tHead, lockPos)
                     end
                 else
                     myRoot.CFrame = savedPos
                     local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
                     myRoot.AssemblyLinearVelocity = Vector3.zero
                     myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if bodyPos and bodyPos.Parent then
-                        bodyPos.Position = lockPos.Position
-                        if bodyGyro then bodyGyro.CFrame = lockPos end
-                    else
-                        createBodies(tRoot, lockPos.Position)
+                    
+                    -- Обновляем позицию через AlignPosition
+                    if targetAttach and targetAttach.Parent then
+                        targetAttach.WorldPosition = lockPos.Position
                     end
+                    
+                    if alignPos and alignPos.Parent then
+                        alignPos.Enabled = true
+                    end
+                    
+                    if alignOri and alignOri.Parent then
+                        alignOri.Enabled = true
+                    end
+                    
                     tHum.PlatformStand = true
                     pcall(function()
                         if currentFPS > 200 then
@@ -238,13 +290,14 @@ function StartMiniScript(titleText)
                             DestroyGrabLine:FireServer(tRoot)
                         end
                     end)
+                    
                     if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
                         local currentDist = (tRoot.Position - lockPos.Position).Magnitude
                         if currentDist > 10 then
                             dragging = false
                             grabStartTime = 0
                             checkStartTime = 0
-                            cleanupBodies()
+                            CleanupKick(target)
                             myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
                         else
                             checkStartTime = tick()
@@ -255,13 +308,14 @@ function StartMiniScript(titleText)
                 dragging = false
                 grabStartTime = 0
                 checkStartTime = 0
-                cleanupBodies()
+                CleanupKick(target)
+                targetAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
             end
             RunService.Heartbeat:Wait()
         end
         
         fpsConnection:Disconnect()
-        cleanupBodies()
+        CleanupKick(target)
         if myRoot then myRoot.CFrame = savedPos end
         if target and target.Character then
             local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
@@ -287,12 +341,12 @@ function StartMiniScript(titleText)
             else
                 kickActive = false
                 if kickTask then task.cancel(kickTask) kickTask = nil end
-                cleanupBodies()
+                CleanupKick(selectedTarget)
                 if selectedTarget and selectedTarget.Character then
                     local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
                     if tRoot then
                         for _, v in pairs(tRoot:GetChildren()) do
-                            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                            if v:IsA("Attachment") or v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
                                 pcall(function() v:Destroy() end)
                             end
                         end
@@ -329,7 +383,7 @@ function StartMiniScript(titleText)
     LocalPlayer.OnTeleport:Connect(function()
         kickActive = false
         if kickTask then task.cancel(kickTask) kickTask = nil end
-        cleanupBodies()
+        CleanupKick(selectedTarget)
         if fovEnabled then SetFOV(false) fovEnabled = false end
     end)
 end
