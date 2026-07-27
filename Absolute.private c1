@@ -141,6 +141,33 @@ local function FindPCLD(hrp)
     end)
 end
 
+local function GetMainPart(item, toyName)
+    if toyName == "FridgeBlack" then
+        for _, v in pairs(item:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name == "SoundPart" then
+                return v
+            end
+        end
+        for _, v in pairs(item:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "Hitbox" and v.Size.X > 3 then
+                return v
+            end
+        end
+        return item:FindFirstChild("SoundPart") or item:FindFirstChildWhichIsA("BasePart")
+    elseif toyName == "Snowflake" then
+        for _, v in pairs(item:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name == "Hitbox" then
+                return v
+            end
+        end
+        return item:FindFirstChild("Hitbox") or item:FindFirstChildWhichIsA("BasePart")
+    elseif toyName == "ChineseLantern" then
+        return item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
+    else
+        return item:FindFirstChild("Hitbox") or item:FindFirstChildWhichIsA("BasePart")
+    end
+end
+
 local function StartAntiKickItem()
     if antiKickItemTask then task.cancel(antiKickItemTask) end
     
@@ -162,7 +189,12 @@ local function StartAntiKickItem()
             end
 
             Item = inv:FindFirstChild("AntiKickItem") 
-            SoundPart = Item and Item:FindFirstChild("Hitbox")
+            
+            if Item then
+                SoundPart = GetMainPart(Item, SelectedToy)
+            else
+                SoundPart = nil
+            end
             
             if not Item or not SoundPart then
                 for _,v in pairs(inv:GetChildren()) do 
@@ -174,15 +206,13 @@ local function StartAntiKickItem()
                 Item = SpawnToyItem(SelectedToy)
                 if not Item then continue end 
                 
-                if SelectedToy == "ChineseLantern" then
-                    SoundPart = Item and FWD(Item, "Handle", 0.5)
-                else
-                    SoundPart = Item and FWD(Item, "Hitbox", 0.5)
+                SoundPart = GetMainPart(Item, SelectedToy)
+                
+                if SoundPart then 
+                    sno(SoundPart) 
                 end
                 
-                if SoundPart then sno(SoundPart) end
-                
-                for _,v in pairs(Item:GetChildren()) do 
+                for _,v in pairs(Item:GetDescendants()) do 
                     if v:IsA("BasePart") then 
                         v.CanCollide = false 
                         v.Transparency = 0.8
@@ -201,21 +231,23 @@ local function StartAntiKickItem()
             
             if SoundPart and targetPart then
                 local offset = Vector3.new(0, 0, 0)
+                local rotation = CFrame.new()
                 
                 if SelectedToy == "ChineseLantern" then
                     offset = Vector3.new(0, 1.5, 0)
                 elseif SelectedToy == "FridgeBlack" then
-                    local mainPart = Item:FindFirstChild("MainPart")
-                    if mainPart then
-                        SoundPart = mainPart
-                        sno(SoundPart)
-                    end
-                    offset = Vector3.new(0, 0, 0)
+                    offset = Vector3.new(0, 0.5, 0)
+                    rotation = CFrame.Angles(0, math.rad(0), 0)
+                    SoundPart.CFrame = targetPart.CFrame * CFrame.new(offset) * rotation
+                    SoundPart.AssemblyLinearVelocity = Vector3.zero
+                    SoundPart.AssemblyAngularVelocity = Vector3.zero
+                    continue
                 elseif SelectedToy == "Snowflake" then
                     offset = Vector3.new(0, 0.5, 0)
+                    rotation = CFrame.Angles(0, math.rad(0), 0)
                 end
                 
-                SoundPart.CFrame = targetPart.CFrame * CFrame.new(offset)
+                SoundPart.CFrame = targetPart.CFrame * CFrame.new(offset) * rotation
                 SoundPart.AssemblyLinearVelocity = Vector3.zero
                 SoundPart.AssemblyAngularVelocity = Vector3.zero
             end
