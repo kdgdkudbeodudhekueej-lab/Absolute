@@ -1801,7 +1801,12 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
-                    SoundPart.CFrame = targetPart.CFrame
+                    -- ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: ТОЛЬКО ДЛЯ ФОНАРЯ ПОДНИМАЕМ НА 1.5
+                    if SelectedToy == "JapaneseLantern" then
+                        SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                    else
+                        SoundPart.CFrame = targetPart.CFrame
+                    end
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
                 end
@@ -1847,6 +1852,7 @@ function StartMainScript(titleText)
                 ["Spooky Candle"] = "SpookyCandle1",
             }
             SelectedToy = ToyList[Value] or "SpookyCandle1"
+            Library:Notify({ Title = "Anti-Kick", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
