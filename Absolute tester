@@ -220,16 +220,17 @@ function StartMainScript(titleText)
         })
     end
 
-    -- ===== GUCCI ANTI GRAB - БЕЗ КНОПОК BLOBMAN =====
+    -- ===== GUCCI ANTI GRAB =====
     local gucciRunId = 0
     local gucciActive = false
     local gucciTask = nil
-    local isGucciRunning = false
-    local gucciBlob = nil
 
-    -- Вспомогательные функции
     local function FWC(Parent, Name, Time) 
         return Parent:FindFirstChild(Name) or Parent:WaitForChild(Name, Time or 3) 
+    end
+
+    local function grab(prt) 
+        ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(prt, prt.CFrame) 
     end
 
     local function toy_spawn_gucci(name, cframe, vector)
@@ -263,19 +264,7 @@ function StartMainScript(titleText)
         return SpawnedToy
     end
 
-    -- Очистка Blobman
     local function clearBlobs()
-        if gucciBlob and gucciBlob.Parent then
-            pcall(function()
-                ReplicatedStorage.MenuToys.DestroyToy:FireServer(gucciBlob)
-            end)
-            task.wait(0.05)
-            if gucciBlob and gucciBlob.Parent then
-                gucciBlob:Destroy()
-            end
-        end
-        gucciBlob = nil
-        
         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
         if BackPack then
             for _, v in pairs(BackPack:GetChildren()) do
@@ -292,32 +281,19 @@ function StartMainScript(titleText)
         end
     end
 
-    -- ===== ГЛАВНАЯ ФУНКЦИЯ =====
+    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI
     local function GucciAntiGrab()
-        if isGucciRunning then return end
-        isGucciRunning = true
-        
         gucciRunId = gucciRunId + 1
         local MyId = gucciRunId
-        
-        -- Очищаем старый Blobman
-        clearBlobs()
         
         local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hum = FWC(char, "Humanoid")
         
-        if not hum then 
-            isGucciRunning = false
-            return 
-        end
-        
-        -- Сброс состояния
         hum.Sit = true
         task.wait(0.02)
         hum.Sit = false
         task.wait(0.02)
         
-        -- Остановка движения
         task.spawn(function()
             local time = tick()
             while tick()-time < 0.8 do
@@ -330,27 +306,129 @@ function StartMainScript(titleText)
             end
         end)
         
-        -- Спавн Blobman
+        local autoGucciT, sitJumpT, Blob, BHead = true, false, nil, nil
+        
+        task.spawn(function()
+            while not Blob and MyId == gucciRunId do
+                task.wait(0.01)
+            end
+            if MyId ~= gucciRunId then return end
+            
+            BHead = FWC(Blob, "Head")
+            local HitBox = FWC(Blob, "GrabbableHitbox")
+            
+            while MyId == gucciRunId and BHead and
+            (not BHead:FindFirstChild("PartOwner") or BHead.PartOwner.Value ~= LocalPlayer.Name) do
+                grab(HitBox)
+                task.wait(0.01)
+            end
+        end)
+        
         local hrp = FWC(char, "HumanoidRootPart")
-        gucciBlob = toy_spawn_gucci(
+        Blob = toy_spawn_gucci(
             "CreatureBlobman",
             hrp.CFrame * CFrame.new(0, 0, -5),
             Vector3.new(0, -15.716, 0)
         )
         
-        if not gucciBlob then 
-            isGucciRunning = false
-            return 
+        if not Blob then return end
+        
+        local Seat = FWC(Blob, "VehicleSeat")
+        
+        task.defer(function()
+            if not(char or hum) then return end
+            
+            local startTime = tick()
+            while autoGucciT and MyId == gucciRunId and tick()-startTime < 0.3 do
+                if Blob and Blob.Parent then
+                    if Seat and Seat.Parent and Seat.Occupant ~= hum then
+                        Seat:Sit(hum)
+                    end
+                end
+                task.wait(0.03)
+                if char and hum and hum.Parent then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+                task.wait(0.03)
+            end
+            autoGucciT = false
+            sitJumpT = false
+        end)
+        
+        sitJumpT = true
+        
+        task.defer(function()
+            while sitJumpT and MyId == gucciRunId do
+                if char and hrp and hrp.Parent then
+                    ReplicatedStorage.CharacterEvents.RagdollRemote:FireServer(hrp, 0.095)
+                end
+                task.wait(0.01)
+            end
+        end)
+        
+        local index
+        
+        task.wait(0.4)
+        
+        if MyId ~= gucciRunId then return end
+        
+        hum.Sit = false
+        Blob.Name = "Gucci"
+        
+        -- ===== НОВЫЙ КОД: УБИРАЕМ КНОПКИ РУК И ВОССТАНАВЛИВАЕМ ОБЫЧНЫЙ ГРАБ =====
+        task.defer(function()
+            if Blob and Blob.Parent then
+                -- Удаляем все ClickDetector'ы с частей Blobman'а
+                for _, part in pairs(Blob:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        for _, child in pairs(part:GetChildren()) do
+                            if child:IsA("ClickDetector") then
+                                child:Destroy()
+                            end
+                        end
+                    end
+                end
+                
+                -- Добавляем обычный ClickDetector на HumanoidRootPart
+                local blobHrp = Blob:FindFirstChild("HumanoidRootPart")
+                if blobHrp then
+                    -- Создаем новый детектор для обычного граба
+                    local newDetector = Instance.new("ClickDetector")
+                    newDetector.Parent = blobHrp
+                    newDetector.MaxActivationDistance = 15
+                    
+                    newDetector.MouseClick:Connect(function(player)
+                        if player == LocalPlayer then
+                            -- Обычный граб как у игроков
+                            local grabEvent = ReplicatedStorage:FindFirstChild("GrabEvents")
+                            if grabEvent then
+                                local setOwner = grabEvent:FindFirstChild("SetNetworkOwner")
+                                if setOwner then
+                                    setOwner:FireServer(blobHrp, blobHrp.CFrame)
+                                end
+                            end
+                        end
+                    end)
+                end
+                
+                -- Включаем стандартные состояния humanoid
+                local blobHum = Blob:FindFirstChild("Humanoid")
+                if blobHum then
+                    blobHum:SetStateEnabled(Enum.HumanoidStateType.Grabbing, true)
+                end
+            end
+        end)
+        -- ===== КОНЕЦ НОВОГО КОДА =====
+        
+        local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
+        for i,v in pairs(BackPack:GetChildren()) do
+            if v.Name == "Gucci" then
+                index = i
+                break
+            end
         end
         
-        local Seat = FWC(gucciBlob, "VehicleSeat")
-        local BHead = FWC(gucciBlob, "Head")
-        
-        -- ===== ВАЖНО: УБИРАЕМ ВСЕ СКРИПТЫ BLOBMAN ЧТОБЫ НЕ БЫЛО КНОПОК =====
-        for _, v in pairs(gucciBlob:GetChildren()) do
-            if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ModuleScript") then
-                v:Destroy()
-            end
+        for _,v in pairs(Blob:GetChildren()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
                 v.CanTouch = false
@@ -358,117 +436,66 @@ function StartMainScript(titleText)
             end
         end
         
-        -- Удаляем папку со скриптами если есть
-        local scriptFolder = gucciBlob:FindFirstChild("BlobmanSeatAndOwnerScript")
-        if scriptFolder then
-            scriptFolder:Destroy()
-        end
-        
-        -- Переименовываем
-        gucciBlob.Name = "Gucci"
-        
-        -- САДИМСЯ НА BLOBMAN
-        if Seat then
-            Seat:Sit(hum)
-            task.wait(0.1)
-        end
-        
-        -- ===== ПОСТОЯННЫЙ РАГДОЛЛ (ЗАЩИТА ОТ ГРАБА) =====
         task.defer(function()
-            while MyId == gucciRunId and char and hrp and hrp.Parent do
-                ReplicatedStorage.CharacterEvents.RagdollRemote:FireServer(hrp, 0.095)
-                task.wait(0.01)
-            end
-        end)
-        
-        -- ===== ГОЛОВА В НЕБЕ =====
-        task.defer(function()
-            while MyId == gucciRunId and gucciBlob and BHead and BHead.Parent do
+            while MyId == gucciRunId and Blob and BHead do
                 BHead.CFrame = CFrame.new(BHead.Position.X, 1e5, BHead.Position.Z)
                 task.wait(0.01)
             end
         end)
         
-        -- Смена иконки
-        task.wait(0.5)
-        pcall(function()
-            local contents = LocalPlayer.PlayerGui.MenuGui.Menu.TabContents.ToyDestroy.Contents
-            if contents then
-                for i,v in ipairs(contents:GetChildren()) do
-                    if v.Name == "CreatureBlobman" then
-                        local view = v:FindFirstChild("ViewItemButton")
-                        if view then
-                            view.Text = "GUCCI"
-                            view.TextScaled = true
-                            if view:FindFirstChild("LowResImage") then
-                                view.LowResImage.Image = ""
-                            end
-                        end
-                    end
-                end
-            end
+        local success, contents = pcall(function()
+            return LocalPlayer.PlayerGui.MenuGui.Menu.TabContents.ToyDestroy.Contents
         end)
         
-        gucciActive = true
-        isGucciRunning = false
-        
-        -- Мониторинг Blobman
-        task.spawn(function()
-            while gucciActive and MyId == gucciRunId do
-                task.wait(1)
-                if not gucciBlob or not gucciBlob.Parent then
-                    print("[Gucci] Blobman исчез!")
-                    gucciActive = false
-                    isGucciRunning = false
-                    if gucciTask then
-                        task.wait(0.5)
-                        GucciAntiGrab()
-                    end
-                    break
+        if success and contents and index then
+            for i,v in ipairs(contents:GetChildren()) do
+                if v.Name == "CreatureBlobman" and i == index then
+                    local view = v.ViewItemButton
+                    view.Text = "GUCCI"
+                    view.TextScaled = true
+                    view.LowResImage.Image = ""
                 end
             end
-        end)
+        end
     end
 
-    -- КНОПКА GUCCI
     GucciBlock:CreateButton({
         Name = "GUCCI ANTI GRAB",
         Callback = function()
-            if isGucciRunning then
-                Library:Notify({ Title = "Gucci", Content = "Already running!", Duration = 2 })
-                return
-            end
             GucciAntiGrab()
             Library:Notify({ Title = "Gucci", Content = "Activated!", Duration = 2 })
         end
     })
 
-    -- AUTO RE-GUCCI
     GucciBlock:CreateToggle({
         Name = "Auto Re-Gucci (Loop)",
         Default = false,
         Callback = function(Value)
+            gucciActive = Value
+            
             if Value then
                 if gucciTask then task.cancel(gucciTask) end
                 gucciTask = task.spawn(function()
-                    while gucciTask do
-                        if not gucciActive or not gucciBlob or not gucciBlob.Parent then
+                    while gucciActive do
+                        local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
+                        local blob = BackPack and (BackPack:FindFirstChild("Gucci") or BackPack:FindFirstChild("CreatureBlobman"))
+                        
+                        if not blob or not blob.Parent then
                             clearBlobs()
                             task.wait(0.5)
                             GucciAntiGrab()
                         end
-                        task.wait(2)
+                        
+                        task.wait(1)
                     end
                 end)
                 Library:Notify({ Title = "Auto Re-Gucci", Content = "Enabled", Duration = 2 })
             else
-                gucciActive = false
                 if gucciTask then
                     task.cancel(gucciTask)
                     gucciTask = nil
                 end
                 clearBlobs()
-                isGucciRunning = false
                 Library:Notify({ Title = "Auto Re-Gucci", Content = "Disabled", Duration = 2 })
             end
         end
@@ -488,7 +515,6 @@ function StartMainScript(titleText)
             gucciTask = nil
         end
         clearBlobs()
-        isGucciRunning = false
     end)
 end
 
