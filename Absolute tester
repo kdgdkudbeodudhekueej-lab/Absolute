@@ -220,7 +220,7 @@ function StartMainScript(titleText)
         })
     end
 
-    -- ===== GUCCI ANTI GRAB С SANTA'S SLEIGH =====
+    -- ===== GUCCI ANTI GRAB С SLEIGH =====
     local gucciRunId = 0
     local gucciActive = false
     local gucciTask = nil
@@ -233,7 +233,7 @@ function StartMainScript(titleText)
         ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(prt, prt.CFrame) 
     end
 
-    -- Функция спавна Santa's Sleigh
+    -- Функция спавна Sleigh
     local function spawnSleigh(name, cframe)
         local ToySpawn = ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
         local InPlot, InOwnerPlot, CanSpawn = LocalPlayer.InPlot, LocalPlayer.InOwnedPlot, LocalPlayer.CanSpawnToy
@@ -269,7 +269,7 @@ function StartMainScript(titleText)
         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
         if BackPack then
             for _, v in pairs(BackPack:GetChildren()) do
-                if v.Name == "Gucci" or v.Name == "Santa's Sleigh" then
+                if v.Name == "Gucci" or v.Name == "Sleigh" then
                     pcall(function()
                         ReplicatedStorage.MenuToys.DestroyToy:FireServer(v)
                     end)
@@ -282,7 +282,7 @@ function StartMainScript(titleText)
         end
     end
 
-    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI С SANTA'S SLEIGH
+    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI С SLEIGH
     local function GucciAntiGrab()
         gucciRunId = gucciRunId + 1
         local MyId = gucciRunId
@@ -311,10 +311,10 @@ function StartMainScript(titleText)
         
         local autoGucciT, sitJumpT, Sleigh = true, false, nil
         
-        -- Спавн Santa's Sleigh
+        -- Спавн Sleigh
         local hrp = FWC(char, "HumanoidRootPart")
         Sleigh = spawnSleigh(
-            "Santa's Sleigh",
+            "Sleigh",
             hrp.CFrame * CFrame.new(0, 0, -5)
         )
         
@@ -440,7 +440,7 @@ function StartMainScript(titleText)
         
         if success and contents and index then
             for i,v in ipairs(contents:GetChildren()) do
-                if v.Name == "Santa's Sleigh" and i == index then
+                if v.Name == "Sleigh" and i == index then
                     local view = v.ViewItemButton
                     view.Text = "GUCCI"
                     view.TextScaled = true
@@ -454,7 +454,7 @@ function StartMainScript(titleText)
         Name = "GUCCI ANTI GRAB (Sleigh)",
         Callback = function()
             GucciAntiGrab()
-            Library:Notify({ Title = "Gucci", Content = "Activated with Santa's Sleigh!", Duration = 2 })
+            Library:Notify({ Title = "Gucci", Content = "Activated with Sleigh!", Duration = 2 })
         end
     })
 
@@ -469,7 +469,7 @@ function StartMainScript(titleText)
                 gucciTask = task.spawn(function()
                     while gucciActive do
                         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-                        local sleigh = BackPack and (BackPack:FindFirstChild("Gucci") or BackPack:FindFirstChild("Santa's Sleigh"))
+                        local sleigh = BackPack and (BackPack:FindFirstChild("Gucci") or BackPack:FindFirstChild("Sleigh"))
                         
                         if not sleigh or not sleigh.Parent then
                             clearSleighs()
