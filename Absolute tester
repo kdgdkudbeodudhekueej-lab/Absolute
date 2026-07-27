@@ -220,11 +220,12 @@ function StartMainScript(titleText)
         })
     end
 
-    -- ===== GUCCI ANTI GRAB =====
+    -- ===== GUCCI ANTI GRAB - РћР РР“РРќРђР› РР— POLAR HUB =====
     local gucciRunId = 0
     local gucciActive = false
     local gucciTask = nil
 
+    -- Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё
     local function FWC(Parent, Name, Time) 
         return Parent:FindFirstChild(Name) or Parent:WaitForChild(Name, Time or 3) 
     end
@@ -264,6 +265,7 @@ function StartMainScript(titleText)
         return SpawnedToy
     end
 
+    -- РћС‡РёСЃС‚РєР° Blobman
     local function clearBlobs()
         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
         if BackPack then
@@ -281,41 +283,7 @@ function StartMainScript(titleText)
         end
     end
 
-    -- НАСТОЯЩЕЕ УДАЛЕНИЕ КНОПОК ГРАБА
-    local grabUICleaner
-    local function destroyGrabUI()
-        -- Удаляем все существующие кнопки
-        local menuGui = LocalPlayer.PlayerGui:FindFirstChild("MenuGui")
-        if menuGui then
-            local actionContainer = menuGui:FindFirstChild("ActionContainer")
-            if actionContainer then
-                for _, child in pairs(actionContainer:GetChildren()) do
-                    if child:IsA("Frame") then
-                        child:Destroy()
-                    end
-                end
-            end
-        end
-        
-        -- Создаем ловушку для новых кнопок
-        if not grabUICleaner then
-            grabUICleaner = game:GetService("RunService").Stepped:Connect(function()
-                local menuGui = LocalPlayer.PlayerGui:FindFirstChild("MenuGui")
-                if menuGui then
-                    local actionContainer = menuGui:FindFirstChild("ActionContainer")
-                    if actionContainer then
-                        for _, child in pairs(actionContainer:GetChildren()) do
-                            if child:IsA("Frame") and child.Name ~= "Default" then
-                                child:Destroy()
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-    end
-
-    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI
+    -- РћРЎРќРћР’РќРђРЇ Р¤РЈРќРљР¦РРЇ GUCCI (РџРћР›РќРћРЎРўР¬Р® РР— POLAR HUB)
     local function GucciAntiGrab()
         gucciRunId = gucciRunId + 1
         local MyId = gucciRunId
@@ -323,11 +291,13 @@ function StartMainScript(titleText)
         local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hum = FWC(char, "Humanoid")
         
+        -- РЁР°Рі 1: РЎР±СЂРѕСЃ СЃРѕСЃС‚РѕСЏРЅРёСЏ
         hum.Sit = true
         task.wait(0.02)
         hum.Sit = false
         task.wait(0.02)
         
+        -- РЁР°Рі 2: РћСЃС‚Р°РЅРѕРІРєР° РґРІРёР¶РµРЅРёСЏ
         task.spawn(function()
             local time = tick()
             while tick()-time < 0.8 do
@@ -342,6 +312,7 @@ function StartMainScript(titleText)
         
         local autoGucciT, sitJumpT, Blob, BHead = true, false, nil, nil
         
+        -- РЁР°Рі 3: Р¤РѕРЅРѕРІС‹Р№ РіСЂР°Р± Blobman
         task.spawn(function()
             while not Blob and MyId == gucciRunId do
                 task.wait(0.01)
@@ -353,11 +324,12 @@ function StartMainScript(titleText)
             
             while MyId == gucciRunId and BHead and
             (not BHead:FindFirstChild("PartOwner") or BHead.PartOwner.Value ~= LocalPlayer.Name) do
-                if HitBox then grab(HitBox) end
+                grab(HitBox)
                 task.wait(0.01)
             end
         end)
         
+        -- РЁР°Рі 4: РЎРїР°РІРЅ Blobman
         local hrp = FWC(char, "HumanoidRootPart")
         Blob = toy_spawn_gucci(
             "CreatureBlobman",
@@ -367,11 +339,9 @@ function StartMainScript(titleText)
         
         if not Blob then return end
         
-        -- АКТИВИРУЕМ УДАЛЕНИЕ КНОПОК СРАЗУ
-        destroyGrabUI()
-        
         local Seat = FWC(Blob, "VehicleSeat")
         
+        -- РЁР°Рі 5: РџРѕСЃР°РґРєР° РЅР° Blobman + РїСЂС‹Р¶РєРё
         task.defer(function()
             if not(char or hum) then return end
             
@@ -394,6 +364,7 @@ function StartMainScript(titleText)
         
         sitJumpT = true
         
+        -- РЁР°Рі 6: РџРћРЎРўРћРЇРќРќР«Р™ Р РђР“Р”РћР›Р› (РљР›Р®Р§Р•Р’РђРЇ Р§РђРЎРўР¬!)
         task.defer(function()
             while sitJumpT and MyId == gucciRunId do
                 if char and hrp and hrp.Parent then
@@ -409,52 +380,19 @@ function StartMainScript(titleText)
         
         if MyId ~= gucciRunId then return end
         
+        -- РЁР°Рі 7: РџРµСЂРµРёРјРµРЅРѕРІР°РЅРёРµ
         hum.Sit = false
         Blob.Name = "Gucci"
         
-        -- Удаляем все ClickDetector'ы
-        for _, v in pairs(Blob:GetDescendants()) do
-            if v:IsA("ClickDetector") or v:IsA("ProximityPrompt") then
-                v:Destroy()
-            end
-        end
-        
-        -- Удаляем GrabbableHitbox
-        local gHitbox = Blob:FindFirstChild("GrabbableHitbox")
-        if gHitbox then
-            gHitbox:Destroy()
-        end
-        
-        -- Добавляем обычный ClickDetector
-        local blobHrp = Blob:FindFirstChild("HumanoidRootPart")
-        if blobHrp then
-            local detector = Instance.new("ClickDetector")
-            detector.Parent = blobHrp
-            detector.MaxActivationDistance = 20
-            
-            detector.MouseClick:Connect(function(player)
-                if player == LocalPlayer then
-                    local grabEvents = ReplicatedStorage:FindFirstChild("GrabEvents")
-                    if grabEvents then
-                        local setOwner = grabEvents:FindFirstChild("SetNetworkOwner")
-                        if setOwner then
-                            setOwner:FireServer(blobHrp, blobHrp.CFrame)
-                        end
-                    end
-                end
-            end)
-        end
-        
         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-        if BackPack then
-            for i,v in pairs(BackPack:GetChildren()) do
-                if v.Name == "Gucci" then
-                    index = i
-                    break
-                end
+        for i,v in pairs(BackPack:GetChildren()) do
+            if v.Name == "Gucci" then
+                index = i
+                break
             end
         end
         
+        -- РЁР°Рі 8: РћС‚РєР»СЋС‡РµРЅРёРµ РєРѕР»Р»РёР·РёР№
         for _,v in pairs(Blob:GetChildren()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
@@ -463,6 +401,7 @@ function StartMainScript(titleText)
             end
         end
         
+        -- РЁР°Рі 9: Р“РѕР»РѕРІР° РІ РЅРµР±Рµ
         task.defer(function()
             while MyId == gucciRunId and Blob and BHead do
                 BHead.CFrame = CFrame.new(BHead.Position.X, 1e5, BHead.Position.Z)
@@ -470,6 +409,7 @@ function StartMainScript(titleText)
             end
         end)
         
+        -- РЁР°Рі 10: РЎРјРµРЅР° РёРєРѕРЅРєРё РІ GUI
         local success, contents = pcall(function()
             return LocalPlayer.PlayerGui.MenuGui.Menu.TabContents.ToyDestroy.Contents
         end)
@@ -484,11 +424,9 @@ function StartMainScript(titleText)
                 end
             end
         end
-        
-        -- Продолжаем удалять кнопки
-        destroyGrabUI()
     end
 
+    -- РљРќРћРџРљРђ GUCCI (РљРђРљ Р’ РћР РР“РРќРђР›Р• - РћР”РќРћР РђР—РћР’Р«Р™ Р—РђРџРЈРЎРљ)
     GucciBlock:CreateButton({
         Name = "GUCCI ANTI GRAB",
         Callback = function()
@@ -497,6 +435,7 @@ function StartMainScript(titleText)
         end
     })
 
+    -- Р”РћРџРћР›РќРРўР•Р›Р¬РќРћ: Toggle РґР»СЏ РїРѕСЃС‚РѕСЏРЅРЅРѕР№ СЂР°Р±РѕС‚С‹ (РїРµСЂРµР·Р°РїСѓСЃРє РїСЂРё СЃРјРµСЂС‚Рё Blobman)
     GucciBlock:CreateToggle({
         Name = "Auto Re-Gucci (Loop)",
         Default = false,
@@ -510,6 +449,7 @@ function StartMainScript(titleText)
                         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
                         local blob = BackPack and (BackPack:FindFirstChild("Gucci") or BackPack:FindFirstChild("CreatureBlobman"))
                         
+                        -- Р•СЃР»Рё Blobman РёСЃС‡РµР· - РїРµСЂРµР·Р°РїСѓСЃРєР°РµРј Gucci
                         if not blob or not blob.Parent then
                             clearBlobs()
                             task.wait(0.5)
@@ -524,10 +464,6 @@ function StartMainScript(titleText)
                 if gucciTask then
                     task.cancel(gucciTask)
                     gucciTask = nil
-                end
-                if grabUICleaner then
-                    grabUICleaner:Disconnect()
-                    grabUICleaner = nil
                 end
                 clearBlobs()
                 Library:Notify({ Title = "Auto Re-Gucci", Content = "Disabled", Duration = 2 })
@@ -547,10 +483,6 @@ function StartMainScript(titleText)
         if gucciTask then
             task.cancel(gucciTask)
             gucciTask = nil
-        end
-        if grabUICleaner then
-            grabUICleaner:Disconnect()
-            grabUICleaner = nil
         end
         clearBlobs()
     end)
