@@ -113,6 +113,21 @@ function StartMainScript(titleText)
         ["Egg"] = "FoodDippyEgg",
         ["Bread"] = "FoodBread",
         ["Mayonnaise"] = "FoodMayonnaise",
+        ["Bugle"] = "InstrumentBrassBugle",
+        ["Trumpet"] = "InstrumentBrassTrumpet",
+        ["Vuvuzela"] = "InstrumentBrassVuvuzela",
+        ["Bongos"] = "InstrumentDrumBongos",
+        ["Snare Drum"] = "InstrumentDrumSnare",
+        ["Acoustic Guitar"] = "InstrumentGuitarAcoustic",
+        ["Banjo"] = "InstrumentGuitarBanjo",
+        ["Lyre"] = "InstrumentGuitarLyre",
+        ["Ukulele"] = "InstrumentGuitarUkulele",
+        ["Violin"] = "InstrumentGuitarViolin",
+        ["Keyboard"] = "InstrumentPianoKeyboard",
+        ["Melodica"] = "InstrumentPianoMelodica",
+        ["Microphone"] = "InstrumentVoiceMicrophone",
+        ["Ocarina"] = "InstrumentWoodwindOcarina",
+        ["Saxophone"] = "InstrumentWoodwindSaxophone",
     }
 
     local SelectedInputToy = "CupMugWhite"
@@ -1720,8 +1735,7 @@ function StartMainScript(titleText)
         MyPCLD = nil
         pcldConn = RunService.Heartbeat:Connect(function()
             if MyPCLD or not hrp or not hrp.Parent then 
-                if pcldConn then pcldConn:Disconnect() pcldConn = nil end
-                return
+                if pcldConn then pcldConn:Disconnect() pcldConn = nil end                return
             end
             for _, v in pairs(Workspace:GetChildren()) do 
                 if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
