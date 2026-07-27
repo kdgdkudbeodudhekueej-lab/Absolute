@@ -21,63 +21,65 @@ local ServerBlock = ServerTab:CreateBlock({Name = "Server Lag", Side = "Left"})
 
 local RS = game:GetService("ReplicatedStorage")
 local GrabEvents = RS:FindFirstChild("GrabEvents")
-local CreateGrabLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
+local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
 
--- ============ LINE LAG (1-10) С ВИДИМЫМИ ЛИНИЯМИ ============
-local lineLagActive = false
-local lineLagTask = nil
-local lineLagPower = 1
+-- ============ MONSTER LAG ИЗ ХУЙ.FLING ============
+local monsterLagActive = false
+local monsterLagTask = nil
+local monsterLagPower = 1
 
 ServerBlock:CreateSlider({
-    Name = "Line Lag Power (1-10)",
+    Name = "Monster Lag Power (1-10)",
     Min = 1,
     Max = 10,
     Default = 1,
     Rounding = 0,
     Callback = function(Value)
-        lineLagPower = Value
+        monsterLagPower = Value
     end
 })
 
 ServerBlock:CreateToggle({
-    Name = "Line Lag",
+    Name = "Monster Lag",
     Default = false,
     Callback = function(Value)
-        lineLagActive = Value
+        monsterLagActive = Value
         
         if Value then
-            local power = lineLagPower
-            local intensity = power * 50
+            local power = monsterLagPower
+            local intensity = power * 1000
             
             Library:Notify({ 
-                Title = "Line Lag", 
-                Content = "Enabled (Power: " .. power .. " | " .. intensity .. " lines/sec)", 
+                Title = "Monster Lag", 
+                Content = "Enabled (Power: " .. power .. " | Intensity: " .. intensity .. ")", 
                 Duration = 3 
             })
             
-            lineLagTask = task.spawn(function()
-                while lineLagActive do
-                    for _, player in pairs(Players:GetPlayers()) do
-                        if player.Character then
-                            local torso = player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso") or player.Character:FindFirstChild("HumanoidRootPart")
-                            if torso then
-                                for _ = 1, intensity do
-                                    pcall(function()
-                                        CreateGrabLine:FireServer(torso, Vector3.zero, torso.Position, false)
-                                    end)
-                                end
-                            end
+            monsterLagTask = task.spawn(function()
+                local WS = game:GetService("Workspace")
+                local LP = game:GetService("Players").LocalPlayer
+                
+                while monsterLagActive and CreateLine do
+                    for _ = 1, intensity do
+                        local spawnLocation = WS:FindFirstChild("SpawnLocation") 
+                            or WS:FindFirstChild("Spawn") 
+                            or (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart"))
+                        
+                        if spawnLocation then
+                            local randomX = math.random(-9e9, 9e9)
+                            local randomZ = math.random(-9e9, 9e9)
+                            CreateLine:FireServer(spawnLocation, CFrame.new(randomX, 0, randomZ))
                         end
                     end
                     task.wait(0.5)
                 end
             end)
         else
-            if lineLagTask then
-                task.cancel(lineLagTask)
-                lineLagTask = nil
+            if monsterLagTask then
+                task.cancel(monsterLagTask)
+                monsterLagTask = nil
             end
-            Library:Notify({ Title = "Line Lag", Content = "Disabled", Duration = 2 })
+            Library:Notify({ Title = "Monster Lag", Content = "Disabled", Duration = 2 })
         end
     end
 })
