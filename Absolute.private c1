@@ -79,7 +79,6 @@ function StartMainScript(titleText)
     local DefenseTab = Window:CreateTab("Defense", true)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
-    local ServerTab = Window:CreateTab("Server", true)
 
     local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
     local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
@@ -99,198 +98,6 @@ function StartMainScript(titleText)
     local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK v2", Side = "Left"})
     local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings v2", Side = "Right"})
     local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
-
-    local ServerBlock = ServerTab:CreateBlock({Name = "Server Lag", Side = "Left"})
-
-    local packetDetectorActive = false
-    local packetDetectorConn = nil
-    local lastLagSource = false
-
-    local function GetSizeMB(StringLength)
-        return StringLength / (1024 * 1024)
-    end
-
-    local function StartPacketDetector()
-        if packetDetectorConn then packetDetectorConn:Disconnect() end
-        packetDetectorConn = RS.GrabEvents.ExtendGrabLine.OnClientEvent:Connect(function(arg1, data)
-            if typeof(data) == "string" and not lastLagSource and packetDetectorActive then
-                lastLagSource = true
-                local StringLen = string.len(data)
-                
-                if StringLen > 300 then
-                    local SizeRounded = math.round(GetSizeMB(StringLen) * 1000) / 1000
-                    
-                    Library:Notify({
-                        Title = "Packet Detector",
-                        Content = "Size: " .. tostring(SizeRounded) .. " MB\nSource: " .. tostring(arg1):sub(1, 30),
-                        Duration = 5
-                    })
-                end
-                
-                task.delay(5, function()
-                    lastLagSource = false
-                end)
-            end
-        end)
-    end
-
-    ServerBlock:CreateToggle({
-        Name = "Packet Detector",
-        Default = false,
-        Callback = function(Value)
-            packetDetectorActive = Value
-            if Value then
-                StartPacketDetector()
-                Library:Notify({ Title = "Packet Detector", Content = "Enabled", Duration = 2 })
-            else
-                if packetDetectorConn then
-                    packetDetectorConn:Disconnect()
-                    packetDetectorConn = nil
-                end
-                Library:Notify({ Title = "Packet Detector", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    local packetLagActive = false
-    local packetLagTask = nil
-    local packetInterval = 1
-    local packetStrength = 6250
-
-    ServerBlock:CreateSlider({
-        Name = "Packet Lag Strength",
-        Min = 0,
-        Max = 6250,
-        Default = 6250,
-        Rounding = 1,
-        Callback = function(Value)
-            packetStrength = Value
-        end
-    })
-
-    ServerBlock:CreateSlider({
-        Name = "Send Interval (1-5 sec)",
-        Min = 1,
-        Max = 5,
-        Default = 1,
-        Rounding = 0,
-        Suffix = "sec",
-        Callback = function(Value)
-            packetInterval = Value
-        end
-    })
-
-    ServerBlock:CreateButton({
-        Name = "Send Packet (Manual)",
-        Callback = function()
-            local packetSize = string.rep("😂😂😂😂🤣🤣🤣🤣", 100 * packetStrength)
-            local sizeMB = math.round(GetSizeMB(string.len(packetSize)) * 1000) / 1000
-            
-            pcall(function()
-                RS.GrabEvents.ExtendGrabLine:FireServer(packetSize)
-                Library:Notify({ 
-                    Title = "Packet Sent", 
-                    Content = "Size: ~" .. sizeMB .. " MB", 
-                    Duration = 2 
-                })
-            end)
-        end
-    })
-
-    ServerBlock:CreateToggle({
-        Name = "Packet Lag (Auto Send)",
-        Default = false,
-        Callback = function(Value)
-            packetLagActive = Value
-            if Value then
-                local packetSize = string.rep("😂😂😂😂🤣🤣🤣🤣", 100 * packetStrength)
-                local sizeMB = math.round(GetSizeMB(string.len(packetSize)) * 1000) / 1000
-                
-                Library:Notify({ 
-                    Title = "Packet Lag", 
-                    Content = "Enabled (~" .. sizeMB .. " MB | Interval: " .. packetInterval .. "s)", 
-                    Duration = 3 
-                })
-                
-                packetLagTask = task.spawn(function()
-                    local ExtendGrabLine = RS.GrabEvents.ExtendGrabLine
-                    while packetLagActive do
-                        task.wait(packetInterval)
-                        pcall(function()
-                            ExtendGrabLine:FireServer(packetSize)
-                        end)
-                    end
-                end)
-            else
-                if packetLagTask then
-                    task.cancel(packetLagTask)
-                    packetLagTask = nil
-                end
-                Library:Notify({ Title = "Packet Lag", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    local lagLineActive = false
-    local lagLineTask = nil
-
-    ServerBlock:CreateSlider({
-        Name = "Line Lag Power (1-10)",
-        Min = 1,
-        Max = 10,
-        Default = 1,
-        Rounding = 0,
-        Callback = function(Value)
-        end
-    })
-
-    local function ServerLagLineFunction(intensity)
-        local createGrabLineEvent = RS:WaitForChild("GrabEvents"):WaitForChild("CreateGrabLine")
-        
-        while lagLineActive do
-            for _ = 1, intensity do
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player.Character then
-                        local torso = player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso")
-                        if torso then
-                            pcall(function()
-                                createGrabLineEvent:FireServer(torso, torso.CFrame)
-                            end)
-                        end
-                    end
-                end
-            end
-            task.wait(1)
-        end
-    end
-
-    ServerBlock:CreateToggle({
-        Name = "Line Lag",
-        Default = false,
-        Callback = function(Value)
-            lagLineActive = Value
-            if Value then
-                local power = Options["LineLagPower"] and Options["LineLagPower"].Value or 1
-                local intensity = power * 100
-                
-                Library:Notify({ 
-                    Title = "Line Lag", 
-                    Content = "Enabled (Power: " .. power .. " | " .. intensity .. " lines/sec)", 
-                    Duration = 3 
-                })
-                
-                lagLineTask = task.spawn(function()
-                    ServerLagLineFunction(intensity)
-                end)
-            else
-                if lagLineTask then
-                    task.cancel(lagLineTask)
-                    lagLineTask = nil
-                end
-                Library:Notify({ Title = "Line Lag", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -486,13 +293,13 @@ function StartMainScript(titleText)
     local blobmanKickActive = false
     local blobmanKickTask = nil
     local blobmanTarget = nil
-    local blobmanGrabInterval = 0.001
+    local blobmanGrabInterval = 0.02
     local blobmanHoldHeight = 15
 
     local blobmanV2Target = nil
     local blobmanV2KickActive = false
     local blobmanV2KickTask = nil
-    local blobmanV2GrabInterval = 0.001
+    local blobmanV2GrabInterval = 0.02
     local blobmanV2HoldHeight = 15
 
     local ownershipRagdollActive = false
@@ -739,11 +546,11 @@ function StartMainScript(titleText)
     })
 
     BlodmanSettingsBlock:CreateSlider({
-        Name = "Blodman Interval (0.001 - 0.05)",
-        Min = 0.001,
-        Max = 0.05,
-        Default = 0.001,
-        Rounding = 3,
+        Name = "Blodman Interval (0.01 - 0.1)",
+        Min = 0.01,
+        Max = 0.1,
+        Default = 0.02,
+        Rounding = 2,
         Callback = function(Value)
             blobmanGrabInterval = Value
         end
@@ -944,11 +751,11 @@ function StartMainScript(titleText)
     })
 
     BlodmanV2SettingsBlock:CreateSlider({
-        Name = "Interval (0.001 - 0.05)",
-        Min = 0.001,
-        Max = 0.05,
-        Default = 0.001,
-        Rounding = 3,
+        Name = "Interval (0.01 - 0.1)",
+        Min = 0.01,
+        Max = 0.1,
+        Default = 0.02,
+        Rounding = 2,
         Callback = function(Value)
             blobmanV2GrabInterval = Value
         end
@@ -1994,6 +1801,7 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
+                    -- ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: ТОЛЬКО ДЛЯ ФОНАРЯ ПОДНИМАЕМ НА 1.5
                     if SelectedToy == "JapaneseLantern" then
                         SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                     else
