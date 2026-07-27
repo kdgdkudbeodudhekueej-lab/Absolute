@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-local UserInputService = game:GetService("UserInputService")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Server_Lag_Script"
@@ -20,46 +19,47 @@ local Window = Library:CreateWindow({
 local ServerTab = Window:CreateTab("Server", true)
 local ServerBlock = ServerTab:CreateBlock({Name = "Server Lag", Side = "Left"})
 
--- ============ LINE LAG (1-10) ============
-local lineLagActive = false
-local lineLagTask = nil
-local lineLagPower = 1
 local RS = game:GetService("ReplicatedStorage")
+local GrabEvents = RS:FindFirstChild("GrabEvents")
+local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
+
+-- ============ MONSTER LAG (из ХУЙ.FLING) ============
+local monsterLagActive = false
+local monsterLagTask = nil
+local monsterLagPower = 1
 
 ServerBlock:CreateSlider({
-    Name = "Line Lag Power (1-10)",
+    Name = "Monster Lag Power (1-10)",
     Min = 1,
     Max = 10,
     Default = 1,
     Rounding = 0,
     Callback = function(Value)
-        lineLagPower = Value
+        monsterLagPower = Value
     end
 })
 
 ServerBlock:CreateToggle({
-    Name = "Line Lag",
+    Name = "Monster Lag",
     Default = false,
     Callback = function(Value)
-        lineLagActive = Value
+        monsterLagActive = Value
         
         if Value then
-            local power = lineLagPower
-            local intensity = power * 1000 -- 1 = 1000, 10 = 10000
+            local power = monsterLagPower
+            local intensity = power * 1000
             
             Library:Notify({ 
-                Title = "Line Lag", 
+                Title = "Monster Lag", 
                 Content = "Enabled (Power: " .. power .. " | Intensity: " .. intensity .. ")", 
                 Duration = 3 
             })
             
-            lineLagTask = task.spawn(function()
-                local GrabEvents = RS:FindFirstChild("GrabEvents")
-                local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
+            monsterLagTask = task.spawn(function()
                 local WS = game:GetService("Workspace")
                 local LP = game:GetService("Players").LocalPlayer
                 
-                while lineLagActive and CreateLine do
+                while monsterLagActive and CreateLine do
                     for _ = 1, intensity do
                         local spawnLocation = WS:FindFirstChild("SpawnLocation") 
                             or WS:FindFirstChild("Spawn") 
@@ -75,11 +75,11 @@ ServerBlock:CreateToggle({
                 end
             end)
         else
-            if lineLagTask then
-                task.cancel(lineLagTask)
-                lineLagTask = nil
+            if monsterLagTask then
+                task.cancel(monsterLagTask)
+                monsterLagTask = nil
             end
-            Library:Notify({ Title = "Line Lag", Content = "Disabled", Duration = 2 })
+            Library:Notify({ Title = "Monster Lag", Content = "Disabled", Duration = 2 })
         end
     end
 })
