@@ -281,7 +281,7 @@ function StartMainScript(titleText)
         end
     end
 
-    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI
+    -- ОСНОВНАЯ ФУНКЦИЯ GUCCI (ИСПРАВЛЕННАЯ)
     local function GucciAntiGrab()
         gucciRunId = gucciRunId + 1
         local MyId = gucciRunId
@@ -289,11 +289,13 @@ function StartMainScript(titleText)
         local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hum = FWC(char, "Humanoid")
         
+        -- Шаг 1: Сброс состояния
         hum.Sit = true
         task.wait(0.02)
         hum.Sit = false
         task.wait(0.02)
         
+        -- Шаг 2: Остановка движения
         task.spawn(function()
             local time = tick()
             while tick()-time < 0.8 do
@@ -308,6 +310,7 @@ function StartMainScript(titleText)
         
         local autoGucciT, sitJumpT, Blob, BHead = true, false, nil, nil
         
+        -- Шаг 3: Фоновый граб Blobman
         task.spawn(function()
             while not Blob and MyId == gucciRunId do
                 task.wait(0.01)
@@ -319,11 +322,12 @@ function StartMainScript(titleText)
             
             while MyId == gucciRunId and BHead and
             (not BHead:FindFirstChild("PartOwner") or BHead.PartOwner.Value ~= LocalPlayer.Name) do
-                grab(HitBox)
+                if HitBox then grab(HitBox) end
                 task.wait(0.01)
             end
         end)
         
+        -- Шаг 4: Спавн Blobman
         local hrp = FWC(char, "HumanoidRootPart")
         Blob = toy_spawn_gucci(
             "CreatureBlobman",
@@ -332,9 +336,33 @@ function StartMainScript(titleText)
         )
         
         if not Blob then return end
+
+        -- === ИСПРАВЛЕНИЕ UI КНОПОК ===
+        -- Отключаем все интерактивы у спавненного Blobman сразу, чтобы UI не создавал вторую кнопку хвата
+        local function disableBlobInteractions(model)
+            for _, v in pairs(model:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = false
+                    v.CanQuery = false
+                elseif v:IsA("ProximityPrompt") or v:IsA("ClickDetector") then
+                    v.Enabled = false
+                end
+            end
+        end
+        disableBlobInteractions(Blob)
+        Blob.DescendantAdded:Connect(function(v)
+            if v:IsA("BasePart") then
+                v.CanTouch = false
+                v.CanQuery = false
+            elseif v:IsA("ProximityPrompt") or v:IsA("ClickDetector") then
+                v.Enabled = false
+            end
+        end)
+        -- ============================
         
         local Seat = FWC(Blob, "VehicleSeat")
         
+        -- Шаг 5: Посадка на Blobman + прыжки
         task.defer(function()
             if not(char or hum) then return end
             
@@ -357,6 +385,7 @@ function StartMainScript(titleText)
         
         sitJumpT = true
         
+        -- Шаг 6: ПОСТОЯННЫЙ РАГДОЛЛ
         task.defer(function()
             while sitJumpT and MyId == gucciRunId do
                 if char and hrp and hrp.Parent then
@@ -372,62 +401,27 @@ function StartMainScript(titleText)
         
         if MyId ~= gucciRunId then return end
         
+        -- Шаг 7: Переименование
         hum.Sit = false
         Blob.Name = "Gucci"
-        
-        -- ===== НОВЫЙ КОД: УБИРАЕМ КНОПКИ РУК И ВОССТАНАВЛИВАЕМ ОБЫЧНЫЙ ГРАБ =====
-        task.defer(function()
-            if Blob and Blob.Parent then
-                -- Удаляем все ClickDetector'ы с частей Blobman'а
-                for _, part in pairs(Blob:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        for _, child in pairs(part:GetChildren()) do
-                            if child:IsA("ClickDetector") then
-                                child:Destroy()
-                            end
-                        end
-                    end
-                end
-                
-                -- Добавляем обычный ClickDetector на HumanoidRootPart
-                local blobHrp = Blob:FindFirstChild("HumanoidRootPart")
-                if blobHrp then
-                    -- Создаем новый детектор для обычного граба
-                    local newDetector = Instance.new("ClickDetector")
-                    newDetector.Parent = blobHrp
-                    newDetector.MaxActivationDistance = 15
-                    
-                    newDetector.MouseClick:Connect(function(player)
-                        if player == LocalPlayer then
-                            -- Обычный граб как у игроков
-                            local grabEvent = ReplicatedStorage:FindFirstChild("GrabEvents")
-                            if grabEvent then
-                                local setOwner = grabEvent:FindFirstChild("SetNetworkOwner")
-                                if setOwner then
-                                    setOwner:FireServer(blobHrp, blobHrp.CFrame)
-                                end
-                            end
-                        end
-                    end)
-                end
-                
-                -- Включаем стандартные состояния humanoid
-                local blobHum = Blob:FindFirstChild("Humanoid")
-                if blobHum then
-                    blobHum:SetStateEnabled(Enum.HumanoidStateType.Grabbing, true)
-                end
-            end
-        end)
-        -- ===== КОНЕЦ НОВОГО КОДА =====
+
+        -- Удаляем GrabbableHitbox у Blobman, чтобы кнопка гарантированно исчезла с экрана
+        local gHitbox = Blob:FindFirstChild("GrabbableHitbox")
+        if gHitbox then
+            gHitbox:Destroy()
+        end
         
         local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-        for i,v in pairs(BackPack:GetChildren()) do
-            if v.Name == "Gucci" then
-                index = i
-                break
+        if BackPack then
+            for i,v in pairs(BackPack:GetChildren()) do
+                if v.Name == "Gucci" then
+                    index = i
+                    break
+                end
             end
         end
         
+        -- Шаг 8: Отключение коллизий
         for _,v in pairs(Blob:GetChildren()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
@@ -436,6 +430,7 @@ function StartMainScript(titleText)
             end
         end
         
+        -- Шаг 9: Голова в небе
         task.defer(function()
             while MyId == gucciRunId and Blob and BHead do
                 BHead.CFrame = CFrame.new(BHead.Position.X, 1e5, BHead.Position.Z)
@@ -443,6 +438,7 @@ function StartMainScript(titleText)
             end
         end)
         
+        -- Шаг 10: Смена иконки в GUI
         local success, contents = pcall(function()
             return LocalPlayer.PlayerGui.MenuGui.Menu.TabContents.ToyDestroy.Contents
         end)
