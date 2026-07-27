@@ -1,4 +1,4 @@
--- Мини-скрипт: Ownership Kick (с Attachment/Align), Third Person, FOV 120
+-- Мини-скрипт: Ownership Kick (с нуля), Third Person, FOV 120
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -123,61 +123,14 @@ function StartMiniScript(titleText)
         if fovEnabled then SetFOV(true) end
     end)
 
-    -- Функция для создания Attachment и Align объектов
-    local function CreateKickAttachments(targetRoot, targetHead, lockPos)
-        -- Очищаем старые объекты
-        for _, child in pairs(targetRoot:GetChildren()) do
-            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
-                child:Destroy()
-            end
-        end
-        
-        -- Создаем Attachment на корне цели
-        local targetAttach = Instance.new("Attachment")
-        targetAttach.Name = "KickAttachment"
-        targetAttach.Parent = targetRoot
-        targetAttach.Position = Vector3.new(0, 0, 0)
-        targetAttach.WorldPosition = lockPos.Position
-        
-        -- Создаем Attachment на голове (для привязки позиции)
-        local headAttach = Instance.new("Attachment")
-        headAttach.Name = "KickAttachment"
-        headAttach.Parent = targetHead
-        headAttach.Position = Vector3.new(0, 0, 0)
-        
-        -- AlignPosition для удержания на месте
-        local alignPos = Instance.new("AlignPosition")
-        alignPos.Name = "KickAlignPosition"
-        alignPos.Parent = targetRoot
-        alignPos.Attachment0 = targetAttach
-        alignPos.Attachment1 = headAttach
-        alignPos.Enabled = true
-        alignPos.ReactionForceEnabled = false
-        alignPos.Responsiveness = 500
-        alignPos.MaxForce = 9e9
-        alignPos.MaxVelocity = 500
-        
-        -- AlignOrientation для контроля вращения
-        local alignOri = Instance.new("AlignOrientation")
-        alignOri.Name = "KickAlignOrientation"
-        alignOri.Parent = targetRoot
-        alignOri.Attachment0 = targetAttach
-        alignOri.Attachment1 = headAttach
-        alignOri.Enabled = true
-        alignOri.ReactionTorqueEnabled = false
-        alignOri.Responsiveness = 500
-        alignOri.MaxTorque = 9e9
-        
-        return targetAttach, headAttach, alignPos, alignOri
-    end
-
-    local function CleanupKick(target)
+    -- Очистка объектов на цели
+    local function CleanupTarget(target)
         if not target then return end
-        local char = target.Character
-        if not char then return end
+        local character = target.Character
+        if not character then return end
         
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local head = char:FindFirstChild("Head")
+        local root = character:FindFirstChild("HumanoidRootPart")
+        local head = character:FindFirstChild("Head")
         
         if root then
             for _, child in pairs(root:GetChildren()) do
@@ -196,71 +149,123 @@ function StartMiniScript(titleText)
         end
     end
 
-    local function OwnershipKickFunction(targetName)
+    -- Создание Attachment и Align объектов
+    local function CreateAttachments(targetRoot, targetHead, targetPos)
+        -- Удаляем старые объекты
+        for _, child in pairs(targetRoot:GetChildren()) do
+            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                child:Destroy()
+            end
+        end
+        
+        -- Attachment на корне
+        local rootAttach = Instance.new("Attachment")
+        rootAttach.Name = "KickRootAttachment"
+        rootAttach.Parent = targetRoot
+        rootAttach.Position = Vector3.new(0, 0, 0)
+        rootAttach.WorldPosition = targetPos
+        
+        -- Attachment на голове
+        local headAttach = Instance.new("Attachment")
+        headAttach.Name = "KickHeadAttachment"
+        headAttach.Parent = targetHead
+        headAttach.Position = Vector3.new(0, 0, 0)
+        
+        -- AlignPosition для удержания позиции
+        local alignPos = Instance.new("AlignPosition")
+        alignPos.Name = "KickAlignPosition"
+        alignPos.Parent = targetRoot
+        alignPos.Attachment0 = rootAttach
+        alignPos.Attachment1 = headAttach
+        alignPos.Enabled = true
+        alignPos.ReactionForceEnabled = false
+        alignPos.Responsiveness = 1000
+        alignPos.MaxForce = 9e9
+        alignPos.MaxVelocity = 1000
+        
+        -- AlignOrientation для контроля вращения
+        local alignOri = Instance.new("AlignOrientation")
+        alignOri.Name = "KickAlignOrientation"
+        alignOri.Parent = targetRoot
+        alignOri.Attachment0 = rootAttach
+        alignOri.Attachment1 = headAttach
+        alignOri.Enabled = true
+        alignOri.ReactionTorqueEnabled = false
+        alignOri.Responsiveness = 1000
+        alignOri.MaxTorque = 9e9
+        
+        return rootAttach, headAttach, alignPos, alignOri
+    end
+
+    -- Основная функция кика
+    local function KickFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target then return end
         
-        local myChar = LocalPlayer.Character
-        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myCharacter = LocalPlayer.Character
+        local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
         if not myRoot then return end
 
-        local savedPos = myRoot.CFrame 
-        local dragging = false
+        local savedPosition = myRoot.CFrame
+        local isDragging = false
         local grabStartTime = 0
         local checkStartTime = 0
         
-        local currentFPS = 60
-        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
-            currentFPS = 1 / dt
-        end)
-
-        local targetAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
-
+        local rootAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
+        
         while kickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
             if not currentTarget or not currentTarget.Parent then 
-                CleanupKick(target)
+                CleanupTarget(target)
                 break 
             end
             
-            myChar = LocalPlayer.Character
-            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local tChar = currentTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            local tHead = tChar and tChar:FindFirstChild("Head")
-            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+            myCharacter = LocalPlayer.Character
+            myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
             
-            if tRoot and tHead and tHum and tHum.Health > 0 and myRoot then
-                if not dragging then
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                    CleanupKick(target)
+            local targetChar = currentTarget.Character
+            local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+            local targetHead = targetChar and targetChar:FindFirstChild("Head")
+            local targetHumanoid = targetChar and targetChar:FindFirstChild("Humanoid")
+            
+            if targetRoot and targetHead and targetHumanoid and targetHumanoid.Health > 0 and myRoot then
+                if not isDragging then
+                    -- Первая фаза: подходим к цели
+                    myRoot.PivotTo(targetRoot.CFrame * CFrame.new(0, 0, 3))
+                    CleanupTarget(target)
                     checkStartTime = 0
+                    
                     pcall(function()
-                        tHum.PlatformStand = true
-                        tHum.Sit = true
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        DestroyGrabLine:FireServer(tRoot)
+                        targetHumanoid.PlatformStand = true
+                        targetHumanoid.Sit = true
+                        SetNetworkOwner:FireServer(targetRoot, targetRoot.CFrame)
+                        SetNetworkOwner:FireServer(targetRoot, targetRoot.CFrame)
+                        DestroyGrabLine:FireServer(targetRoot)
                     end)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if grabStartTime == 0 then grabStartTime = tick() end
-                    if tick() - grabStartTime > 0.35 then
-                        dragging = true
-                        grabStartTime = 0
-                        checkStartTime = tick()
-                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                        targetAttach, headAttach, alignPos, alignOri = CreateKickAttachments(tRoot, tHead, lockPos)
-                    end
-                else
-                    myRoot.CFrame = savedPos
-                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                    
                     myRoot.AssemblyLinearVelocity = Vector3.zero
                     myRoot.AssemblyAngularVelocity = Vector3.zero
                     
-                    -- Обновляем позицию через AlignPosition
-                    if targetAttach and targetAttach.Parent then
-                        targetAttach.WorldPosition = lockPos.Position
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.35 then
+                        isDragging = true
+                        grabStartTime = 0
+                        checkStartTime = tick()
+                        
+                        local lockPosition = savedPosition * CFrame.new(0, holdHeight, 0)
+                        rootAttach, headAttach, alignPos, alignOri = CreateAttachments(targetRoot, targetHead, lockPosition.Position)
+                    end
+                else
+                    -- Вторая фаза: удерживаем цель
+                    myRoot.PivotTo(savedPosition)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    local lockPosition = savedPosition * CFrame.new(0, holdHeight, 0)
+                    
+                    -- Обновляем позицию через Attachment
+                    if rootAttach and rootAttach.Parent then
+                        rootAttach.WorldPosition = lockPosition.Position
                     end
                     
                     if alignPos and alignPos.Parent then
@@ -271,56 +276,47 @@ function StartMiniScript(titleText)
                         alignOri.Enabled = true
                     end
                     
-                    tHum.PlatformStand = true
+                    targetHumanoid.PlatformStand = true
+                    
                     pcall(function()
-                        if currentFPS > 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        elseif currentFPS >= 155 and currentFPS <= 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        else
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        end
+                        SetNetworkOwner:FireServer(targetRoot, lockPosition)
+                        SetNetworkOwner:FireServer(targetRoot, lockPosition)
+                        SetNetworkOwner:FireServer(targetRoot, lockPosition)
+                        SetNetworkOwner:FireServer(targetRoot, lockPosition)
+                        DestroyGrabLine:FireServer(targetRoot)
                     end)
                     
+                    -- Проверка: не сбежала ли цель
                     if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
-                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
-                        if currentDist > 10 then
-                            dragging = false
+                        local currentDistance = (targetRoot.Position - lockPosition.Position).Magnitude
+                        if currentDistance > 10 then
+                            isDragging = false
                             grabStartTime = 0
                             checkStartTime = 0
-                            CleanupKick(target)
-                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                            CleanupTarget(target)
+                            myRoot.PivotTo(targetRoot.CFrame * CFrame.new(0, 0, 3))
                         else
                             checkStartTime = tick()
                         end
                     end
                 end
             else
-                dragging = false
+                isDragging = false
                 grabStartTime = 0
                 checkStartTime = 0
-                CleanupKick(target)
-                targetAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
+                CleanupTarget(target)
+                rootAttach, headAttach, alignPos, alignOri = nil, nil, nil, nil
             end
             RunService.Heartbeat:Wait()
         end
         
-        fpsConnection:Disconnect()
-        CleanupKick(target)
-        if myRoot then myRoot.CFrame = savedPos end
+        -- Очистка при завершении
+        CleanupTarget(target)
+        if myRoot then myRoot.PivotTo(savedPosition) end
         if target and target.Character then
-            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
-            if tRoot then
-                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+            local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                pcall(function() DestroyGrabLine:FireServer(targetRoot) end)
             end
         end
     end
@@ -336,24 +332,22 @@ function StartMiniScript(titleText)
                 end
                 kickActive = true
                 if kickTask then task.cancel(kickTask) kickTask = nil end
-                kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
+                kickTask = task.spawn(function() KickFunction(selectedTarget.Name) end)
                 Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
             else
                 kickActive = false
                 if kickTask then task.cancel(kickTask) kickTask = nil end
-                CleanupKick(selectedTarget)
+                CleanupTarget(selectedTarget)
                 if selectedTarget and selectedTarget.Character then
-                    local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-                    if tRoot then
-                        for _, v in pairs(tRoot:GetChildren()) do
-                            if v:IsA("Attachment") or v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-                                pcall(function() v:Destroy() end)
+                    local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        for _, child in pairs(targetRoot:GetChildren()) do
+                            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                                child:Destroy()
                             end
                         end
-                        pcall(function()
-                            tRoot.AssemblyLinearVelocity = Vector3.zero
-                            tRoot.AssemblyAngularVelocity = Vector3.zero
-                        end)
+                        targetRoot.AssemblyLinearVelocity = Vector3.zero
+                        targetRoot.AssemblyAngularVelocity = Vector3.zero
                     end
                 end
                 Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
@@ -370,6 +364,7 @@ function StartMiniScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
+    -- Автообновление списка игроков
     task.spawn(function()
         while true do
             updateList()
@@ -380,10 +375,11 @@ function StartMiniScript(titleText)
         end
     end)
 
+    -- Очистка при телепорте
     LocalPlayer.OnTeleport:Connect(function()
         kickActive = false
         if kickTask then task.cancel(kickTask) kickTask = nil end
-        CleanupKick(selectedTarget)
+        CleanupTarget(selectedTarget)
         if fovEnabled then SetFOV(false) fovEnabled = false end
     end)
 end
