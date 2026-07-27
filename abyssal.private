@@ -293,13 +293,13 @@ function StartMainScript(titleText)
     local blobmanKickActive = false
     local blobmanKickTask = nil
     local blobmanTarget = nil
-    local blobmanGrabInterval = 0.001
+    local blobmanGrabInterval = 0.02
     local blobmanHoldHeight = 15
 
     local blobmanV2Target = nil
     local blobmanV2KickActive = false
     local blobmanV2KickTask = nil
-    local blobmanV2GrabInterval = 0.001
+    local blobmanV2GrabInterval = 0.02
     local blobmanV2HoldHeight = 15
 
     local ownershipRagdollActive = false
@@ -546,11 +546,11 @@ function StartMainScript(titleText)
     })
 
     BlodmanSettingsBlock:CreateSlider({
-        Name = "Blodman Interval (0.001 - 0.05)",
-        Min = 0.001,
-        Max = 0.05,
-        Default = 0.001,
-        Rounding = 3,
+        Name = "Blodman Interval (0.01 - 0.1)",
+        Min = 0.01,
+        Max = 0.1,
+        Default = 0.02,
+        Rounding = 2,
         Callback = function(Value)
             blobmanGrabInterval = Value
         end
@@ -751,11 +751,11 @@ function StartMainScript(titleText)
     })
 
     BlodmanV2SettingsBlock:CreateSlider({
-        Name = "Interval (0.001 - 0.05)",
-        Min = 0.001,
-        Max = 0.05,
-        Default = 0.001,
-        Rounding = 3,
+        Name = "Interval (0.01 - 0.1)",
+        Min = 0.01,
+        Max = 0.1,
+        Default = 0.02,
+        Rounding = 2,
         Callback = function(Value)
             blobmanV2GrabInterval = Value
         end
@@ -1735,7 +1735,8 @@ function StartMainScript(titleText)
         MyPCLD = nil
         pcldConn = RunService.Heartbeat:Connect(function()
             if MyPCLD or not hrp or not hrp.Parent then 
-                if pcldConn then pcldConn:Disconnect() pcldConn = nil end                return
+                if pcldConn then pcldConn:Disconnect() pcldConn = nil end
+                return
             end
             for _, v in pairs(Workspace:GetChildren()) do 
                 if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
