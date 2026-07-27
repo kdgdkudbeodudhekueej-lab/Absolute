@@ -20,11 +20,21 @@ local Window = Library:CreateWindow({
     ToggleKey = Enum.KeyCode.RightShift,
 })
 
+-- СОЗДАЕМ ВКЛАДКИ
 local MainTab = Window:CreateTab("Main", true)
-local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
-local VisualBlock = MainTab:CreateBlock({Name = "Visual", Side = "Left"})
-local AntiKickBlock = MainTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+local VisualTab = Window:CreateTab("Visual", true)
+local AntiKickTab = Window:CreateTab("Anti-Kick", true)
 
+-- БЛОКИ В MAIN
+local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
+
+-- БЛОКИ В VISUAL
+local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+
+-- БЛОКИ В ANTI-KICK
+local AntiKickItemBlock = AntiKickTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+
+-- ============ VISUAL ============
 -- FOV 120
 local fovEnabled = false
 local originalFOV = 70
@@ -68,12 +78,28 @@ VisualBlock:CreateToggle({
     end
 })
 
--- Anti-Kick ITEM
+-- ============ ANTI-KICK ITEM ============
 local antiKickItemActive = false
 local antiKickItemTask = nil
 local MyPCLD = nil
 local pcldConn = nil
 local SelectedToy = "JapaneseLantern"
+
+-- ВЫБОР ПРЕДМЕТА
+AntiKickItemBlock:CreateDropdown({
+    Name = "Select Item",
+    Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
+    Default = "Japanese Lantern",
+    Callback = function(Value)
+        local ToyList = {
+            ["Japanese Lantern"] = "JapaneseLantern",
+            ["Spray Can"] = "SprayCanWD",
+            ["Spooky Candle"] = "SpookyCandle1",
+        }
+        SelectedToy = ToyList[Value] or "JapaneseLantern"
+        Library:Notify({ Title = "Anti-Kick", Content = "Selected: " .. Value, Duration = 2 })
+    end
+})
 
 local function GetMagnitude(Part1, Part2)
     return (Part1.Position - Part2.Position).Magnitude
@@ -267,7 +293,8 @@ local function StopAntiKickItem()
     end)
 end
 
-AntiKickBlock:CreateToggle({
+-- ТОГГЛ АНТИ-КИК
+AntiKickItemBlock:CreateToggle({
     Name = "Anti-Kick [ITEM]",
     Default = false,
     Callback = function(Value)
