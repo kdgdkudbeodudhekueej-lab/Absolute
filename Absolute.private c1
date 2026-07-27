@@ -1,0 +1,344 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local RS = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "Absolute_Mini"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "Absolute Mini",
+    Theme = "Night",
+    ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
+    ToggleKey = Enum.KeyCode.RightShift,
+})
+
+local DefenseTab = Window:CreateTab("Defense", true)
+local VisualTab = Window:CreateTab("Visual", true)
+
+local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+
+local antiKickItemActive = false
+local antiKickItemTask = nil
+local MyPCLD = nil
+local pcldConn = nil
+local SelectedToy = "SpookyCandle1"
+
+local function GetMagnitude(Part1, Part2)
+    return (Part1.Position - Part2.Position).Magnitude
+end
+
+local function FWD(parent, part, timeOffset)
+    return parent:FindFirstChild(part) or parent:WaitForChild(part, timeOffset or 1)
+end
+
+local function CheckNetworkOwnerOnPart(Part) 
+    local po = Part:FindFirstChild("PartOwner")
+    return po and po.Value == LocalPlayer.Name
+end
+
+local function sno(part)
+    pcall(function()
+        local grabEvents = RS:FindFirstChild("GrabEvents")
+        local setNetOwner = grabEvents and grabEvents:FindFirstChild("SetNetworkOwner")
+        if setNetOwner then
+            setNetOwner:FireServer(part, part.CFrame)
+        end
+    end)
+end
+
+local function CheckForHome()
+    local plotItems = Workspace:FindFirstChild("PlotItems")
+    local plots = Workspace:FindFirstChild("Plots")
+    
+    if plots and plotItems then
+        for i = 1, 5 do 
+            local Plot = plots:FindFirstChild("Plot"..i)
+            if Plot then
+                local sign = Plot:FindFirstChild("PlotSign")
+                local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
+                if owners then
+                    for _,v in pairs(owners:GetChildren()) do 
+                        if v.Value == LocalPlayer.Name then 
+                            return plotItems:FindFirstChild("Plot"..i)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function SpawnToyItem(ToyName)
+    local InPlot = LocalPlayer:FindFirstChild("InPlot")
+    local InOwnedPlot = LocalPlayer:FindFirstChild("InOwnedPlot")
+    local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
+    local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+
+    if InPlot and InPlot.Value and InOwnedPlot and not InOwnedPlot.Value then 
+        InPlot:GetPropertyChangedSignal("Value"):Wait()
+    end 
+    if CanSpawnToy and not CanSpawnToy.Value then 
+        CanSpawnToy:GetPropertyChangedSignal("Value"):Wait()
+    end
+
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local SpawnCF = (MyPCLD or hrp).CFrame * CFrame.new(0, 14, 20)
+    local Container = (InOwnedPlot and InOwnedPlot.Value) and CheckForHome() or inv
+    if not Container then return nil end
+
+    local spawnedObject = nil
+    local connection
+    connection = Container.ChildAdded:Connect(function(child)
+        if child.Name == ToyName then
+            spawnedObject = child
+        end
+    end)
+
+    task.spawn(function()
+        pcall(function()
+            local menuToys = RS:FindFirstChild("MenuToys")
+            local spawnRemote = menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction")
+            if spawnRemote then
+                spawnRemote:InvokeServer(ToyName, SpawnCF, Vector3.zero)
+            end
+        end)
+    end)
+
+    local start = tick()
+    repeat task.wait() until spawnedObject or (tick() - start) > 2.5
+
+    if connection then connection:Disconnect() end
+    return spawnedObject
+end
+
+local function FindPCLD(hrp)
+    if pcldConn then pcldConn:Disconnect() end
+    MyPCLD = nil
+    pcldConn = RunService.Heartbeat:Connect(function()
+        if MyPCLD or not hrp or not hrp.Parent then 
+            if pcldConn then pcldConn:Disconnect() pcldConn = nil end
+            return
+        end
+        for _, v in pairs(Workspace:GetChildren()) do 
+            if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
+                if GetMagnitude(v, hrp) <= 2 then 
+                    MyPCLD = v
+                    break
+                end
+            end
+        end
+    end)
+end
+
+local function StartAntiKickItem()
+    if antiKickItemTask then task.cancel(antiKickItemTask) end
+    
+    antiKickItemTask = task.spawn(function()
+        local Item, SoundPart
+        while antiKickItemActive and task.wait() do 
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+            local inPlot = LocalPlayer:FindFirstChild("InPlot")
+            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+            
+            if not hrp or not hum or hum.Health <= 0 or not inv then continue end  
+            if inPlot and inPlot.Value then continue end 
+            
+            if not MyPCLD and not pcldConn then
+                FindPCLD(hrp)
+            end
+
+            Item = inv:FindFirstChild("AntiKickItem") 
+            SoundPart = Item and Item:FindFirstChild("Hitbox")
+            
+            if not Item or not SoundPart then
+                for _,v in pairs(inv:GetChildren()) do 
+                    if v.Name == "AntiKickItem" then 
+                        pcall(function() destroyToy:FireServer(v) end)
+                    end
+                end
+                
+                Item = SpawnToyItem(SelectedToy)
+                if not Item then continue end 
+                
+                if SelectedToy == "ChineseLantern" then
+                    SoundPart = Item and FWD(Item, "Handle", 0.5)
+                else
+                    SoundPart = Item and FWD(Item, "Hitbox", 0.5)
+                end
+                
+                if SoundPart then sno(SoundPart) end
+                
+                for _,v in pairs(Item:GetChildren()) do 
+                    if v:IsA("BasePart") then 
+                        v.CanCollide = false 
+                        v.Transparency = 0.8
+                        v.Color = Color3.fromRGB(0, 255, 255)
+                    end
+                end
+                
+                Item.Name = "AntiKickItem"
+            end
+            
+            if SoundPart and not CheckNetworkOwnerOnPart(SoundPart) then 
+                sno(SoundPart)
+            end
+            
+            local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
+            
+            if SoundPart and targetPart then
+                local offset = Vector3.new(0, 0, 0)
+                
+                if SelectedToy == "ChineseLantern" then
+                    offset = Vector3.new(0, 1.5, 0)
+                elseif SelectedToy == "FridgeBlack" then
+                    local mainPart = Item:FindFirstChild("MainPart")
+                    if mainPart then
+                        SoundPart = mainPart
+                        sno(SoundPart)
+                    end
+                    offset = Vector3.new(0, 0, 0)
+                elseif SelectedToy == "Snowflake" then
+                    offset = Vector3.new(0, 0.5, 0)
+                end
+                
+                SoundPart.CFrame = targetPart.CFrame * CFrame.new(offset)
+                SoundPart.AssemblyLinearVelocity = Vector3.zero
+                SoundPart.AssemblyAngularVelocity = Vector3.zero
+            end
+        end
+    end)
+end
+
+local function StopAntiKickItem()
+    antiKickItemActive = false
+    if antiKickItemTask then 
+        task.cancel(antiKickItemTask) 
+        antiKickItemTask = nil 
+    end
+    if pcldConn then 
+        pcldConn:Disconnect() 
+        pcldConn = nil 
+    end
+    MyPCLD = nil
+    
+    task.spawn(function()
+        local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+        local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+        if inv and destroyToy then
+            for _,v in pairs(inv:GetChildren()) do 
+                if v.Name == "AntiKickItem" then 
+                    pcall(function() destroyToy:FireServer(v) end)
+                end
+            end
+        end
+    end)
+end
+
+AntiKickItemBlock:CreateDropdown({
+    Name = "Anti Kick Item",
+    Items = {"Japanese Lantern", "Spray Can", "Spooky Candle", "Fridge Black", "Snowflake", "Chinese Lantern"},
+    Default = "Spooky Candle",
+    Callback = function(Value)
+        local ToyList = {
+            ["Japanese Lantern"] = "JapaneseLantern",
+            ["Spray Can"] = "SprayCanWD",
+            ["Spooky Candle"] = "SpookyCandle1",
+            ["Fridge Black"] = "FridgeBlack",
+            ["Snowflake"] = "Snowflake",
+            ["Chinese Lantern"] = "ChineseLantern",
+        }
+        SelectedToy = ToyList[Value] or "SpookyCandle1"
+        Library:Notify({ Title = "Anti-Kick Item", Content = "Selected: " .. Value, Duration = 2 })
+    end
+})
+
+AntiKickItemBlock:CreateToggle({
+    Name = "Anti-Kick [ITEM]",
+    Default = false,
+    Callback = function(Value)
+        antiKickItemActive = Value
+        if Value then 
+            StartAntiKickItem() 
+            Library:Notify({ Title = "Anti-Kick [ITEM]", Content = "Enabled", Duration = 2 })
+        else 
+            StopAntiKickItem() 
+            Library:Notify({ Title = "Anti-Kick [ITEM]", Content = "Disabled", Duration = 2 })
+        end
+    end
+})
+
+local fovEnabled = false
+local originalFOV = 70
+
+local function SetFOV(value)
+    if value then
+        originalFOV = Workspace.CurrentCamera.FieldOfView
+        Workspace.CurrentCamera.FieldOfView = 120
+    else
+        Workspace.CurrentCamera.FieldOfView = originalFOV
+    end
+end
+
+local function SetThirdPerson(enabled)
+    if enabled then
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMaxZoomDistance = 1000
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    else
+        LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        LocalPlayer.CameraMaxZoomDistance = 0.5
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end
+end
+
+VisualBlock:CreateToggle({
+    Name = "FOV 120",
+    Default = false,
+    Callback = function(Value)
+        fovEnabled = Value
+        SetFOV(Value)
+        Library:Notify({ Title = "FOV", Content = Value and "120 Enabled" or "Disabled", Duration = 2 })
+    end
+})
+
+VisualBlock:CreateToggle({
+    Name = "Third Person",
+    Default = false,
+    Callback = function(Value)
+        SetThirdPerson(Value)
+        Library:Notify({ Title = "Third Person", Content = Value and "Enabled" or "Disabled", Duration = 2 })
+    end
+})
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if antiKickItemActive then
+        MyPCLD = nil
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then FindPCLD(hrp) end
+    end
+    if fovEnabled then SetFOV(true) end
+end)
+
+LocalPlayer.OnTeleport:Connect(function()
+    if antiKickItemActive then
+        StopAntiKickItem()
+    end
+end)
+
+print("Absolute Mini loaded!")
