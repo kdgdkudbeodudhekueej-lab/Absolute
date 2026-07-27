@@ -1,87 +1,378 @@
+-- Mini Script: Ownership Kick + FOV 120 + Third Person
+-- Optimized with speed control and enhanced BodyGyro/BodyPosition
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "Server_Lag_Script"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local RS = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Server Lag",
+    Title = "Mini Script",
     Theme = "Night",
-    ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
+    ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Ping = true },
     ToggleKey = Enum.KeyCode.RightShift,
 })
 
-local ServerTab = Window:CreateTab("Server", true)
-local ServerBlock = ServerTab:CreateBlock({Name = "Server Lag", Side = "Left"})
+local MainTab = Window:CreateTab("Main", true)
 
-local RS = game:GetService("ReplicatedStorage")
-local GrabEvents = RS:FindFirstChild("GrabEvents")
-local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
+local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
+local VisualBlock = MainTab:CreateBlock({Name = "Visual", Side = "Right"})
 
--- ============ MONSTER LAG ИЗ ХУЙ.FLING ============
-local monsterLagActive = false
-local monsterLagTask = nil
-local monsterLagPower = 1
+-- Variables
+local selectedTarget = nil
+local kickActive = false
+local kickTask = nil
+local holdHeight = 17
+local fovEnabled = false
+local originalFOV = 70
+local spamSpeed = 0.02
 
-ServerBlock:CreateSlider({
-    Name = "Monster Lag Power (1-10)",
-    Min = 1,
-    Max = 10,
-    Default = 1,
-    Rounding = 0,
-    Callback = function(Value)
-        monsterLagPower = Value
+-- Get GrabEvents
+local GrabEvents = RS:WaitForChild("GrabEvents")
+local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
+local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
+
+-- Target selection
+local targetNames = {}
+local function updateList()
+    targetNames = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(targetNames, p.DisplayName .. " (" .. p.Name .. ")")
+        end
+    end
+end
+
+local function getPlayerFromSelection(selection)
+    if not selection or selection == "" then return nil end
+    local username = selection:match("%((.-)%)")
+    if username then
+        return Players:FindFirstChild(username)
+    end
+    return nil
+end
+
+local TargetDropdown = KickBlock:CreateDropdown({
+    Name = "Select Target",
+    Options = targetNames,
+    Callback = function(v)
+        selectedTarget = getPlayerFromSelection(v)
     end
 })
 
-ServerBlock:CreateToggle({
-    Name = "Monster Lag",
+KickBlock:CreateButton({
+    Name = "Refresh List",
+    Callback = function()
+        updateList()
+        TargetDropdown:Refresh(targetNames, true)
+    end
+})
+
+-- Speed control slider
+KickBlock:CreateSlider({
+    Name = "Spam Speed (0.01 - 0.02 sec)",
+    Min = 0.01,
+    Max = 0.02,
+    Default = 0.02,
+    Rounding = 3,
+    Suffix = "sec",
+    Callback = function(Value)
+        spamSpeed = Value
+        Library:Notify({ Title = "Speed", Content = "Set to: " .. string.format("%.3f", Value) .. "s", Duration = 1 })
+    end
+})
+
+-- Height slider
+KickBlock:CreateSlider({
+    Name = "Hold Height",
+    Min = 5,
+    Max = 40,
+    Default = 17,
+    Rounding = 0,
+    Callback = function(Value) 
+        holdHeight = Value 
+    end
+})
+
+-- Enhanced cleanup function
+local function cleanupBodies()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, v in pairs(hrp:GetChildren()) do
+                    if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                        v:Destroy()
+                    end
+                end
+            end
+        end
+        if selectedTarget and selectedTarget.Character then
+            local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                for _, v in pairs(tRoot:GetChildren()) do
+                    if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                        v:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Enhanced Ownership Kick with speed control
+local function OwnershipKickFunction(targetName)
+    local target = Players:FindFirstChild(targetName)
+    if not target then return end
+    
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local savedPos = myRoot.CFrame 
+    local dragging = false
+    local grabStartTime = 0
+    local checkStartTime = 0
+    local currentSpeed = spamSpeed
+    
+    local bodyPos = nil
+    local bodyGyro = nil
+
+    -- Enhanced BodyPosition with max force
+    local function createBodies(targetRoot, pos)
+        cleanupBodies()
+        
+        -- Remove existing
+        for _, v in pairs(targetRoot:GetChildren()) do
+            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                v:Destroy()
+            end
+        end
+        
+        -- Enhanced BodyPosition - Max force
+        bodyPos = Instance.new("BodyPosition")
+        bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9) -- Максимальная сила
+        bodyPos.D = 5000 -- Максимальное демпфирование
+        bodyPos.P = 5000 -- Максимальная пропорциональная сила
+        bodyPos.Position = pos
+        bodyPos.Parent = targetRoot
+        
+        -- Enhanced BodyGyro
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro.D = 5000
+        bodyGyro.P = 5000
+        bodyGyro.CFrame = CFrame.new(pos)
+        bodyGyro.Parent = targetRoot
+        
+        -- Дополнительно: BodyVelocity для усиления
+        local bodyVel = Instance.new("BodyVelocity")
+        bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyVel.Velocity = Vector3.zero
+        bodyVel.Parent = targetRoot
+    end
+
+    while kickActive do
+        local currentTarget = Players:FindFirstChild(target.Name)
+        if not currentTarget or not currentTarget.Parent then 
+            cleanupBodies()
+            break 
+        end
+        
+        myChar = LocalPlayer.Character
+        myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local tChar = currentTarget.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        local tHum = tChar and tChar:FindFirstChild("Humanoid")
+        
+        if tRoot and tHum and tHum.Health > 0 and myRoot then
+            if not dragging then
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                cleanupBodies()
+                checkStartTime = 0
+                pcall(function()
+                    tHum.PlatformStand = true
+                    tHum.Sit = true
+                    SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                    SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                    DestroyGrabLine:FireServer(tRoot)
+                end)
+                myRoot.AssemblyLinearVelocity = Vector3.zero
+                myRoot.AssemblyAngularVelocity = Vector3.zero
+                if grabStartTime == 0 then grabStartTime = tick() end
+                if tick() - grabStartTime > 0.35 then
+                    dragging = true
+                    grabStartTime = 0
+                    checkStartTime = tick()
+                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                    createBodies(tRoot, lockPos.Position)
+                end
+            else
+                myRoot.CFrame = savedPos
+                local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                myRoot.AssemblyLinearVelocity = Vector3.zero
+                myRoot.AssemblyAngularVelocity = Vector3.zero
+                
+                if bodyPos and bodyPos.Parent then
+                    bodyPos.Position = lockPos.Position
+                    if bodyGyro then 
+                        bodyGyro.CFrame = lockPos 
+                    end
+                else
+                    createBodies(tRoot, lockPos.Position)
+                end
+                
+                tHum.PlatformStand = true
+                pcall(function()
+                    -- Усиленный спам с контролем скорости
+                    local spamCount = 4
+                    if currentSpeed <= 0.012 then
+                        spamCount = 8
+                    elseif currentSpeed <= 0.015 then
+                        spamCount = 6
+                    end
+                    
+                    for i = 1, spamCount do
+                        SetNetworkOwner:FireServer(tRoot, lockPos)
+                    end
+                    DestroyGrabLine:FireServer(tRoot)
+                end)
+                
+                if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+                    local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                    if currentDist > 10 then
+                        dragging = false
+                        grabStartTime = 0
+                        checkStartTime = 0
+                        cleanupBodies()
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    else
+                        checkStartTime = tick()
+                    end
+                end
+            end
+        else
+            dragging = false
+            grabStartTime = 0
+            checkStartTime = 0
+            cleanupBodies()
+        end
+        
+        -- Используем скорость спама из слайдера
+        task.wait(currentSpeed)
+    end
+    
+    cleanupBodies()
+    if myRoot then myRoot.CFrame = savedPos end
+    if target and target.Character then
+        local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if tRoot then
+            pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+        end
+    end
+end
+
+-- Toggle for Ownership Kick
+KickBlock:CreateToggle({
+    Name = "Enable Ownership Kick",
     Default = false,
     Callback = function(Value)
-        monsterLagActive = Value
-        
         if Value then
-            local power = monsterLagPower
-            local intensity = power * 1000
-            
-            Library:Notify({ 
-                Title = "Monster Lag", 
-                Content = "Enabled (Power: " .. power .. " | Intensity: " .. intensity .. ")", 
-                Duration = 3 
-            })
-            
-            monsterLagTask = task.spawn(function()
-                local WS = game:GetService("Workspace")
-                local LP = game:GetService("Players").LocalPlayer
-                
-                while monsterLagActive and CreateLine do
-                    for _ = 1, intensity do
-                        local spawnLocation = WS:FindFirstChild("SpawnLocation") 
-                            or WS:FindFirstChild("Spawn") 
-                            or (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart"))
-                        
-                        if spawnLocation then
-                            local randomX = math.random(-9e9, 9e9)
-                            local randomZ = math.random(-9e9, 9e9)
-                            CreateLine:FireServer(spawnLocation, CFrame.new(randomX, 0, randomZ))
+            if not selectedTarget then
+                Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
+                return
+            end
+            kickActive = true
+            if kickTask then task.cancel(kickTask) kickTask = nil end
+            kickTask = task.spawn(function() 
+                OwnershipKickFunction(selectedTarget.Name) 
+            end)
+            Library:Notify({ Title = "Ownership Kick", Content = "Enabled (Speed: " .. string.format("%.3f", spamSpeed) .. "s)", Duration = 2 })
+        else
+            kickActive = false
+            if kickTask then task.cancel(kickTask) kickTask = nil end
+            cleanupBodies()
+            if selectedTarget and selectedTarget.Character then
+                local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                if tRoot then
+                    for _, v in pairs(tRoot:GetChildren()) do
+                        if v:IsA("BodyPosition") or v:IsA("BodyGyro") or v:IsA("BodyVelocity") then
+                            pcall(function() v:Destroy() end)
                         end
                     end
-                    task.wait(0.5)
+                    pcall(function()
+                        tRoot.AssemblyLinearVelocity = Vector3.zero
+                        tRoot.AssemblyAngularVelocity = Vector3.zero
+                    end)
                 end
-            end)
-        else
-            if monsterLagTask then
-                task.cancel(monsterLagTask)
-                monsterLagTask = nil
             end
-            Library:Notify({ Title = "Monster Lag", Content = "Disabled", Duration = 2 })
+            Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
         end
     end
 })
 
-Library:Notify({ Title = "Server Lag", Content = "Loaded!", Duration = 3 })
+-- Visual Settings
+local function SetFOV(value)
+    if value then
+        originalFOV = Workspace.CurrentCamera.FieldOfView
+        Workspace.CurrentCamera.FieldOfView = 120
+    else
+        Workspace.CurrentCamera.FieldOfView = originalFOV
+    end
+end
+
+local function SetThirdPerson(enabled)
+    if enabled then
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMaxZoomDistance = 1000
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    else
+        LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        LocalPlayer.CameraMaxZoomDistance = 0.5
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end
+end
+
+VisualBlock:CreateToggle({
+    Name = "FOV 120",
+    Default = false,
+    Callback = function(Value)
+        fovEnabled = Value
+        SetFOV(Value)
+        Library:Notify({ Title = "FOV", Content = Value and "120 Enabled" or "Disabled", Duration = 1 })
+    end
+})
+
+VisualBlock:CreateToggle({
+    Name = "Third Person",
+    Default = false,
+    Callback = function(Value)
+        SetThirdPerson(Value)
+        Library:Notify({ Title = "Third Person", Content = Value and "Enabled" or "Disabled", Duration = 1 })
+    end
+})
+
+-- Auto refresh target list
+task.spawn(function()
+    while true do
+        updateList()
+        pcall(function() TargetDropdown:Refresh(targetNames, true) end)
+        task.wait(5)
+    end
+end)
+
+-- Cleanup on teleport
+LocalPlayer.OnTeleport:Connect(function()
+    kickActive = false
+    if kickTask then task.cancel(kickTask) kickTask = nil end
+    cleanupBodies()
+    if fovEnabled then SetFOV(false) fovEnabled = false end
+end)
+
+Library:Notify({ Title = "Mini Script", Content = "Loaded!", Duration = 3 })
