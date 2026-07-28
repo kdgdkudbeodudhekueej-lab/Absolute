@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Absolute_Startup"
@@ -12,7 +13,6 @@ function StartMainScript(titleText)
     local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
     local Players = game:GetService("Players")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local RunService = game:GetService("RunService")
     local Workspace = game:GetService("Workspace")
     local LocalPlayer = Players.LocalPlayer
     local RS = ReplicatedStorage
@@ -77,18 +77,195 @@ function StartMainScript(titleText)
 
     local MainTab = Window:CreateTab("Main", true)
     local VisualTab = Window:CreateTab("Visual", true)
-    local DefenseTab = Window:CreateTab("Defense", true)
 
+    local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
+    local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
     local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
-    local GucciBlock = DefenseTab:CreateBlock({Name = "Gucci Anti Grab", Side = "Right"})
 
-    -- ===== VISUAL SETTINGS =====
-    local originalFOV = 70
+    -- ========== DELTA TIME ==========
+    local deltaTime = 0.016
+    RunService.RenderStepped:Connect(function(dt)
+        deltaTime = dt
+    end)
+
+    -- ========== ПЕРЕМЕННЫЕ ==========
+    local selectedTarget = nil
+    local kickActive = false
+    local kickTask = nil
+    local holdHeight = 17
+
     local fovEnabled = false
-    local thirdPersonEnabled = false
+    local originalFOV = 70
 
+    local SetNetworkOwner = RS:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner")
+    local DestroyGrabLine = RS:WaitForChild("GrabEvents"):WaitForChild("DestroyGrabLine")
+
+    -- ========== ALIGN ДЛЯ УДЕРЖАНИЯ ==========
+    local alignPos = nil
+    local alignOrient = nil
+
+    local function cleanupAlign()
+        pcall(function()
+            if alignPos then 
+                alignPos:Destroy() 
+                alignPos = nil 
+            end
+            if alignOrient then 
+                alignOrient:Destroy() 
+                alignOrient = nil 
+            end
+        end)
+    end
+
+    local function createAlign(targetRoot, targetPos)
+        cleanupAlign()
+        
+        -- Удаляем старые Align, если есть
+        for _, v in pairs(targetRoot:GetChildren()) do
+            if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
+                v:Destroy()
+            end
+        end
+        
+        -- Создаём Attachments
+        local att1 = Instance.new("Attachment")
+        att1.Parent = targetRoot
+        
+        local att2 = Instance.new("Attachment")
+        att2.Parent = targetRoot
+        att2.WorldPosition = targetPos
+        att2.WorldOrientation = Vector3.zero
+        
+        -- AlignPosition
+        alignPos = Instance.new("AlignPosition")
+        alignPos.Parent = targetRoot
+        alignPos.Attachment0 = att1
+        alignPos.Attachment1 = att2
+        alignPos.MaxForce = 9e9
+        alignPos.MaxVelocity = math.huge
+        alignPos.Responsiveness = 100
+        alignPos.ReactionForceEnabled = false
+        
+        -- AlignOrientation
+        alignOrient = Instance.new("AlignOrientation")
+        alignOrient.Parent = targetRoot
+        alignOrient.Attachment0 = att1
+        alignOrient.Attachment1 = att2
+        alignOrient.MaxTorque = 9e9
+        alignOrient.MaxAngularVelocity = math.huge
+        alignOrient.Responsiveness = 100
+        alignOrient.ReactionTorqueEnabled = false
+    end
+
+    -- ========== ОСНОВНАЯ ФУНКЦИЯ KICK ==========
+    local function OwnershipKickFunction(targetName)
+        local target = Players:FindFirstChild(targetName)
+        if not target then return end
+        
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+
+        local savedPos = myRoot.CFrame 
+        local dragging = false
+        local grabStartTime = 0
+        local checkStartTime = 0
+        local elapsedTime = 0
+        
+        while kickActive do
+            elapsedTime = elapsedTime + deltaTime
+            
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then 
+                cleanupAlign()
+                break 
+            end
+            
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local tChar = currentTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+            
+            if tRoot and tHum and tHum.Health > 0 and myRoot then
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    cleanupAlign()
+                    checkStartTime = 0
+                    pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    if grabStartTime == 0 then grabStartTime = elapsedTime end
+                    if elapsedTime - grabStartTime > 0.35 then
+                        dragging = true
+                        grabStartTime = 0
+                        checkStartTime = elapsedTime
+                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                        createAlign(tRoot, lockPos.Position)
+                    end
+                else
+                    myRoot.CFrame = savedPos
+                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    if alignPos and alignPos.Parent then
+                        -- Обновляем позицию через Attachment1
+                        if alignPos.Attachment1 then
+                            alignPos.Attachment1.WorldPosition = lockPos.Position
+                            alignPos.Attachment1.WorldOrientation = Vector3.zero
+                        end
+                    else
+                        createAlign(tRoot, lockPos.Position)
+                    end
+                    
+                    tHum.PlatformStand = true
+                    pcall(function()
+                        SetNetworkOwner:FireServer(tRoot, lockPos)
+                        SetNetworkOwner:FireServer(tRoot, lockPos)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    
+                    if checkStartTime > 0 and elapsedTime - checkStartTime > 0.30 then
+                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                        if currentDist > 10 then
+                            dragging = false
+                            grabStartTime = 0
+                            checkStartTime = 0
+                            cleanupAlign()
+                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                        else
+                            checkStartTime = elapsedTime
+                        end
+                    end
+                end
+            else
+                dragging = false
+                grabStartTime = 0
+                checkStartTime = 0
+                cleanupAlign()
+            end
+            RunService.Heartbeat:Wait()
+        end
+        
+        cleanupAlign()
+        if myRoot then myRoot.CFrame = savedPos end
+        if target and target.Character then
+            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+            end
+        end
+    end
+
+    -- ========== FOV 120 ==========
     local function SetFOV(value)
         if value then
             originalFOV = Workspace.CurrentCamera.FieldOfView
@@ -98,6 +275,7 @@ function StartMainScript(titleText)
         end
     end
 
+    -- ========== THIRD PERSON ==========
     local function SetThirdPerson(enabled)
         if enabled then
             LocalPlayer.CameraMode = Enum.CameraMode.Classic
@@ -109,6 +287,88 @@ function StartMainScript(titleText)
             LocalPlayer.CameraMinZoomDistance = 0.5
         end
     end
+
+    -- ========== UI ==========
+    local targetNames = {}
+    local function updateList()
+        targetNames = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local displayName = p.DisplayName or p.Name
+                table.insert(targetNames, displayName .. " (" .. p.Name .. ")")
+            end
+        end
+    end
+
+    local function getPlayerFromSelection(selection)
+        if not selection or selection == "" then return nil end
+        local username = selection:match("%((.-)%)")
+        if username then
+            return Players:FindFirstChild(username)
+        end
+        return nil
+    end
+
+    local TargetDropdown = TargetBlock:CreateDropdown({
+        Name = "Select Target",
+        Options = targetNames,
+        Callback = function(v)
+            selectedTarget = getPlayerFromSelection(v)
+        end
+    })
+
+    TargetBlock:CreateButton({
+        Name = "Refresh List",
+        Callback = function()
+            updateList()
+            TargetDropdown:Refresh(targetNames, true)
+        end
+    })
+
+    SettingsBlock:CreateSlider({
+        Name = "Hold Height",
+        Min = 5,
+        Max = 40,
+        Default = 17,
+        Rounding = 0,
+        Callback = function(Value) holdHeight = Value end
+    })
+
+    KickBlock:CreateToggle({
+        Name = "Enable Ownership Kick",
+        Default = false,
+        Callback = function(Value)
+            if Value then
+                if not selectedTarget then
+                    Library:Notify({ Title = "Error", Content = "Select target", Duration = 3 })
+                    return
+                end
+                kickActive = true
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
+                Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
+            else
+                kickActive = false
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                cleanupAlign()
+                if selectedTarget and selectedTarget.Character then
+                    local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        for _, v in pairs(tRoot:GetChildren()) do
+                            if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
+                                pcall(function() v:Destroy() end)
+                            end
+                        end
+                        pcall(function()
+                            tRoot.AssemblyLinearVelocity = Vector3.zero
+                            tRoot.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                    end
+                end
+                Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
 
     VisualBlock:CreateToggle({
         Name = "FOV 120",
@@ -123,381 +383,30 @@ function StartMainScript(titleText)
         Name = "Third Person",
         Default = false,
         Callback = function(Value)
-            thirdPersonEnabled = Value
             SetThirdPerson(Value)
         end
     })
 
+    task.spawn(function()
+        while true do
+            updateList()
+            if TargetDropdown then
+                pcall(function() TargetDropdown:Refresh(targetNames, true) end)
+            end
+            task.wait(5)
+        end
+    end)
+
+    LocalPlayer.OnTeleport:Connect(function()
+        kickActive = false
+        if kickTask then task.cancel(kickTask) kickTask = nil end
+        cleanupAlign()
+        if fovEnabled then SetFOV(false) fovEnabled = false end
+    end)
+
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
         if fovEnabled then SetFOV(true) end
-        if thirdPersonEnabled then SetThirdPerson(true) end
-    end)
-
-    -- ===== ANTI BAN =====
-    local antiBanActive = false
-    local antiBanCon = nil
-    local warnTimestamps = {}
-
-    local function startAntiBan()
-        if antiBanCon then antiBanCon:Disconnect() end
-        
-        antiBanCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-            if reason == "Flying" then
-                local currentTime = os.clock()
-                table.insert(warnTimestamps, currentTime)
-                
-                for i = #warnTimestamps, 1, -1 do
-                    if currentTime - warnTimestamps[i] > 1 then
-                        table.remove(warnTimestamps, i)
-                    end
-                end
-                
-                if #warnTimestamps >= 3 then
-                    Library:Notify({ Title = "Anti Ban", Content = "3 warnings! Leaving...", Duration = 3 })
-                    task.wait(0.5)
-                    LocalPlayer:Kick("Anti Ban: Preventing ban.")
-                end
-            end
-        end)
-    end
-
-    AntiBanBlock:CreateToggle({
-        Name = "Anti Ban",
-        Default = false,
-        Callback = function(Value)
-            antiBanActive = Value
-            if Value then
-                startAntiBan()
-                Library:Notify({ Title = "Anti Ban", Content = "Enabled", Duration = 2 })
-            else
-                if antiBanCon then
-                    antiBanCon:Disconnect()
-                    antiBanCon = nil
-                end
-                warnTimestamps = {}
-                Library:Notify({ Title = "Anti Ban", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    -- ===== AUTO RESET =====
-    do
-        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
-        local AutoResetCon = nil
-        
-        AntiBanBlock:CreateToggle({
-            Name = "Auto Reset",
-            Default = false,
-            Callback = function(Value)
-                if AutoResetCon then
-                    AutoResetCon:Disconnect()
-                    AutoResetCon = nil
-                end
-
-                if Value then
-                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                        if reason == "Flying" then
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum then
-                                Library:Notify({ 
-                                    Title = "Auto Reset", 
-                                    Content = "Resetting to prevent Ban!", 
-                                    Duration = 3 
-                                })
-                                char:BreakJoints()
-                                hum.Health = 0
-                            end
-                        end
-                    end)
-                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
-                end
-            end
-        })
-    end
-
-    -- ===== GUCCI ANTI GRAB (from POLAR HUB) =====
-    local gucciRunId = 0
-    local gucciActive = false
-    local gucciTask = nil
-
-    local function FWC(Parent, Name, Time) 
-        return Parent:FindFirstChild(Name) or Parent:WaitForChild(Name, Time or 3) 
-    end
-
-    local function grab(prt) 
-        ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(prt, prt.CFrame) 
-    end
-
-    local function toy_spawn_gucci(name, cframe, vector)
-        local ToySpawn = ReplicatedStorage.MenuToys.SpawnToyRemoteFunction
-        local InPlot, InOwnerPlot, CanSpawn = LocalPlayer.InPlot, LocalPlayer.InOwnedPlot, LocalPlayer.CanSpawnToy
-
-        while InPlot.Value and not InOwnerPlot.Value and not CanSpawn.Value do
-            task.wait(0.01)
-        end
-
-        task.spawn(function()
-            ToySpawn:InvokeServer(name, cframe, vector or Vector3.new())
-        end)
-        
-        local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-        local SpawnedToy
-        BackPack.ChildAdded:Once(function(toy)
-            if toy.Name == name and toy:IsA("Model") then
-                SpawnedToy = toy
-            end
-        end)
-        
-        local time = tick()
-        while not SpawnedToy do
-            if tick()-time < 2 then
-                task.wait(0.01)
-            else
-                return false
-            end
-        end
-        return SpawnedToy
-    end
-
-    local function GucciAntiGrabLoop()
-        while gucciActive do
-            gucciRunId = gucciRunId + 1
-            local MyId = gucciRunId
-            
-            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hum = FWC(char, "Humanoid")
-            
-            if not hum then 
-                task.wait(0.5)
-                continue 
-            end
-            
-            hum.Sit = true
-            task.wait(0.02)
-            hum.Sit = false
-            task.wait(0.02)
-            
-            task.spawn(function()
-                local time = tick()
-                while tick()-time < 0.8 do
-                    for _,v in pairs(char:GetChildren()) do
-                        if v:IsA('BasePart') then
-                            v.Velocity = Vector3.new()
-                        end
-                    end
-                    task.wait(0.01)
-                end
-            end)
-            
-            local autoGucciT, sitJumpT, Blob, BHead = true, false, nil, nil
-            
-            task.spawn(function()
-                while not Blob and MyId == gucciRunId do
-                    task.wait(0.01)
-                end
-                if MyId ~= gucciRunId then return end
-                
-                BHead = FWC(Blob, "Head")
-                local HitBox = FWC(Blob, "GrabbableHitbox")
-                
-                while MyId == gucciRunId and BHead and
-                (not BHead:FindFirstChild("PartOwner") or BHead.PartOwner.Value ~= LocalPlayer.Name) do
-                    grab(HitBox)
-                    task.wait(0.01)
-                end
-            end)
-            
-            local hrp = FWC(char, "HumanoidRootPart")
-            if not hrp then 
-                task.wait(0.5)
-                continue 
-            end
-            
-            Blob = toy_spawn_gucci(
-                "CreatureBlobman",
-                hrp.CFrame * CFrame.new(0, 0, -5),
-                Vector3.new(0, -15.716, 0)
-            )
-            
-            if not Blob then 
-                task.wait(0.5)
-                continue 
-            end
-            
-            local Seat = FWC(Blob, "VehicleSeat")
-            
-            task.defer(function()
-                if not(char or hum) then return end
-                
-                local startTime = tick()
-                while autoGucciT and MyId == gucciRunId and tick()-startTime < 0.3 do
-                    if Blob and Blob.Parent then
-                        if Seat and Seat.Parent and Seat.Occupant ~= hum then
-                            Seat:Sit(hum)
-                        end
-                    end
-                    task.wait(0.03)
-                    if char and hum and hum.Parent then
-                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                    task.wait(0.03)
-                end
-                autoGucciT = false
-                sitJumpT = false
-            end)
-            
-            sitJumpT = true
-            
-            task.defer(function()
-                while sitJumpT and MyId == gucciRunId do
-                    if char and hrp and hrp.Parent then
-                        ReplicatedStorage.CharacterEvents.RagdollRemote:FireServer(hrp, 0.095)
-                    end
-                    task.wait(0.01)
-                end
-            end)
-            
-            local index
-            
-            task.wait(0.4)
-            
-            if MyId ~= gucciRunId then 
-                if Blob and Blob.Parent then
-                    pcall(function() Blob:Destroy() end)
-                end
-                break 
-            end
-            
-            if hum then
-                hum.Sit = false
-            end
-            
-            if Blob then
-                Blob.Name = "Gucci"
-            end
-            
-            local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-            if BackPack and Blob then
-                for i,v in pairs(BackPack:GetChildren()) do
-                    if v == Blob then
-                        index = i
-                        break
-                    end
-                end
-            end
-            
-            if Blob then
-                for _,v in pairs(Blob:GetChildren()) do
-                    if v:IsA("BasePart") then
-                        v.CanCollide = false
-                        v.CanTouch = false
-                        v.CanQuery = false
-                    end
-                end
-            end
-            
-            if Blob and BHead then
-                task.defer(function()
-                    while MyId == gucciRunId and Blob and BHead and BHead.Parent do
-                        BHead.CFrame = CFrame.new(BHead.Position.X, 1e5, BHead.Position.Z)
-                        task.wait(0.01)
-                    end
-                end)
-            end
-            
-            local success, contents = pcall(function()
-                return LocalPlayer.PlayerGui.MenuGui.Menu.TabContents.ToyDestroy.Contents
-            end)
-            
-            if success and contents and index then
-                for i,v in ipairs(contents:GetChildren()) do
-                    if v.Name == "CreatureBlobman" and i == index then
-                        local view = v.ViewItemButton
-                        view.Text = "GUCCI"
-                        view.TextScaled = true
-                        view.LowResImage.Image = ""
-                    end
-                end
-            end
-            
-            -- Ждём перед следующим циклом
-            for i = 1, 30 do
-                if not gucciActive then break end
-                task.wait(0.1)
-            end
-        end
-        
-        -- Очистка при выключении
-        local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-        if BackPack then
-            for _,v in pairs(BackPack:GetChildren()) do
-                if v.Name == "Gucci" or v.Name == "CreatureBlobman" then
-                    pcall(function()
-                        ReplicatedStorage.MenuToys.DestroyToy:FireServer(v)
-                    end)
-                    task.wait(0.05)
-                    if v and v.Parent then
-                        v:Destroy()
-                    end
-                end
-            end
-        end
-    end
-
-    GucciBlock:CreateToggle({
-        Name = "Gucci Anti Grab",
-        Default = false,
-        Callback = function(Value)
-            gucciActive = Value
-            if Value then
-                if gucciTask then task.cancel(gucciTask) end
-                gucciTask = task.spawn(GucciAntiGrabLoop)
-                Library:Notify({ Title = "Gucci Anti Grab", Content = "Enabled", Duration = 2 })
-            else
-                if gucciTask then
-                    task.cancel(gucciTask)
-                    gucciTask = nil
-                end
-                -- Очистка спавнов
-                task.spawn(function()
-                    local BackPack = Workspace:FindFirstChild(LocalPlayer.Name .. 'SpawnedInToys')
-                    if BackPack then
-                        for _,v in pairs(BackPack:GetChildren()) do
-                            if v.Name == "Gucci" or v.Name == "CreatureBlobman" then
-                                pcall(function()
-                                    ReplicatedStorage.MenuToys.DestroyToy:FireServer(v)
-                                end)
-                                task.wait(0.05)
-                                if v and v.Parent then
-                                    v:Destroy()
-                                end
-                            end
-                        end
-                    end
-                end)
-                Library:Notify({ Title = "Gucci Anti Grab", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
-    LocalPlayer.OnTeleport:Connect(function()
-        if fovEnabled then SetFOV(false) fovEnabled = false end
-        if thirdPersonEnabled then SetThirdPerson(false) thirdPersonEnabled = false end
-        if antiBanCon then
-            antiBanCon:Disconnect()
-            antiBanCon = nil
-        end
-        warnTimestamps = {}
-        gucciActive = false
-        if gucciTask then
-            task.cancel(gucciTask)
-            gucciTask = nil
-        end
     end)
 end
 
