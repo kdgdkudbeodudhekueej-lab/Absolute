@@ -88,13 +88,10 @@ function StartMainScript(titleText)
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
     local AntiExplosionBlock = DefenseTab:CreateBlock({Name = "Anti-Explosion", Side = "Right"})
+    local AntiBurnBlock = DefenseTab:CreateBlock({Name = "Anti Burn", Side = "Right"})
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-    local AntiBurnBlock = DefenseTab:CreateBlock({Name = "Anti-Burn", Side = "Left"})
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Right"})
-    
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
@@ -258,7 +255,7 @@ function StartMainScript(titleText)
     end
 
     AntiInputLagBlock:CreateToggle({
-        Name = "Anti-Input Lag",
+        Name = "Anti-Input (Protection from input lag)",
         Default = false,
         Callback = function(Value)
             antiInputActive = Value
@@ -1211,6 +1208,8 @@ function StartMainScript(titleText)
         end)
     end
 
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
+
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
         Default = false,
@@ -1232,6 +1231,7 @@ function StartMainScript(titleText)
 
     local antiExplosionActive = false
     local antiExplosionConn = nil
+    
     local function antiExplosionStart()
         antiExplosionActive = true
         antiExplosionConn = Workspace.ChildAdded:Connect(function(model)
@@ -1240,18 +1240,15 @@ function StartMainScript(titleText)
                 local char = LocalPlayer.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChild("Humanoid")
-                if hrp and (model.Position - hrp.Position).Magnitude <= 25 then
+                if hrp and (model.Position - hrp.Position).Magnitude <= 40 and hum and hum:FindFirstChild("Ragdolled") and hum.Ragdolled.Value == true then
                     pcall(function()
                         hrp.Anchored = true
+                        task.wait(0.01)
+                        hrp.Anchored = false
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         hrp.AssemblyAngularVelocity = Vector3.zero
+                        hum:ChangeState(Enum.HumanoidStateType.Running)
                         model:Destroy()
-                        task.wait(0.05)
-                        hrp.Anchored = false
-                        if hum then
-                            hum.PlatformStand = false
-                            hum:ChangeState(Enum.HumanoidStateType.Running)
-                        end
                     end)
                 end
             end
@@ -1269,6 +1266,81 @@ function StartMainScript(titleText)
                 antiExplosionActive = false 
                 if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
                 Library:Notify({ Title = "Anti-Explosion", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    local antiBurnActive = false
+    local antiBurnConn = nil
+    local antiBurnConn2 = nil
+
+    local function antiBurnStart()
+        antiBurnActive = true
+        
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                antiBurnConn = hum.FireDebounce.Changed:Connect(function()
+                    if hum.FireDebounce.Value == true then
+                        local bar = workspace.Plots.Plot1.Barrier.PlotBarrier
+                        local pos = bar.CFrame
+                        task.spawn(function()
+                            repeat task.wait() bar.CFrame = char.HumanoidRootPart.CFrame until not hum.FireDebounce.Value
+                        end)
+                        task.wait(1)
+                        hum.FireDebounce.Value = false
+                        task.wait()
+                        bar.CFrame = pos
+                    end
+                end)
+            end
+        end
+
+        antiBurnConn2 = LocalPlayer.CharacterAdded:Connect(function(ch)
+            task.wait(0.1)
+            local hum = ch:FindFirstChild("Humanoid")
+            if hum then
+                if antiBurnConn then antiBurnConn:Disconnect() end
+                antiBurnConn = hum.FireDebounce.Changed:Connect(function()
+                    if hum.FireDebounce.Value == true then
+                        local bar = workspace.Plots.Plot1.Barrier.PlotBarrier
+                        local pos = bar.CFrame
+                        task.spawn(function()
+                            repeat task.wait() bar.CFrame = ch.HumanoidRootPart.CFrame until not hum.FireDebounce.Value
+                        end)
+                        task.wait(1)
+                        hum.FireDebounce.Value = false
+                        task.wait()
+                        bar.CFrame = pos
+                    end
+                end)
+            end
+        end)
+    end
+
+    local function antiBurnStop()
+        antiBurnActive = false
+        if antiBurnConn then
+            antiBurnConn:Disconnect()
+            antiBurnConn = nil
+        end
+        if antiBurnConn2 then
+            antiBurnConn2:Disconnect()
+            antiBurnConn2 = nil
+        end
+    end
+
+    AntiBurnBlock:CreateToggle({
+        Name = "Anti Burn",
+        Default = false,
+        Callback = function(Value)
+            if Value then 
+                antiBurnStart() 
+                Library:Notify({ Title = "Anti Burn", Content = "Enabled", Duration = 2 })
+            else 
+                antiBurnStop() 
+                Library:Notify({ Title = "Anti Burn", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1619,6 +1691,7 @@ function StartMainScript(titleText)
             antiLagActive = false
             DisableAntiLag()
         end
+        antiBurnStop()
         
         task.spawn(function()
             local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
@@ -1840,6 +1913,8 @@ function StartMainScript(titleText)
         end)
     end
 
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
@@ -1961,145 +2036,6 @@ function StartMainScript(titleText)
             StopAntiKickItem()
         end
     end)
-
-    local antiBurnEnabled = false
-    local antiburnConnection = nil
-    local antiburnCharAddedConnection = nil
-    local hum = nil
-
-    local function resetFireDebounce(character)
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid and humanoid:FindFirstChild("FireDebounce") then
-            humanoid.FireDebounce.Value = false
-        end
-    end
-
-    local function setupAntiBurn(character)
-        if antiburnConnection then
-            antiburnConnection:Disconnect()
-            antiburnConnection = nil
-        end
-
-        if not character then return end
-        
-        local humanoid = character:FindFirstChild("Humanoid")
-        if not humanoid then return end
-
-        hum = humanoid
-
-        antiburnConnection = humanoid:GetPropertyChangedSignal("FireDebounce"):Connect(function()
-            if not character or not character.Parent or not antiBurnEnabled then 
-                return 
-            end
-            
-            if humanoid.FireDebounce.Value == true then
-                local barrier = Workspace:FindFirstChild("Plots")
-                if barrier then
-                    barrier = barrier:FindFirstChild("Plot1")
-                    if barrier then
-                        barrier = barrier:FindFirstChild("Barrier")
-                        if barrier then
-                            barrier = barrier:FindFirstChild("PlotBarrier")
-                        end
-                    end
-                end
-
-                if barrier then
-                    local originalPosition = barrier.CFrame
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
-
-                    task.spawn(function()
-                        while humanoid and humanoid.FireDebounce.Value == true and antiBurnEnabled do
-                            if hrp then
-                                barrier.CFrame = hrp.CFrame
-                            end
-                            task.wait()
-                        end
-
-                        task.wait(1)
-                        resetFireDebounce(character)
-                        task.wait()
-                        barrier.CFrame = originalPosition
-                    end)
-                else
-                    task.wait(1)
-                    resetFireDebounce(character)
-                end
-            end
-        end)
-    end
-
-    local function toggleAntiBurn(state)
-        antiBurnEnabled = state
-
-        if state then
-            local character = LocalPlayer.Character
-            
-            if character then
-                setupAntiBurn(character)
-            end
-
-            if not antiburnCharAddedConnection then
-                antiburnCharAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-                    if antiburnConnection then
-                        antiburnConnection:Disconnect()
-                        antiburnConnection = nil
-                    end
-                    
-                    local newHumanoid = newCharacter:WaitForChild("Humanoid", 2)
-                    if newHumanoid then
-                        hum = newHumanoid
-                        setupAntiBurn(newCharacter)
-                    end
-                end)
-            end
-        else
-            antiBurnEnabled = false
-            
-            if antiburnConnection then
-                antiburnConnection:Disconnect()
-                antiburnConnection = nil
-            end
-            
-            if antiburnCharAddedConnection then
-                antiburnCharAddedConnection:Disconnect()
-                antiburnCharAddedConnection = nil
-            end
-
-            local barrier = Workspace:FindFirstChild("Plots")
-            if barrier then
-                barrier = barrier:FindFirstChild("Plot1")
-                if barrier then
-                    barrier = barrier:FindFirstChild("Barrier")
-                    if barrier then
-                        barrier = barrier:FindFirstChild("PlotBarrier")
-                        if barrier then
-                            barrier.CFrame = CFrame.new(22.4250031, 6.3499999, -72.0749969)
-                        end
-                    end
-                end
-            end
-
-            local character = LocalPlayer.Character
-            if character then
-                resetFireDebounce(character)
-            end
-        end
-    end
-
-    AntiBurnBlock:CreateToggle({
-        Name = "Anti-Burn",
-        Default = false,
-        Callback = function(Value)
-            toggleAntiBurn(Value)
-            if Value then 
-                Library:Notify({ Title = "Anti-Burn", Content = "Enabled", Duration = 2 })
-            else 
-                Library:Notify({ Title = "Anti-Burn", Content = "Disabled", Duration = 2 })
-            end
-        end
-    })
-
 end
 
 StartMainScript("Absolute")
