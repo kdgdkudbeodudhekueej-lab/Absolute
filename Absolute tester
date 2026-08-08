@@ -82,7 +82,6 @@ function StartMainScript(titleText)
 
     local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
     local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
-    local RagdollSpamBlock = MainTab:CreateBlock({Name = "Ragdoll Spam", Side = "Left"})
     local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
     local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
     
@@ -281,6 +280,7 @@ function StartMainScript(titleText)
     local kickActive = false
     local kickTask = nil
     local holdHeight = 17
+    local kickInterval = 0.01
     local fovEnabled = false
     local originalFOV = 70
 
@@ -305,11 +305,6 @@ function StartMainScript(titleText)
 
     local ownershipRagdollActive = false
     local ownershipRagdollTask = nil
-
-    local ragdollSpamActive = false
-    local ragdollSpamTask = nil
-    local ragdollSpamSegments = 8
-    local ragdollSpamPower = 10
 
     local bodyPos = nil
     local bodyGyro = nil
@@ -1107,11 +1102,20 @@ function StartMainScript(titleText)
 
     SettingsBlock:CreateSlider({
         Name = "Hold Height",
-        Min = 5,
-        Max = 40,
+        Min = 3,
+        Max = 25,
         Default = 17,
         Rounding = 0,
         Callback = function(Value) holdHeight = Value end
+    })
+
+    SettingsBlock:CreateSlider({
+        Name = "Interval",
+        Min = 0.01,
+        Max = 0.02,
+        Default = 0.01,
+        Rounding = 2,
+        Callback = function(Value) kickInterval = Value end
     })
 
     AntiGrabBlock:CreateToggle({
@@ -1396,18 +1400,21 @@ function StartMainScript(titleText)
                         if currentFPS > 200 then
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
                         elseif currentFPS >= 155 and currentFPS <= 200 then
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
                         else
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
                         end
                     end)
                     if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
@@ -1429,7 +1436,7 @@ function StartMainScript(titleText)
                 checkStartTime = 0
                 cleanupBodies()
             end
-            RunService.Heartbeat:Wait()
+            task.wait(kickInterval)
         end
         
         fpsConnection:Disconnect()
@@ -1583,136 +1590,6 @@ function StartMainScript(titleText)
         end
     })
 
-    local function RagdollSpamFunction(targetName)
-        local target = Players:FindFirstChild(targetName)
-        if not target or not target.Character then return end
-        
-        local myChar = LocalPlayer.Character
-        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not myRoot then return end
-
-        RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("PalletLightBrown", myRoot.CFrame * CFrame.new(0, 5, 0), Vector3.zero)
-        
-        local pallet
-        repeat
-            pallet = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys") 
-                and workspace[LocalPlayer.Name.."SpawnedInToys"]:FindFirstChild("PalletLightBrown")
-            RunService.Heartbeat:Wait()
-        until pallet or not ragdollSpamActive
-        
-        if not pallet then return end
-        
-        local mainPart = pallet:FindFirstChild("SoundPart")
-        if not mainPart then return end
-        
-        SetNetworkOwner:FireServer(mainPart, mainPart.CFrame)
-        
-        local hammerGoingDown = true
-        local segmentIndex = 0
-        
-        while ragdollSpamActive and pallet.Parent do
-            RunService.Heartbeat:Wait()
-            
-            local tChar = target.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            
-            if tRoot then
-                local startPos = tRoot.Position + Vector3.new(0, 50000, 0)
-                local endPos = tRoot.Position
-                
-                if hammerGoingDown then
-                    segmentIndex = segmentIndex + 1
-                    local alpha = segmentIndex / ragdollSpamSegments
-                    local nextPos = startPos:Lerp(endPos, alpha)
-                    
-                    mainPart.CFrame = CFrame.new(nextPos)
-                    mainPart.AssemblyLinearVelocity = Vector3.new(0, -50000, 0)
-                    mainPart.AssemblyAngularVelocity = Vector3.zero
-                    
-                    if segmentIndex >= ragdollSpamSegments then
-                        mainPart.AssemblyLinearVelocity = Vector3.new(0, -ragdollSpamPower, 0)
-                        hammerGoingDown = false
-                    end
-                else
-                    mainPart.CFrame = CFrame.new(startPos)
-                    mainPart.AssemblyLinearVelocity = Vector3.zero
-                    segmentIndex = 0
-                    hammerGoingDown = true
-                end
-            else
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    mainPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0)
-                    mainPart.AssemblyLinearVelocity = Vector3.zero
-                end
-            end
-        end
-        
-        if pallet then
-            pcall(function()
-                RS.MenuToys.DestroyToy:FireServer(pallet)
-            end)
-            if pallet.Parent then 
-                pallet:Destroy() 
-            end
-        end
-    end
-
-    RagdollSpamBlock:CreateToggle({
-        Name = "Ragdoll Spam (Pallet Hammer)",
-        Default = false,
-        Callback = function(Value)
-            ragdollSpamActive = Value
-            if ragdollSpamTask then task.cancel(ragdollSpamTask) end
-            if Value then
-                if not selectedTarget then
-                    Library:Notify({Title = "Error", Content = "Select target first", Duration = 3})
-                    ragdollSpamActive = false
-                    return
-                end
-                ragdollSpamTask = task.spawn(function() 
-                    RagdollSpamFunction(selectedTarget.Name) 
-                end)
-                Library:Notify({Title = "Ragdoll Spam", Content = "Enabled", Duration = 2})
-            else
-                task.spawn(function()
-                    local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-                    if toysFolder then
-                        local pallet = toysFolder:FindFirstChild("PalletLightBrown")
-                        if pallet then
-                            pcall(function()
-                                RS.MenuToys.DestroyToy:FireServer(pallet)
-                            end)
-                            if pallet.Parent then
-                                pallet:Destroy()
-                            end
-                        end
-                    end
-                end)
-                Library:Notify({Title = "Ragdoll Spam", Content = "Disabled", Duration = 2})
-            end
-        end
-    })
-
-    RagdollSpamBlock:CreateSlider({
-        Name = "Segments",
-        Min = 3,
-        Max = 20,
-        Default = 8,
-        Callback = function(Value)
-            ragdollSpamSegments = Value
-        end
-    })
-
-    RagdollSpamBlock:CreateSlider({
-        Name = "Impact Power",
-        Min = 1,
-        Max = 50,
-        Default = 10,
-        Callback = function(Value)
-            ragdollSpamPower = Value
-        end
-    })
-
     task.spawn(function()
         while true do
             updateList()
@@ -1735,8 +1612,6 @@ function StartMainScript(titleText)
         cleanupBodies()
         ownershipRagdollActive = false
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
-        ragdollSpamActive = false
-        if ragdollSpamTask then task.cancel(ragdollSpamTask) end
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
         if fovEnabled then SetFOV(false) fovEnabled = false end
