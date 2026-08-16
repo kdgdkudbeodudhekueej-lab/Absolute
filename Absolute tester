@@ -75,15 +75,15 @@ function StartMainScript(titleText)
         recolor(Window)
     end
 
-    local MainTab = Window:CreateTab("Main", true)
+    local TargetTab = Window:CreateTab("Target", true)
     local DefenseTab = Window:CreateTab("Defense", true)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
 
-    local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
-    local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
-    local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
-    local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
+    local KickBlock = TargetTab:CreateBlock({Name = "Ragdoll Kick", Side = "Left"})
+    local KickSettingsBlock = TargetTab:CreateBlock({Name = "Kick Settings", Side = "Right"})
+    local PalletBlock = TargetTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
+    local TargetBlock = TargetTab:CreateBlock({Name = "Target", Side = "Left"})
     
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
@@ -280,7 +280,6 @@ function StartMainScript(titleText)
     local kickActive = false
     local kickTask = nil
     local holdHeight = 17
-    local kickInterval = 0.01
     local fovEnabled = false
     local originalFOV = 70
 
@@ -1100,22 +1099,13 @@ function StartMainScript(titleText)
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
 
-    SettingsBlock:CreateSlider({
+    KickSettingsBlock:CreateSlider({
         Name = "Hold Height",
-        Min = 3,
-        Max = 25,
+        Min = 5,
+        Max = 40,
         Default = 17,
         Rounding = 0,
         Callback = function(Value) holdHeight = Value end
-    })
-
-    SettingsBlock:CreateSlider({
-        Name = "Interval",
-        Min = 0.01,
-        Max = 0.02,
-        Default = 0.01,
-        Rounding = 2,
-        Callback = function(Value) kickInterval = Value end
     })
 
     AntiGrabBlock:CreateToggle({
@@ -1309,149 +1299,204 @@ function StartMainScript(titleText)
         end
     })
 
-    local function OwnershipKickFunction(targetName)
+    -- RAGDOLL KICK - ПОЛНАЯ ФУНКЦИЯ
+    local ragdollKickActive = false
+    local ragdollKickTask = nil
+    local ragdollKickOffsetX = 0
+    local ragdollKickOffsetY = 0
+    local ragdollKickOffsetZ = 0
+    local ragdollKickTarget = nil
+    local ragdollKickBodyPos = nil
+    local ragdollKickBodyGyro = nil
+    local ragdollKickAttachments = {}
+
+    local function cleanupRagdollKickBodies()
+        ragdollKickBodyPos = nil
+        ragdollKickBodyGyro = nil
+        for _, v in pairs(ragdollKickAttachments) do
+            if v then pcall(function() v:Destroy() end) end
+        end
+        ragdollKickAttachments = {}
+    end
+
+    local function RagdollKickFunction(targetName)
         local target = Players:FindFirstChild(targetName)
         if not target then return end
         
+        local GE = RS:WaitForChild("GrabEvents")
+        local SetNetOwner = GE:WaitForChild("SetNetworkOwner")
+        local DestroyGrabLine = GE:WaitForChild("DestroyGrabLine")
+        
+        local ZERO_VECTOR = Vector3.new(0, 0, 0)
+        local GRAB_TIMEOUT = 0.10
+        local MAX_DISTANCE = 25
+        local PALLET_COOLDOWN = 0.01
+        local HIDDEN_CF = CFrame.new(0, 1e9, 0)
+
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myRoot then return end
 
-        local savedPos = myRoot.CFrame 
-        local dragging = false
-        local grabStartTime = 0
-        local checkStartTime = 0
+        local savedPos = myRoot.CFrame
+        local isGrabbing = false
+        local startTime = nil
+        local lastPalletTime = 0
+        local checkStartTime = nil
+        local currentTargetRoot = nil
         
-        local currentFPS = 60
-        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
-            currentFPS = 1 / dt
+        local MyToys = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+        local pallet = MyToys and MyToys:FindFirstChild("PalletLightBrown")
+        if not pallet and LocalPlayer.CanSpawnToy.Value then
+            RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("PalletLightBrown", HIDDEN_CF, Vector3.new(0, -90, 0))
+            task.wait(0.2)
+            MyToys = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            pallet = MyToys and MyToys:FindFirstChild("PalletLightBrown")
+        end
+        local soundPart = pallet and pallet:FindFirstChild("SoundPart")
+
+        local function getCurrentOffset()
+            return Vector3.new(ragdollKickOffsetX or 0, ragdollKickOffsetY or 0, ragdollKickOffsetZ or 0)
+        end
+
+        local function cleanupPhysicsObjects()
+            isGrabbing = false
+            currentTargetRoot = nil
+            cleanupRagdollKickBodies()
+        end
+
+        local function isTargetAlive()
+            target = Players:FindFirstChild(targetName)
+            if not target or not target.Parent then return false end
+            
+            local char = target.Character
+            if not char then return false end
+            
+            local hum = char:FindFirstChild("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            
+            if not hum or hum.Health <= 0 or not root then return false end
+            
+            currentTargetRoot = root
+            return true
+        end
+
+        task.spawn(function()
+            while ragdollKickActive do
+                if target and target.Parent and target.Character then
+                    local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        SetNetOwner:FireServer(tRoot, tRoot.CFrame)
+                        DestroyGrabLine:FireServer(tRoot)
+                        tRoot.AssemblyLinearVelocity = ZERO_VECTOR
+                        tRoot.AssemblyAngularVelocity = ZERO_VECTOR
+                    end
+                end
+                task.wait()
+            end
         end)
 
-        local bodyPos = nil
-        local bodyGyro = nil
+        while ragdollKickActive do
+            RunService.Stepped:Wait()
 
-        local function createBodies(targetRoot, pos)
-            cleanupBodies()
-            for _, v in pairs(targetRoot:GetChildren()) do
-                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                    v:Destroy()
-                end
+            if not isTargetAlive() then
+                cleanupPhysicsObjects()
+                task.wait(0.5)
+                continue
             end
-            bodyPos = Instance.new("BodyPosition")
-            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            bodyPos.D = 100
-            bodyPos.Position = pos
-            bodyPos.Parent = targetRoot
-            bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bodyGyro.D = 100
-            bodyGyro.CFrame = CFrame.new(pos)
-            bodyGyro.Parent = targetRoot
-        end
 
-        while kickActive do
-            local currentTarget = Players:FindFirstChild(target.Name)
-            if not currentTarget or not currentTarget.Parent then 
-                cleanupBodies()
-                break 
-            end
-            
             myChar = LocalPlayer.Character
             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local tChar = currentTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            local tHum = tChar and tChar:FindFirstChild("Humanoid")
-            
-            if tRoot and tHum and tHum.Health > 0 and myRoot then
-                if not dragging then
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                    cleanupBodies()
-                    checkStartTime = 0
-                    pcall(function()
-                        tHum.PlatformStand = true
-                        tHum.Sit = true
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        DestroyGrabLine:FireServer(tRoot)
-                    end)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if grabStartTime == 0 then grabStartTime = tick() end
-                    if tick() - grabStartTime > 0.35 then
-                        dragging = true
-                        grabStartTime = 0
-                        checkStartTime = tick()
-                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                        createBodies(tRoot, lockPos.Position)
-                    end
-                else
+            if not myRoot then continue end
+
+            local tChar = target.Character
+            local tHum = tChar:FindFirstChild("Humanoid")
+            local tRoot = currentTargetRoot
+
+            if not isGrabbing then
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -6, -10)
+                myRoot.Velocity = ZERO_VECTOR
+                tHum.PlatformStand = true
+                tHum.Sit = false
+
+                if not startTime then startTime = tick() end
+
+                if tick() - startTime > GRAB_TIMEOUT then
+                    isGrabbing = true
+                    startTime = nil
                     myRoot.CFrame = savedPos
-                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if bodyPos and bodyPos.Parent then
-                        bodyPos.Position = lockPos.Position
-                        if bodyGyro then bodyGyro.CFrame = lockPos end
-                    else
-                        createBodies(tRoot, lockPos.Position)
+                    
+                    local bp = Instance.new("BodyPosition", tRoot)
+                    bp.MaxForce = Vector3.new(2e9, 2e9, 2e9)
+                    bp.P = 5000000; bp.D = 2500
+                    bp.Position = myRoot.Position + Vector3.new(0, 12.5, 0) + getCurrentOffset()
+                    
+                    local bg = Instance.new("BodyGyro", tRoot)
+                    bg.MaxTorque = Vector3.new(2e9, 2e9, 2e9)
+                    bg.P = 5000000; bg.D = 2500
+                    bg.CFrame = myRoot.CFrame
+                    
+                    local force = Instance.new("BodyForce", tRoot)
+                    local m = 0
+                    for _, v in pairs(tChar:GetChildren()) do
+                        if v:IsA("BasePart") then m = m + v:GetMass() end
                     end
-                    tHum.PlatformStand = true
-                    pcall(function()
-                        if currentFPS > 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                        elseif currentFPS >= 155 and currentFPS <= 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                        else
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                        end
-                    end)
-                    if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
-                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
-                        if currentDist > 10 then
-                            dragging = false
-                            grabStartTime = 0
-                            checkStartTime = 0
-                            cleanupBodies()
-                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                        else
-                            checkStartTime = tick()
-                        end
-                    end
+                    force.Force = Vector3.new(0, m * workspace.Gravity, 0)
+
+                    ragdollKickAttachments.bp = bp
+                    ragdollKickAttachments.bg = bg
+                    ragdollKickAttachments.force = force
+                    tHum:ChangeState(Enum.HumanoidStateType.Physics)
                 end
             else
-                dragging = false
-                grabStartTime = 0
-                checkStartTime = 0
-                cleanupBodies()
+                for _, part in ipairs(tChar:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+
+                if ragdollKickAttachments.bp and myRoot then
+                    ragdollKickAttachments.bp.Position = myRoot.Position + Vector3.new(0, 12.5, 0) + getCurrentOffset()
+                    tRoot.AssemblyLinearVelocity = ZERO_VECTOR
+                end
+
+                if ragdollKickAttachments.bg and myRoot then
+                    ragdollKickAttachments.bg.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
+                end
+
+                if not checkStartTime then checkStartTime = tick() + 0.25 end
+                if checkStartTime and tick() >= checkStartTime then
+                    local dist = (myRoot.Position - tRoot.Position).Magnitude
+                    if dist > MAX_DISTANCE then
+                        cleanupPhysicsObjects()
+                        isGrabbing = false
+                        startTime = tick()
+                        checkStartTime = nil
+                        savedPos = myRoot.CFrame
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -8, 0)
+                        SetNetOwner:FireServer(tRoot, tRoot.CFrame)
+                        task.wait()
+                        DestroyGrabLine:FireServer(tRoot)
+                        continue
+                    end
+                end
+
+                local currentTime = tick()
+                if currentTime - lastPalletTime >= PALLET_COOLDOWN then
+                    lastPalletTime = currentTime
+                    if soundPart then
+                        soundPart.CFrame = tRoot.CFrame * CFrame.new(0, 2.5, 0)
+                        SetNetOwner:FireServer(soundPart, soundPart.CFrame)
+                        task.wait()
+                        soundPart.CFrame = HIDDEN_CF
+                    end
+                end
             end
-            task.wait(kickInterval)
         end
-        
-        fpsConnection:Disconnect()
-        cleanupBodies()
-        if myRoot then myRoot.CFrame = savedPos end
-        if target and target.Character then
-            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
-            if tRoot then
-                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
-            end
-        end
+
+        cleanupPhysicsObjects()
+        if myRoot and savedPos then myRoot.CFrame = savedPos end
     end
 
     KickBlock:CreateToggle({
-        Name = "Enable Ownership Kick",
+        Name = "Enable Ragdoll Kick",
         Default = false,
         Callback = function(Value)
             if Value then
@@ -1459,14 +1504,14 @@ function StartMainScript(titleText)
                     Library:Notify({ Title = "Error", Content = "Select target", Duration = 3 })
                     return
                 end
-                kickActive = true
-                if kickTask then task.cancel(kickTask) kickTask = nil end
-                kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
-                Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
+                ragdollKickActive = true
+                if ragdollKickTask then task.cancel(ragdollKickTask) ragdollKickTask = nil end
+                ragdollKickTask = task.spawn(function() RagdollKickFunction(selectedTarget.Name) end)
+                Library:Notify({ Title = "Ragdoll Kick", Content = "Enabled", Duration = 2 })
             else
-                kickActive = false
-                if kickTask then task.cancel(kickTask) kickTask = nil end
-                cleanupBodies()
+                ragdollKickActive = false
+                if ragdollKickTask then task.cancel(ragdollKickTask) ragdollKickTask = nil end
+                cleanupRagdollKickBodies()
                 if selectedTarget and selectedTarget.Character then
                     local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
                     if tRoot then
@@ -1481,7 +1526,17 @@ function StartMainScript(titleText)
                         end)
                     end
                 end
-                Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
+                task.spawn(function()
+                    local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+                    if toysFolder then
+                        local pallet = toysFolder:FindFirstChild("PalletLightBrown")
+                        if pallet then
+                            pcall(function() RS.MenuToys.DestroyToy:FireServer(pallet) end)
+                            if pallet.Parent then pallet:Destroy() end
+                        end
+                    end
+                end)
+                Library:Notify({ Title = "Ragdoll Kick", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1607,6 +1662,9 @@ function StartMainScript(titleText)
     end)
 
     LocalPlayer.OnTeleport:Connect(function()
+        ragdollKickActive = false
+        if ragdollKickTask then task.cancel(ragdollKickTask) ragdollKickTask = nil end
+        cleanupRagdollKickBodies()
         kickActive = false
         if kickTask then task.cancel(kickTask) kickTask = nil end
         cleanupBodies()
@@ -1748,7 +1806,8 @@ function StartMainScript(titleText)
         MyPCLD = nil
         pcldConn = RunService.Heartbeat:Connect(function()
             if MyPCLD or not hrp or not hrp.Parent then 
-                if pcldConn then pcldConn:Disconnect() pcldConn = nil end                return
+                if pcldConn then pcldConn:Disconnect() pcldConn = nil end
+                return
             end
             for _, v in pairs(Workspace:GetChildren()) do 
                 if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
