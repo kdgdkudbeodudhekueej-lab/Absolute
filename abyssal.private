@@ -1,4 +1,4 @@
--- Mini Spin Kick Blobman + Visuals
+-- Mini Spin Kick Blobman + Visuals (с спам-грабом)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -25,7 +25,7 @@ local BlodmanTab = Window:CreateTab("Blodman", true)
 local VisualTab = Window:CreateTab("Visual", true)
 
 -- Блоки для Blodman
-local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "SPIN KICK BLOBMAN", Side = "Left"})
+local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "SPIN KICK BLOBMAN (Spam Grab)", Side = "Left"})
 local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
 local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
 
@@ -42,6 +42,7 @@ local blobmanGrabInterval = 0.02
 local blobmanHoldHeight = 20
 local autoSitBlodmanActive = false
 local autoSitBlodmanTask = nil
+local spamCounter = 0
 
 -- ============ ФУНКЦИИ ДЛЯ СПИСКА ИГРОКОВ ============
 local function updateList()
@@ -69,7 +70,7 @@ end
 -- Обновляем список при старте
 updateList()
 
--- ============ SPIN KICK BLOBMAN ============
+-- ============ SPIN KICK BLOBMAN (СПАМ-ГРАБ) ============
 local function BlobmanSpinKickLoop()
     local target = blobmanTarget
     if not target then 
@@ -120,8 +121,9 @@ local function BlobmanSpinKickLoop()
 
     local lockedPcldWorldPos = nil
     local savedBlobCF = blobRoot and blobRoot.CFrame
+    local spamCounter = 0
 
-    Library:Notify({ Title = "Spin Kick", Content = "Started!", Duration = 2 })
+    Library:Notify({ Title = "Spin Kick", Content = "Started with Spam Grab!", Duration = 2 })
 
     while blobmanSpinKickActive do
         local currentTarget = Players:FindFirstChild(target.Name)
@@ -172,25 +174,17 @@ local function BlobmanSpinKickLoop()
                     dragging = true
                     grabStartTime = 0
                     orbitAngle = 0
+                    spamCounter = 0
                     
                     -- Возвращаем блоба
                     if savedBlobCF then
                         blobRoot.CFrame = savedBlobCF
                         blobRoot.Velocity = Vector3.zero
                     end
-                    
-                    -- Захватываем через детектор
-                    pcall(function()
-                        local weld = R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChildWhichIsA("Weld")
-                        if weld then
-                            release:FireServer(weld)
-                            grab:FireServer(R_Det, tRoot, weld)
-                        end
-                    end)
                 end
                 task.wait(blobmanGrabInterval)
             else
-                -- ФАЗА 2: ВРАЩЕНИЕ ПО КРУГУ
+                -- ФАЗА 2: ВРАЩЕНИЕ ПО КРУГУ + СПАМ-ГРАБ
                 local dt = RunService.Heartbeat:Wait()
                 orbitAngle = orbitAngle + ORBIT_ANGULAR_SPEED * dt
 
@@ -233,16 +227,26 @@ local function BlobmanSpinKickLoop()
                 tHum.PlatformStand = true
                 tHum.Sit = true
 
+                -- ===== СПАМ-ГРАБ (как в Kick V2) =====
+                spamCounter = spamCounter + 1
+                
+                pcall(function()
+                    -- Спамим граб через детектор
+                    grab:FireServer(R_Det, tRoot, R_Weld)
+                end)
+                
+                -- Каждые 2 раза делаем релиз для перезахвата
+                if spamCounter % 2 == 0 then
+                    pcall(function()
+                        release:FireServer(R_Weld)
+                    end)
+                end
+                
                 -- Отправка сетевых событий
                 pcall(function()
                     local targetCF = CFrame.new(targetPos) * tRoot.CFrame.Rotation
                     GE.SetNetworkOwner:FireServer(tRoot, targetCF)
                     GE.DestroyGrabLine:FireServer(tRoot)
-                    local weld = R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChildWhichIsA("Weld")
-                    if weld then
-                        release:FireServer(weld)
-                        grab:FireServer(R_Det, tRoot, weld)
-                    end
                 end)
                 
                 task.wait(blobmanGrabInterval)
@@ -251,6 +255,7 @@ local function BlobmanSpinKickLoop()
             dragging = false
             grabStartTime = 0
             lockedPcldWorldPos = nil
+            spamCounter = 0
             task.wait(0.1)
         end
     end
@@ -359,7 +364,7 @@ BlodmanMainBlock:CreateButton({
 
 -- Включение Spin Kick
 BlodmanMainBlock:CreateToggle({
-    Name = "SPIN KICK BLOBMAN",
+    Name = "SPIN KICK BLOBMAN (Spam Grab)",
     Default = false,
     Callback = function(Value)
         blobmanSpinKickActive = Value
@@ -465,4 +470,4 @@ LocalPlayer.OnTeleport:Connect(function()
     if fovEnabled then SetFOV(false) fovEnabled = false end
 end)
 
-Library:Notify({ Title = "Spin Kick Mini", Content = "Loaded successfully!", Duration = 3 })
+Library:Notify({ Title = "Spin Kick Mini", Content = "Loaded with Spam Grab!", Duration = 3 })
