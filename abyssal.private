@@ -38,11 +38,11 @@ local targetNames = {}
 local blobmanTarget = nil
 local blobmanSpinKickActive = false
 local blobmanSpinKickTask = nil
-local blobmanGrabInterval = 0.02
+local blobmanGrabInterval = 0.02  -- Скорость граба
+local blobmanSpinSpeed = 25       -- Скорость вращения (отдельно)
 local blobmanHoldHeight = 20
 local autoSitBlodmanActive = false
 local autoSitBlodmanTask = nil
-local spamCounter = 0
 
 -- ============ ФУНКЦИИ ДЛЯ СПИСКА ИГРОКОВ ============
 local function updateList()
@@ -97,7 +97,6 @@ local function BlobmanSpinKickLoop()
     local grabStartTime = 0
     local orbitAngle = 0
     local ORBIT_RADIUS = 25
-    local ORBIT_ANGULAR_SPEED = 25
     
     local hum = myChar and myChar:FindFirstChild("Humanoid")
     local seat = hum and hum.SeatPart
@@ -182,11 +181,11 @@ local function BlobmanSpinKickLoop()
                         blobRoot.Velocity = Vector3.zero
                     end
                 end
-                task.wait(blobmanGrabInterval)
+                task.wait(blobmanGrabInterval) -- Используем скорость граба
             else
                 -- ФАЗА 2: ВРАЩЕНИЕ ПО КРУГУ + СПАМ-ГРАБ
                 local dt = RunService.Heartbeat:Wait()
-                orbitAngle = orbitAngle + ORBIT_ANGULAR_SPEED * dt
+                orbitAngle = orbitAngle + blobmanSpinSpeed * dt -- Используем отдельную скорость вращения
 
                 local basePos = lockedPcldWorldPos or tRoot.Position
 
@@ -249,7 +248,7 @@ local function BlobmanSpinKickLoop()
                     GE.DestroyGrabLine:FireServer(tRoot)
                 end)
                 
-                task.wait(blobmanGrabInterval)
+                task.wait(blobmanGrabInterval) -- Используем скорость граба
             end
         else
             dragging = false
@@ -395,13 +394,24 @@ BlodmanMainBlock:CreateToggle({
 
 -- Настройки
 BlodmanSettingsBlock:CreateSlider({
-    Name = "Interval (0.01 - 0.1)",
+    Name = "Grab Speed (0.01 - 0.1)",
     Min = 0.01,
     Max = 0.1,
     Default = 0.02,
     Rounding = 2,
     Callback = function(Value)
         blobmanGrabInterval = Value
+    end
+})
+
+BlodmanSettingsBlock:CreateSlider({
+    Name = "Spin Speed (5 - 50)",
+    Min = 5,
+    Max = 50,
+    Default = 25,
+    Rounding = 0,
+    Callback = function(Value)
+        blobmanSpinSpeed = Value
     end
 })
 
