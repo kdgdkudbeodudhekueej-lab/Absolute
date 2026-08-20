@@ -91,7 +91,11 @@ function StartMainScript(titleText)
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+    
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+    local VisualESPTab = VisualTab:CreateBlock({Name = "ESP Settings", Side = "Right"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
@@ -1150,193 +1154,205 @@ function StartMainScript(titleText)
         end
     })
 
-    local pcldEspEnabled = false
-    local pcldEspLines = {}
-    local blackholeEspEnabled = false
-    local blackholeEspLines = {}
+    local espEnabled = false 
+    local espBoxes = {} 
+    local espTargetNames = {"partesp", "playercharacterlocationdetector"} 
+    local espColor = Color3.fromRGB(30, 30, 30)
 
-    local function CreateEspLine(part, color)
-        if not part then return end
-        
-        local line = Instance.new("Part")
-        line.Name = "EspLine"
-        line.Size = Vector3.new(0.1, 0.1, 0.1)
-        line.Anchored = true
-        line.CanCollide = false
-        line.CanTouch = false
-        line.CanQuery = false
-        line.Material = Enum.Material.Neon
-        line.BrickColor = BrickColor.new(color)
-        line.Transparency = 0.3
-        line.Parent = workspace
-        
-        local attachment1 = Instance.new("Attachment", line)
-        local attachment2 = Instance.new("Attachment", line)
-        attachment1.Position = Vector3.new(-0.05, 0, 0)
-        attachment2.Position = Vector3.new(0.05, 0, 0)
-        
-        local trail = Instance.new("Trail", line)
-        trail.Attachment0 = attachment1
-        trail.Attachment1 = attachment2
-        trail.Lifetime = 0.1
-        trail.MinLength = 0.1
-        trail.Texture = "rbxassetid://3634428551"
-        trail.Color = ColorSequence.new(Color3.fromRGB(128, 0, 255))
-        trail.Transparency = NumberSequence.new(0.3)
-        trail.Enabled = true
-        
-        return line
-    end
+    local function IsTarget(obj) 
+        if not obj:IsA("BasePart") then return false end 
+        for _, name in ipairs(espTargetNames) do 
+            if string.lower(obj.Name) == string.lower(name) then return true end 
+        end 
+        return false 
+    end 
 
-    local function UpdatePCLDEsp()
-        if not pcldEspEnabled then
-            for _, line in pairs(pcldEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            pcldEspLines = {}
-            return
-        end
+    local function AddBoxESP(obj) 
+        if espBoxes[obj] then return end 
+        local group = {} 
         
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        local box = Instance.new("BoxHandleAdornment") 
+        box.Adornee = obj 
+        box.AlwaysOnTop = true 
+        box.ZIndex = 8 
+        box.Color3 = espColor 
+        box.Transparency = 0.6 
+        box.Size = obj.Size 
+        box.Parent = game.CoreGui 
+        table.insert(group, box) 
         
-        local pcld = nil
-        for _, v in pairs(Workspace:GetChildren()) do
-            if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
-                if (v.Position - hrp.Position).Magnitude <= 5 then
-                    pcld = v
-                    break
-                end
-            end
-        end
+        local outline = Instance.new("SelectionBox") 
+        outline.Adornee = obj 
+        outline.Color3 = Color3.fromRGB(0, 0, 0) 
+        outline.LineThickness = 0.09
+        outline.SurfaceTransparency = 1 
+        outline.Parent = game.CoreGui 
+        table.insert(group, outline) 
         
-        if not pcld then
-            for _, line in pairs(pcldEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            pcldEspLines = {}
-            return
-        end
+        espBoxes[obj] = group 
         
-        while pcldEspEnabled and pcld and pcld.Parent do
-            for _, line in pairs(pcldEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            pcldEspLines = {}
-            
-            local size = pcld.Size
-            local positions = {
-                pcld.CFrame * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2),
-                pcld.CFrame * CFrame.new(size.X/2, -size.Y/2, -size.Z/2),
-                pcld.CFrame * CFrame.new(size.X/2, size.Y/2, -size.Z/2),
-                pcld.CFrame * CFrame.new(-size.X/2, size.Y/2, -size.Z/2),
-                pcld.CFrame * CFrame.new(-size.X/2, -size.Y/2, size.Z/2),
-                pcld.CFrame * CFrame.new(size.X/2, -size.Y/2, size.Z/2),
-                pcld.CFrame * CFrame.new(size.X/2, size.Y/2, size.Z/2),
-                pcld.CFrame * CFrame.new(-size.X/2, size.Y/2, size.Z/2),
-            }
-            
-            local edges = {
-                {1,2}, {2,3}, {3,4}, {4,1},
-                {5,6}, {6,7}, {7,8}, {8,5},
-                {1,5}, {2,6}, {3,7}, {4,8}
-            }
-            
-            for _, edge in pairs(edges) do
-                local line = CreateEspLine(pcld, "Bright violet")
-                if line then
-                    local attachment1 = line:FindFirstChild("Attachment")
-                    local attachment2 = line:FindFirstChild("Attachment1")
-                    if attachment1 and attachment2 then
-                        attachment1.Position = positions[edge[1]]
-                        attachment2.Position = positions[edge[2]]
-                    end
-                    table.insert(pcldEspLines, line)
-                end
-            end
-            
-            task.wait(0.1)
-        end
-    end
+        obj.AncestryChanged:Connect(function(_, parent) 
+            if not parent and espBoxes[obj] then 
+                for _, item in ipairs(espBoxes[obj]) do 
+                    if item then item:Destroy() end 
+                end 
+                espBoxes[obj] = nil 
+            end 
+        end) 
+    end 
 
-    local function UpdateBlackholeEsp()
-        if not blackholeEspEnabled then
-            for _, line in pairs(blackholeEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            blackholeEspLines = {}
-            return
-        end
-        
-        while blackholeEspEnabled do
-            for _, line in pairs(blackholeEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            blackholeEspLines = {}
-            
-            local blackhole = nil
-            for _, v in pairs(Workspace:GetChildren()) do
-                if v.Name == "Blackhole" and v:IsA("Model") then
-                    blackhole = v
-                    break
-                end
-            end
-            
-            if blackhole then
-                local center = blackhole:FindFirstChild("CenterPart")
-                if center then
-                    local size = center.Size
-                    local positions = {
-                        center.CFrame * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2),
-                        center.CFrame * CFrame.new(size.X/2, -size.Y/2, -size.Z/2),
-                        center.CFrame * CFrame.new(size.X/2, size.Y/2, -size.Z/2),
-                        center.CFrame * CFrame.new(-size.X/2, size.Y/2, -size.Z/2),
-                        center.CFrame * CFrame.new(-size.X/2, -size.Y/2, size.Z/2),
-                        center.CFrame * CFrame.new(size.X/2, -size.Y/2, size.Z/2),
-                        center.CFrame * CFrame.new(size.X/2, size.Y/2, size.Z/2),
-                        center.CFrame * CFrame.new(-size.X/2, size.Y/2, size.Z/2),
-                    }
-                    
-                    local edges = {
-                        {1,2}, {2,3}, {3,4}, {4,1},
-                        {5,6}, {6,7}, {7,8}, {8,5},
-                        {1,5}, {2,6}, {3,7}, {4,8}
-                    }
-                    
-                    for _, edge in pairs(edges) do
-                        local line = CreateEspLine(center, "Bright violet")
-                        if line then
-                            local attachment1 = line:FindFirstChild("Attachment")
-                            local attachment2 = line:FindFirstChild("Attachment1")
-                            if attachment1 and attachment2 then
-                                attachment1.Position = positions[edge[1]]
-                                attachment2.Position = positions[edge[2]]
-                            end
-                            table.insert(blackholeEspLines, line)
-                        end
-                    end
-                end
-            end
-            
-            task.wait(0.1)
-        end
-    end
+    local function RemoveAllBoxes() 
+        for obj, items in pairs(espBoxes) do 
+            for _, item in ipairs(items) do 
+                if item then item:Destroy() end 
+            end 
+        end 
+        espBoxes = {} 
+    end 
 
-    VisualBlock:CreateToggle({
-        Name = "PCLD ESP",
-        Default = false,
-        Callback = function(Value)
-            pcldEspEnabled = Value
-            task.spawn(UpdatePCLDEsp)
+    local function Scan() 
+        for _, obj in ipairs(workspace:GetDescendants()) do 
+            if espEnabled and IsTarget(obj) then 
+                AddBoxESP(obj) 
+            end 
+        end 
+    end 
+
+    workspace.DescendantAdded:Connect(function(obj) 
+        if espEnabled and IsTarget(obj) then 
+            AddBoxESP(obj) 
+        end 
+    end) 
+
+    VisualESPTab:CreateToggle({ 
+        Name = "Player-Location (PCLD ESP)", 
+        Default = false, 
+        Callback = function(Value) 
+            espEnabled = Value 
+            if espEnabled then 
+                Scan() 
+            else 
+                RemoveAllBoxes() 
+            end 
         end
     })
 
-    VisualBlock:CreateToggle({
-        Name = "Blackhole ESP",
+    VisualESPTab:CreateColorpicker({
+        Name = "PCLD ESP Color",
+        Default = Color3.fromRGB(0, 0, 0),
+        Callback = function(Value)
+            espColor = Value
+            for obj, group in pairs(espBoxes) do
+                if group and group[1] then
+                    group[1].Color3 = espColor
+                end
+            end
+        end
+    })
+
+    local espNameEnabled = false
+    local espNameColor = Color3.fromRGB(255, 255, 255)
+    local espNames = {}
+
+    local function AddNameESP(player)
+        if player == LocalPlayer then return end
+
+        local function setupEsp(character)
+            if espNames[player.Name] then
+                espNames[player.Name]:Destroy()
+                espNames[player.Name] = nil
+            end
+
+            local head = character:WaitForChild("Head", 5)
+            if not head then return end
+
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = player.Name .. "_NameESP"
+            billboard.Adornee = head
+            billboard.Size = UDim2.new(0, 200, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+            billboard.AlwaysOnTop = true
+
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Parent = billboard
+            textLabel.BackgroundTransparency = 1
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.Text = player.Name
+            textLabel.TextColor3 = espNameColor
+            textLabel.TextStrokeTransparency = 0.2
+            textLabel.TextSize = 14
+            textLabel.Font = Enum.Font.GothamBold
+
+            local success, _ = pcall(function()
+                billboard.Parent = game:GetService("CoreGui")
+            end)
+            if not success then
+                billboard.Parent = LocalPlayer:WaitForChild("PlayerGui")
+            end
+
+            espNames[player.Name] = billboard
+        end
+
+        if player.Character then
+            setupEsp(player.Character)
+        end
+
+        player.CharacterAdded:Connect(function(char)
+            if espNameEnabled then
+                setupEsp(char)
+            end
+        end)
+    end
+
+    local function ScanPlayers()
+        for _, player in pairs(Players:GetPlayers()) do
+            AddNameESP(player)
+        end
+    end
+
+    local function RemoveAllNames()
+        for _, gui in pairs(espNames) do
+            if gui then gui:Destroy() end
+        end
+        table.clear(espNames)
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+        if espNameEnabled then
+            AddNameESP(player)
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        if espNames[player.Name] then
+            espNames[player.Name]:Destroy()
+            espNames[player.Name] = nil
+        end
+    end)
+
+    VisualESPTab:CreateToggle({
+        Name = "Name ESP",
         Default = false,
         Callback = function(Value)
-            blackholeEspEnabled = Value
-            task.spawn(UpdateBlackholeEsp)
+            espNameEnabled = Value
+            if Value then
+                ScanPlayers()
+            else
+                RemoveAllNames()
+            end
+        end
+    })
+
+    VisualESPTab:CreateColorpicker({
+        Name = "Name ESP Color",
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(Value)
+            espNameColor = Value
+            for _, gui in pairs(espNames) do
+                if gui and gui:FindFirstChild("TextLabel") then
+                    gui.TextLabel.TextColor3 = espNameColor
+                end
+            end
         end
     })
 
@@ -1454,8 +1470,6 @@ function StartMainScript(titleText)
             end
         end)
     end
-
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
@@ -1866,22 +1880,6 @@ function StartMainScript(titleText)
             DisableAntiLag()
         end
         
-        if pcldEspEnabled then
-            pcldEspEnabled = false
-            for _, line in pairs(pcldEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            pcldEspLines = {}
-        end
-        
-        if blackholeEspEnabled then
-            blackholeEspEnabled = false
-            for _, line in pairs(blackholeEspLines) do
-                if line and line.Parent then line:Destroy() end
-            end
-            blackholeEspLines = {}
-        end
-        
         task.spawn(function()
             local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
             if toysFolder then
@@ -2032,37 +2030,6 @@ function StartMainScript(titleText)
                 Item = inv:FindFirstChild("AntiKickItem") 
                 SoundPart = Item and Item:FindFirstChild("Hitbox")
                 
-                local needsRespawn = false
-                local newOwner = nil
-                if Item then
-                    for _, v in pairs(Item:GetChildren()) do
-                        if v:IsA("BasePart") then
-                            local partOwner = v:FindFirstChild("PartOwner")
-                            if partOwner and partOwner.Value ~= LocalPlayer.Name then
-                                needsRespawn = true
-                                newOwner = partOwner.Value
-                                break
-                            end
-                        end
-                    end
-                end
-                
-                if needsRespawn and Item and newOwner then
-                    local thief = Players:FindFirstChild(newOwner)
-                    local thiefName = thief and thief.DisplayName or newOwner
-                    
-                    Library:Notify({ 
-                        Title = "⚠️ Anti-Kick Item Stolen!", 
-                        Content = thiefName .. " stolen your Anti-Kick Item!", 
-                        Duration = 4 
-                    })
-                    
-                    pcall(function() destroyToy:FireServer(Item) end)
-                    task.wait(0.1)
-                    Item = nil
-                    SoundPart = nil
-                end
-                
                 if not Item or not SoundPart then
                     for _,v in pairs(inv:GetChildren()) do 
                         if v.Name == "AntiKickItem" then 
@@ -2078,11 +2045,9 @@ function StartMainScript(titleText)
                     
                     for _,v in pairs(Item:GetChildren()) do 
                         if v:IsA("BasePart") then 
-                            v.CanCollide = false
-                            v.CanTouch = false
-                            v.CanQuery = false
-                            v.Transparency = 0.70
-                            v.Massless = true
+                            v.CanCollide = false 
+                            v.Transparency = 0.8
+                            v.Color = Color3.fromRGB(0, 255, 255)
                         end
                     end
                     
@@ -2095,28 +2060,13 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
-                    local targetCF = targetPart.CFrame
                     if SelectedToy == "JapaneseLantern" then
-                        targetCF = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                        SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                    else
+                        SoundPart.CFrame = targetPart.CFrame
                     end
-                    
-                    local currentCF = SoundPart.CFrame
-                    local lerpFactor = 0.3
-                    local newCF = currentCF:Lerp(targetCF, lerpFactor)
-                    
-                    SoundPart.CFrame = newCF
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
-                    
-                    for _,v in pairs(Item:GetChildren()) do 
-                        if v:IsA("BasePart") then 
-                            v.CanCollide = false
-                            v.CanTouch = false
-                            v.CanQuery = false
-                            v.Transparency = 0.70
-                            v.Massless = true
-                        end
-                    end
                 end
             end
         end)
@@ -2147,8 +2097,6 @@ function StartMainScript(titleText)
         end)
     end
 
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
@@ -2160,7 +2108,7 @@ function StartMainScript(titleText)
                 ["Spooky Candle"] = "SpookyCandle1",
             }
             SelectedToy = ToyList[Value] or "SpookyCandle1"
-            Library:Notify({ Title = "Anti-Kick Item", Content = "Selected: " .. Value, Duration = 2 })
+            Library:Notify({ Title = "Anti-Kick", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
