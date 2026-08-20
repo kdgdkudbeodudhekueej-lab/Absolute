@@ -823,26 +823,11 @@ function StartMainScript(titleText)
         local spamCounter = 0
         
         local kickPosition = myRoot.CFrame
-        
-        local function TeleportTargetToKickPosition(targetRoot, targetChar)
-            if not targetRoot or not targetChar then return false end
-            
-            local targetPos = Vector3.new(
-                kickPosition.X, 
-                kickPosition.Y + currentHoldHeight - 10, 
-                kickPosition.Z
-            )
-            
-            targetRoot.CFrame = CFrame.new(targetPos) * targetRoot.CFrame.Rotation
-            targetRoot.Velocity = Vector3.zero
-            targetRoot.AssemblyLinearVelocity = Vector3.zero
-            targetRoot.AssemblyAngularVelocity = Vector3.zero
-            
-            myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 5)
-            myRoot.Velocity = Vector3.zero
-            
-            return true
-        end
+        local targetPos = Vector3.new(
+            kickPosition.X, 
+            kickPosition.Y + currentHoldHeight - 10, 
+            kickPosition.Z
+        )
 
         Library:Notify({ Title = "Kick (Circle)", Content = "Started! Position locked", Duration = 2 })
 
@@ -865,141 +850,110 @@ function StartMainScript(titleText)
                 dragging = false
                 grabStartTime = 0
                 spamCounter = 0
-                
-                local waitStart = tick()
-                local found = false
-                while tick() - waitStart < 10 and circleKickActive do
-                    local newChar = currentTarget.Character
-                    local newRoot = newChar and newChar:FindFirstChild("HumanoidRootPart")
-                    local newHum = newChar and newChar:FindFirstChild("Humanoid")
-                    
-                    if newRoot and newHum and newHum.Health > 0 then
-                        local success = TeleportTargetToKickPosition(newRoot, newChar)
-                        
-                        if success then
-                            tRoot = newRoot
-                            tHum = newHum
-                            tChar = newChar
-                            found = true
-                            dragging = false
-                            grabStartTime = 0
-                            break
-                        end
-                    end
-                    task.wait(0.1)
-                end
-                
-                if not found then
-                    task.wait(0.1)
-                    continue
-                end
+                task.wait(0.1)
+                continue
             end
 
-            if tRoot and tHum and tHum.Health > 0 and myRoot and blobRoot then
-                local targetPos = Vector3.new(
+            tRoot.AssemblyLinearVelocity = Vector3.zero
+            tRoot.Velocity = Vector3.zero
+
+            local distanceFromKick = (tRoot.Position - targetPos).Magnitude
+            
+            if distanceFromKick > 15 then
+                tRoot.CFrame = CFrame.new(targetPos) * tRoot.CFrame.Rotation
+                tRoot.Velocity = Vector3.zero
+                tRoot.AssemblyLinearVelocity = Vector3.zero
+                dragging = false
+                grabStartTime = 0
+                task.wait(0.05)
+                continue
+            end
+
+            if not dragging then
+                if grabStartTime == 0 then
+                    grabStartTime = tick()
+                    savedBlobCF = blobRoot.CFrame
+                end
+
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
+                myRoot.Velocity = Vector3.zero
+                
+                pcall(function()
+                    if R_Weld then
+                        release:FireServer(R_Weld)
+                        task.wait(0.02)
+                        grab:FireServer(R_Det, tRoot, R_Weld)
+                    end
+                end)
+                
+                pcall(function()
+                    GE.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                end)
+
+                if tick() - grabStartTime > 0.35 then
+                    myRoot.CFrame = kickPosition
+                    myRoot.Velocity = Vector3.zero
+                    
+                    dragging = true
+                    grabStartTime = 0
+                    orbitAngle = 0
+                    spamCounter = 0
+                    
+                    if savedBlobCF then
+                        blobRoot.CFrame = savedBlobCF
+                        blobRoot.Velocity = Vector3.zero
+                    end
+                end
+                task.wait(circleGrabInterval)
+            else
+                local dt = RunService.Heartbeat:Wait()
+                orbitAngle = orbitAngle + circleSpinSpeed * dt
+
+                local orbitCenter = Vector3.new(
                     kickPosition.X, 
                     kickPosition.Y + currentHoldHeight - 10, 
                     kickPosition.Z
                 )
-                local distanceFromKick = (tRoot.Position - targetPos).Magnitude
                 
-                if distanceFromKick > 20 then
-                    TeleportTargetToKickPosition(tRoot, tChar)
-                    dragging = false
-                    grabStartTime = 0
-                    task.wait(0.1)
-                    continue
-                end
+                local offset = Vector3.new(
+                    math.cos(orbitAngle) * ORBIT_RADIUS,
+                    0,
+                    math.sin(orbitAngle) * ORBIT_RADIUS
+                )
+                local orbitPos = orbitCenter + offset
 
-                tRoot.AssemblyLinearVelocity = Vector3.zero
-                tRoot.Velocity = Vector3.zero
+                blobRoot.CFrame = CFrame.lookAt(orbitPos, orbitCenter)
+                blobRoot.Velocity = Vector3.zero
+                pcall(function()
+                    blobRoot.AssemblyLinearVelocity = Vector3.zero
+                    blobRoot.AssemblyAngularVelocity = Vector3.zero
+                end)
 
-                if not dragging then
-                    if grabStartTime == 0 then
-                        grabStartTime = tick()
-                        savedBlobCF = blobRoot.CFrame
+                tRoot.CFrame = CFrame.new(targetPos) * tRoot.CFrame.Rotation
+                tHum.PlatformStand = true
+                tHum.Sit = true
+
+                spamCounter = spamCounter + 1
+                
+                pcall(function()
+                    if R_Weld then
+                        grab:FireServer(R_Det, tRoot, R_Weld)
                     end
-
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
-                    myRoot.Velocity = Vector3.zero
-                    
+                end)
+                
+                if spamCounter % 2 == 0 then
                     pcall(function()
                         if R_Weld then
                             release:FireServer(R_Weld)
-                            task.wait(0.02)
-                            grab:FireServer(R_Det, tRoot, R_Weld)
                         end
                     end)
-                    
-                    pcall(function()
-                        GE.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                    end)
-
-                    if tick() - grabStartTime > 0.35 then
-                        myRoot.CFrame = kickPosition
-                        myRoot.Velocity = Vector3.zero
-                        
-                        dragging = true
-                        grabStartTime = 0
-                        orbitAngle = 0
-                        spamCounter = 0
-                        
-                        if savedBlobCF then
-                            blobRoot.CFrame = savedBlobCF
-                            blobRoot.Velocity = Vector3.zero
-                        end
-                    end
-                    task.wait(circleGrabInterval)
-                else
-                    local dt = RunService.Heartbeat:Wait()
-                    orbitAngle = orbitAngle + circleSpinSpeed * dt
-
-                    local orbitCenter = Vector3.new(
-                        kickPosition.X, 
-                        kickPosition.Y + currentHoldHeight - 10, 
-                        kickPosition.Z
-                    )
-                    
-                    local offset = Vector3.new(
-                        math.cos(orbitAngle) * ORBIT_RADIUS,
-                        0,
-                        math.sin(orbitAngle) * ORBIT_RADIUS
-                    )
-                    local orbitPos = orbitCenter + offset
-
-                    blobRoot.CFrame = CFrame.lookAt(orbitPos, orbitCenter)
-                    blobRoot.Velocity = Vector3.zero
-                    pcall(function()
-                        blobRoot.AssemblyLinearVelocity = Vector3.zero
-                        blobRoot.AssemblyAngularVelocity = Vector3.zero
-                    end)
-
-                    tRoot.CFrame = CFrame.new(targetPos) * tRoot.CFrame.Rotation
-                    tHum.PlatformStand = true
-                    tHum.Sit = true
-
-                    spamCounter = spamCounter + 1
-                    
-                    pcall(function()
-                        if R_Weld then
-                            grab:FireServer(R_Det, tRoot, R_Weld)
-                        end
-                    end)
-                    
-                    if spamCounter % 2 == 0 then
-                        pcall(function()
-                            if R_Weld then
-                                release:FireServer(R_Weld)
-                            end
-                        end)
-                    end
-                    
-                    pcall(function()
-                        GE.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                    end)
-                    
-                    task.wait(circleGrabInterval)
                 end
+                
+                pcall(function()
+                    GE.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                end)
+                
+                task.wait(circleGrabInterval)
             end
         end
 
