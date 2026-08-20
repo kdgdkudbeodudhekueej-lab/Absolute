@@ -1826,6 +1826,37 @@ function StartMainScript(titleText)
                 Item = inv:FindFirstChild("AntiKickItem") 
                 SoundPart = Item and Item:FindFirstChild("Hitbox")
                 
+                local needsRespawn = false
+                local newOwner = nil
+                if Item then
+                    for _, v in pairs(Item:GetChildren()) do
+                        if v:IsA("BasePart") then
+                            local partOwner = v:FindFirstChild("PartOwner")
+                            if partOwner and partOwner.Value ~= LocalPlayer.Name then
+                                needsRespawn = true
+                                newOwner = partOwner.Value
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if needsRespawn and Item and newOwner then
+                    local thief = Players:FindFirstChild(newOwner)
+                    local thiefName = thief and thief.DisplayName or newOwner
+                    
+                    Library:Notify({ 
+                        Title = "⚠️ Anti-Kick Item Stolen!", 
+                        Content = thiefName .. " stole your Anti-Kick Item! Respawning...", 
+                        Duration = 4 
+                    })
+                    
+                    pcall(function() destroyToy:FireServer(Item) end)
+                    task.wait(0.1)
+                    Item = nil
+                    SoundPart = nil
+                end
+                
                 if not Item or not SoundPart then
                     for _,v in pairs(inv:GetChildren()) do 
                         if v.Name == "AntiKickItem" then 
@@ -1841,9 +1872,11 @@ function StartMainScript(titleText)
                     
                     for _,v in pairs(Item:GetChildren()) do 
                         if v:IsA("BasePart") then 
-                            v.CanCollide = false 
-                            v.Transparency = 0.8
-                            v.Color = Color3.fromRGB(0, 255, 255)
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
                         end
                     end
                     
@@ -1856,13 +1889,28 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
+                    local targetCF = targetPart.CFrame
                     if SelectedToy == "JapaneseLantern" then
-                        SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
-                    else
-                        SoundPart.CFrame = targetPart.CFrame
+                        targetCF = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                     end
+                    
+                    local currentCF = SoundPart.CFrame
+                    local lerpFactor = 0.3
+                    local newCF = currentCF:Lerp(targetCF, lerpFactor)
+                    
+                    SoundPart.CFrame = newCF
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
+                    
+                    for _,v in pairs(Item:GetChildren()) do 
+                        if v:IsA("BasePart") then 
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
+                        end
+                    end
                 end
             end
         end)
@@ -1906,7 +1954,7 @@ function StartMainScript(titleText)
                 ["Spooky Candle"] = "SpookyCandle1",
             }
             SelectedToy = ToyList[Value] or "SpookyCandle1"
-            Library:Notify({ Title = "Anti-Kick", Content = "Selected: " .. Value, Duration = 2 })
+            Library:Notify({ Title = "Anti-Kick Item", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
