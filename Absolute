@@ -95,8 +95,8 @@ function StartMainScript(titleText)
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
-    local BlodmanV2Block = BlodmanTab:CreateBlock({Name = "BLODMAN KICK v2", Side = "Left"})
-    local BlodmanV2SettingsBlock = BlodmanTab:CreateBlock({Name = "Settings v2", Side = "Right"})
+    local BlodmanCircleBlock = BlodmanTab:CreateBlock({Name = "KICK (CIRCLE)", Side = "Left"})
+    local BlodmanCircleSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings Circle", Side = "Right"})
     local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
 
     local InputToyList = {
@@ -296,11 +296,12 @@ function StartMainScript(titleText)
     local blobmanGrabInterval = 0.02
     local blobmanHoldHeight = 15
 
-    local blobmanV2Target = nil
-    local blobmanV2KickActive = false
-    local blobmanV2KickTask = nil
-    local blobmanV2GrabInterval = 0.02
-    local blobmanV2HoldHeight = 15
+    local circleTarget = nil
+    local circleKickActive = false
+    local circleKickTask = nil
+    local circleSpinSpeed = 13.576
+    local circleHoldHeight = 20
+    local circleGrabInterval = 0.01
 
     local ownershipRagdollActive = false
     local ownershipRagdollTask = nil
@@ -567,6 +568,44 @@ function StartMainScript(titleText)
         end
     })
 
+    local CircleTargetDropdown = BlodmanCircleBlock:CreateDropdown({
+        Name = "Select Target",
+        Options = targetNames,
+        Callback = function(v)
+            circleTarget = getPlayerFromSelection(v)
+        end
+    })
+
+    BlodmanCircleBlock:CreateButton({
+        Name = "Refresh List",
+        Callback = function()
+            updateList()
+            CircleTargetDropdown:Refresh(targetNames, true)
+        end
+    })
+
+    BlodmanCircleSettingsBlock:CreateSlider({
+        Name = "Spin Speed (13 - 20)",
+        Min = 13,
+        Max = 20,
+        Default = 13.576,
+        Rounding = 3,
+        Callback = function(Value)
+            circleSpinSpeed = Value
+        end
+    })
+
+    BlodmanCircleSettingsBlock:CreateSlider({
+        Name = "Hold Height (5 - 40)",
+        Min = 5,
+        Max = 40,
+        Default = 20,
+        Rounding = 0,
+        Callback = function(Value)
+            circleHoldHeight = Value
+        end
+    })
+
     local function cleanupBodies()
         pcall(function()
             if bodyPos then bodyPos:Destroy() bodyPos = nil end
@@ -734,67 +773,41 @@ function StartMainScript(titleText)
         end
     })
 
-    local BlobmanV2TargetDropdown = BlodmanV2Block:CreateDropdown({
-        Name = "Select Target",
-        Options = targetNames,
-        Callback = function(v)
-            blobmanV2Target = getPlayerFromSelection(v)
+    local function CircleKickLoop()
+        local target = circleTarget
+        if not target then 
+            Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
+            return 
         end
-    })
-
-    BlodmanV2Block:CreateButton({
-        Name = "Refresh List",
-        Callback = function()
-            updateList()
-            BlobmanV2TargetDropdown:Refresh(targetNames, true)
-        end
-    })
-
-    BlodmanV2SettingsBlock:CreateSlider({
-        Name = "Interval (0.01 - 0.1)",
-        Min = 0.01,
-        Max = 0.1,
-        Default = 0.02,
-        Rounding = 2,
-        Callback = function(Value)
-            blobmanV2GrabInterval = Value
-        end
-    })
-
-    BlodmanV2SettingsBlock:CreateSlider({
-        Name = "Hold Height",
-        Min = 5,
-        Max = 40,
-        Default = 15,
-        Rounding = 0,
-        Callback = function(Value)
-            blobmanV2HoldHeight = Value
-        end
-    })
-
-    local function BlobmanV2KickLoop()
-        local target = blobmanV2Target
-        if not target then return end
 
         local GE = RS:WaitForChild("GrabEvents")
+        if not GE then 
+            Library:Notify({ Title = "Error", Content = "GrabEvents not found", Duration = 3 })
+            return 
+        end
+        
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not myRoot then return end
+        if not myRoot then 
+            Library:Notify({ Title = "Error", Content = "Character not found", Duration = 3 })
+            return 
+        end
 
-        local savedPos = myRoot.CFrame
-        local currentHoldHeight = blobmanV2HoldHeight
+        local currentHoldHeight = circleHoldHeight
         local dragging = false
         local grabStartTime = 0
-        local spamCounter = 0
-
+        local orbitAngle = 0
+        local ORBIT_RADIUS = 25
+        
         local hum = myChar and myChar:FindFirstChild("Humanoid")
         local seat = hum and hum.SeatPart
         if not seat or seat.Parent.Name ~= "CreatureBlobman" then
-            Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+            Library:Notify({ Title = "Error", Content = "Sit on Blobman first!", Duration = 3 })
             return
         end
 
         local blob = seat.Parent
+        local blobRoot = blob:FindFirstChild("HumanoidRootPart") or blob.PrimaryPart
         local remoteFolder = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
         local grab = remoteFolder and remoteFolder:FindFirstChild("CreatureGrab")
         local release = remoteFolder and remoteFolder:FindFirstChild("CreatureRelease")
@@ -806,7 +819,12 @@ function StartMainScript(titleText)
             return
         end
 
-        while blobmanV2KickActive do
+        local savedPos = myRoot.CFrame
+        local spamCounter = 0
+
+        Library:Notify({ Title = "Kick (Circle)", Content = "Started!", Duration = 2 })
+
+        while circleKickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
             if not currentTarget or not currentTarget.Parent then break end
 
@@ -816,49 +834,90 @@ function StartMainScript(titleText)
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             local tHum = tChar and tChar:FindFirstChild("Humanoid")
 
+            local seat = myChar and myChar.Humanoid and myChar.Humanoid.SeatPart
+
             if tRoot and tHum and tHum.Health > 0 and myRoot and seat then
                 tRoot.AssemblyLinearVelocity = Vector3.zero
                 tRoot.Velocity = Vector3.zero
 
-                if not dragging then
-                    myRoot.CFrame = tRoot.CFrame
-                    if GE then
-                        pcall(function()
-                            tHum.PlatformStand = true
-                            GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
-                            GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                        end)
-                    end
+                local blobman = seat.Parent
+                local remoteFolder = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
+                
+                if remoteFolder then
+                    local grab = remoteFolder:FindFirstChild("CreatureGrab")
+                    local release = remoteFolder:FindFirstChild("CreatureRelease")
                     
-                    if grabStartTime == 0 then grabStartTime = tick() end
-                    if tick() - grabStartTime > 0.3 then
-                        dragging = true
-                        grabStartTime = 0
-                    end
-                else
-                    local lockPos = savedPos * CFrame.new(0, currentHoldHeight, 0)
-                    myRoot.CFrame = savedPos
-                    tRoot.CFrame = lockPos
-                    
-                    spamCounter = spamCounter + 1
-                    
-                    pcall(function()
-                        grab:FireServer(R_Det, tRoot, R_Weld)
-                    end)
-                    
-                    if spamCounter % 2 == 0 then
-                        pcall(function()
-                            release:FireServer(R_Weld)
-                        end)
-                    end
-                    
-                    if GE then
-                        pcall(function()
-                            tHum.PlatformStand = true
-                            GE.SetNetworkOwner:FireServer(tRoot, lockPos)
-                            GE.DestroyGrabLine:FireServer(tRoot)
-                            GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                        end)
+                    local R_Det = blobman:FindFirstChild("RightDetector")
+                    local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
+
+                    if grab and release and R_Weld then
+                        
+                        if not dragging then
+                            myRoot.CFrame = tRoot.CFrame
+                            if GE then
+                                pcall(function()
+                                    tHum.PlatformStand = true
+                                    GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
+                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                                end)
+                            end
+                            
+                            if grabStartTime == 0 then grabStartTime = tick() end
+                            if tick() - grabStartTime > 0.3 then
+                                dragging = true
+                                grabStartTime = 0
+                            end
+                        else
+                            local targetPos = Vector3.new(
+                                savedPos.X,
+                                savedPos.Y + currentHoldHeight,
+                                savedPos.Z
+                            )
+                            
+                            local lockPos = CFrame.new(targetPos)
+                            myRoot.CFrame = savedPos
+                            tRoot.CFrame = lockPos
+                            
+                            local dt = RunService.Heartbeat:Wait()
+                            orbitAngle = orbitAngle + circleSpinSpeed * dt
+
+                            local orbitCenter = Vector3.new(
+                                savedPos.X,
+                                savedPos.Y + currentHoldHeight,
+                                savedPos.Z
+                            )
+                            
+                            local offset = Vector3.new(
+                                math.cos(orbitAngle) * ORBIT_RADIUS,
+                                0,
+                                math.sin(orbitAngle) * ORBIT_RADIUS
+                            )
+                            local orbitPos = orbitCenter + offset
+
+                            blobRoot.CFrame = CFrame.lookAt(orbitPos, orbitCenter)
+                            blobRoot.Velocity = Vector3.zero
+                            
+                            spamCounter = spamCounter + 1
+                            
+                            pcall(function()
+                                grab:FireServer(R_Det, tRoot, R_Weld)
+                            end)
+                            
+                            if spamCounter % 2 == 0 then
+                                pcall(function()
+                                    release:FireServer(R_Weld)
+                                end)
+                            end
+                            
+                            if GE then
+                                pcall(function()
+                                    tHum.PlatformStand = true
+                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
+                                    GE.DestroyGrabLine:FireServer(tRoot)
+                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                                end)
+                            end
+                        end
                     end
                 end
             else
@@ -868,24 +927,26 @@ function StartMainScript(titleText)
                 task.wait(0.1)
             end
             
-            task.wait(blobmanV2GrabInterval)
+            task.wait(circleGrabInterval)
         end
 
         if myRoot then
             myRoot.CFrame = savedPos
         end
-        blobmanV2KickActive = false
+        circleKickActive = false
+        
+        Library:Notify({ Title = "Kick (Circle)", Content = "Stopped", Duration = 2 })
     end
 
-    BlodmanV2Block:CreateToggle({
-        Name = "BLODMAN KICK v2 (Grab+Blob)",
+    BlodmanCircleBlock:CreateToggle({
+        Name = "KICK (CIRCLE)",
         Default = false,
         Callback = function(Value)
-            blobmanV2KickActive = Value
-            if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
+            circleKickActive = Value
+            if circleKickTask then task.cancel(circleKickTask) circleKickTask = nil end
 
             if Value then
-                if not blobmanV2Target then
+                if not circleTarget then
                     Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
                     return
                 end
@@ -893,19 +954,16 @@ function StartMainScript(titleText)
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChild("Humanoid")
                 if not hum or not hum.SeatPart then
-                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman first!", Duration = 3 })
                     return
                 end
 
                 if hum.SeatPart.Parent.Name ~= "CreatureBlobman" then
-                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
+                    Library:Notify({ Title = "Error", Content = "Sit on Blobman!", Duration = 3 })
                     return
                 end
 
-                blobmanV2KickTask = task.spawn(BlobmanV2KickLoop)
-                Library:Notify({ Title = "BLODMAN KICK v2", Content = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "BLODMAN KICK v2", Content = "Disabled", Duration = 2 })
+                circleKickTask = task.spawn(CircleKickLoop)
             end
         end
     })
@@ -1586,8 +1644,8 @@ function StartMainScript(titleText)
             if BlobmanTargetDropdown then
                 pcall(function() BlobmanTargetDropdown:Refresh(targetNames, true) end)
             end
-            if BlobmanV2TargetDropdown then
-                pcall(function() BlobmanV2TargetDropdown:Refresh(targetNames, true) end)
+            if CircleTargetDropdown then
+                pcall(function() CircleTargetDropdown:Refresh(targetNames, true) end)
             end
             task.wait(5)
         end
@@ -1611,8 +1669,8 @@ function StartMainScript(titleText)
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
         blobmanKickActive = false
         if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
-        blobmanV2KickActive = false
-        if blobmanV2KickTask then task.cancel(blobmanV2KickTask) blobmanV2KickTask = nil end
+        circleKickActive = false
+        if circleKickTask then task.cancel(circleKickTask) circleKickTask = nil end
         if antiLagActive then
             antiLagActive = false
             DisableAntiLag()
@@ -1641,10 +1699,6 @@ function StartMainScript(titleText)
 
     local function FWD(parent, part, timeOffset)
         return parent:FindFirstChild(part) or parent:WaitForChild(part, timeOffset or 1)
-    end
-
-    local function CFP(parent, part)
-        return parent:FindFirstChild(part) ~= nil  
     end
 
     local function CheckNetworkOwnerOnPart(Part) 
@@ -1735,7 +1789,8 @@ function StartMainScript(titleText)
         MyPCLD = nil
         pcldConn = RunService.Heartbeat:Connect(function()
             if MyPCLD or not hrp or not hrp.Parent then 
-                if pcldConn then pcldConn:Disconnect() pcldConn = nil end                return
+                if pcldConn then pcldConn:Disconnect() pcldConn = nil end
+                return
             end
             for _, v in pairs(Workspace:GetChildren()) do 
                 if v.Name == "PlayerCharacterLocationDetector" and v:IsA("BasePart") then
@@ -1801,7 +1856,6 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
-                    -- ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: ТОЛЬКО ДЛЯ ФОНАРЯ ПОДНИМАЕМ НА 1.5
                     if SelectedToy == "JapaneseLantern" then
                         SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                     else
