@@ -26,6 +26,24 @@ function StartMainScript(titleText)
 
     local mainGui = Window.Parent
     if mainGui then
+        if mainGui:IsA("Frame") then
+            mainGui.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            mainGui.BackgroundTransparency = 0.15
+            mainGui.ClipsDescendants = true
+            
+            local cornerRadius = Instance.new("UICorner")
+            cornerRadius.CornerRadius = UDim.new(0, 25)
+            cornerRadius.Parent = mainGui
+            
+            for _, child in pairs(mainGui:GetChildren()) do
+                if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+                    local childCorner = Instance.new("UICorner")
+                    childCorner.CornerRadius = UDim.new(0, 25)
+                    childCorner.Parent = child
+                end
+            end
+        end
+        
         local bgFlag = Instance.new("Frame")
         bgFlag.Size = UDim2.new(1, 0, 1, 0)
         bgFlag.BackgroundTransparency = 1
@@ -99,6 +117,8 @@ function StartMainScript(titleText)
     local BlodmanCircleBlock = BlodmanTab:CreateBlock({Name = "KICK (CIRCLE)", Side = "Left"})
     local BlodmanCircleSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings Circle", Side = "Right"})
     local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -1379,8 +1399,6 @@ function StartMainScript(titleText)
         end)
     end
 
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
-
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
         Default = false,
@@ -2049,8 +2067,6 @@ function StartMainScript(titleText)
             end
         end)
     end
-
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
 
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
