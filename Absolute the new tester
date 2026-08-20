@@ -26,24 +26,6 @@ function StartMainScript(titleText)
 
     local mainGui = Window.Parent
     if mainGui then
-        if mainGui:IsA("Frame") then
-            mainGui.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-            mainGui.BackgroundTransparency = 0.15
-            mainGui.ClipsDescendants = true
-            
-            local cornerRadius = Instance.new("UICorner")
-            cornerRadius.CornerRadius = UDim.new(0, 25)
-            cornerRadius.Parent = mainGui
-            
-            for _, child in pairs(mainGui:GetChildren()) do
-                if child:IsA("Frame") or child:IsA("ScrollingFrame") then
-                    local childCorner = Instance.new("UICorner")
-                    childCorner.CornerRadius = UDim.new(0, 25)
-                    childCorner.Parent = child
-                end
-            end
-        end
-        
         local bgFlag = Instance.new("Frame")
         bgFlag.Size = UDim2.new(1, 0, 1, 0)
         bgFlag.BackgroundTransparency = 1
@@ -117,8 +99,6 @@ function StartMainScript(titleText)
     local BlodmanCircleBlock = BlodmanTab:CreateBlock({Name = "KICK (CIRCLE)", Side = "Left"})
     local BlodmanCircleSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings Circle", Side = "Right"})
     local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -706,9 +686,11 @@ function StartMainScript(titleText)
                     local release = remoteFolder:FindFirstChild("CreatureRelease")
                     
                     local R_Det = blobman:FindFirstChild("RightDetector")
+                    local L_Det = blobman:FindFirstChild("LeftDetector")
                     local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
+                    local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-                    if grab and release and R_Weld then
+                    if grab and release and R_Weld and L_Weld then
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
@@ -734,11 +716,13 @@ function StartMainScript(titleText)
                             
                             pcall(function()
                                 grab:FireServer(R_Det, tRoot, R_Weld)
+                                grab:FireServer(L_Det, tRoot, L_Weld)
                             end)
                             
                             if spamCounter % 2 == 0 then
                                 pcall(function()
                                     release:FireServer(R_Weld)
+                                    release:FireServer(L_Weld)
                                 end)
                             end
                             
@@ -833,9 +817,11 @@ function StartMainScript(titleText)
         local grab = remoteFolder and remoteFolder:FindFirstChild("CreatureGrab")
         local release = remoteFolder and remoteFolder:FindFirstChild("CreatureRelease")
         local R_Det = blob:FindFirstChild("RightDetector")
+        local L_Det = blob:FindFirstChild("LeftDetector")
         local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
+        local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-        if not (grab and release and R_Det and R_Weld) then
+        if not (grab and release and R_Det and R_Weld and L_Det and L_Weld) then
             Library:Notify({ Title = "Error", Content = "Blobman components not found", Duration = 3 })
             return
         end
@@ -869,9 +855,11 @@ function StartMainScript(titleText)
                     local release = remoteFolder:FindFirstChild("CreatureRelease")
                     
                     local R_Det = blobman:FindFirstChild("RightDetector")
+                    local L_Det = blobman:FindFirstChild("LeftDetector")
                     local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
+                    local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-                    if grab and release and R_Weld then
+                    if grab and release and R_Weld and L_Weld then
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
@@ -922,11 +910,13 @@ function StartMainScript(titleText)
                             
                             pcall(function()
                                 grab:FireServer(R_Det, tRoot, R_Weld)
+                                grab:FireServer(L_Det, tRoot, L_Weld)
                             end)
                             
                             if spamCounter % 2 == 0 then
                                 pcall(function()
                                     release:FireServer(R_Weld)
+                                    release:FireServer(L_Weld)
                                 end)
                             end
                             
@@ -1398,6 +1388,8 @@ function StartMainScript(titleText)
             end
         end)
     end
+
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
@@ -2067,6 +2059,8 @@ function StartMainScript(titleText)
             end
         end)
     end
+
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
 
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
