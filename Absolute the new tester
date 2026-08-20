@@ -793,7 +793,6 @@ function StartMainScript(titleText)
             return 
         end
 
-        local savedPos = myRoot.CFrame
         local currentHoldHeight = circleHoldHeight
         local dragging = false
         local grabStartTime = 0
@@ -820,15 +819,39 @@ function StartMainScript(titleText)
             return
         end
 
-        local lockedPcldWorldPos = nil
         local savedBlobCF = blobRoot and blobRoot.CFrame
         local spamCounter = 0
+        
+        local kickPosition = myRoot.CFrame
+        
+        local function TeleportTargetToKickPosition(targetRoot, targetChar)
+            if not targetRoot or not targetChar then return false end
+            
+            local targetPos = Vector3.new(
+                kickPosition.X, 
+                kickPosition.Y + currentHoldHeight - 10, 
+                kickPosition.Z
+            )
+            
+            targetRoot.CFrame = CFrame.new(targetPos) * targetRoot.CFrame.Rotation
+            targetRoot.Velocity = Vector3.zero
+            targetRoot.AssemblyLinearVelocity = Vector3.zero
+            targetRoot.AssemblyAngularVelocity = Vector3.zero
+            
+            myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 5)
+            myRoot.Velocity = Vector3.zero
+            
+            return true
+        end
 
-        Library:Notify({ Title = "Kick (Circle)", Content = "Started!", Duration = 2 })
+        Library:Notify({ Title = "Kick (Circle)", Content = "Started! Position locked", Duration = 2 })
 
         while circleKickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
-            if not currentTarget or not currentTarget.Parent then break end
+            if not currentTarget or not currentTarget.Parent then 
+                task.wait(0.5)
+                continue 
+            end
 
             myChar = LocalPlayer.Character
             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -838,7 +861,56 @@ function StartMainScript(titleText)
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             local tHum = tChar and tChar:FindFirstChild("Humanoid")
 
+            if not tRoot or not tHum or tHum.Health <= 0 then
+                dragging = false
+                grabStartTime = 0
+                spamCounter = 0
+                
+                local waitStart = tick()
+                local found = false
+                while tick() - waitStart < 10 and circleKickActive do
+                    local newChar = currentTarget.Character
+                    local newRoot = newChar and newChar:FindFirstChild("HumanoidRootPart")
+                    local newHum = newChar and newChar:FindFirstChild("Humanoid")
+                    
+                    if newRoot and newHum and newHum.Health > 0 then
+                        local success = TeleportTargetToKickPosition(newRoot, newChar)
+                        
+                        if success then
+                            tRoot = newRoot
+                            tHum = newHum
+                            tChar = newChar
+                            found = true
+                            dragging = false
+                            grabStartTime = 0
+                            break
+                        end
+                    end
+                    task.wait(0.1)
+                end
+                
+                if not found then
+                    task.wait(0.1)
+                    continue
+                end
+            end
+
             if tRoot and tHum and tHum.Health > 0 and myRoot and blobRoot then
+                local targetPos = Vector3.new(
+                    kickPosition.X, 
+                    kickPosition.Y + currentHoldHeight - 10, 
+                    kickPosition.Z
+                )
+                local distanceFromKick = (tRoot.Position - targetPos).Magnitude
+                
+                if distanceFromKick > 20 then
+                    TeleportTargetToKickPosition(tRoot, tChar)
+                    dragging = false
+                    grabStartTime = 0
+                    task.wait(0.1)
+                    continue
+                end
+
                 tRoot.AssemblyLinearVelocity = Vector3.zero
                 tRoot.Velocity = Vector3.zero
 
@@ -846,17 +918,6 @@ function StartMainScript(titleText)
                     if grabStartTime == 0 then
                         grabStartTime = tick()
                         savedBlobCF = blobRoot.CFrame
-                        savedPos = myRoot.CFrame
-                        
-                        for _, v in ipairs(tChar:GetChildren()) do
-                            if v:IsA("BasePart") and string.lower(v.Name) == "playercharacterlocationdetector" then
-                                lockedPcldWorldPos = v.Position
-                                break
-                            end
-                        end
-                        if not lockedPcldWorldPos then
-                            lockedPcldWorldPos = tRoot.Position
-                        end
                     end
 
                     myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
@@ -875,7 +936,7 @@ function StartMainScript(titleText)
                     end)
 
                     if tick() - grabStartTime > 0.35 then
-                        myRoot.CFrame = savedPos
+                        myRoot.CFrame = kickPosition
                         myRoot.Velocity = Vector3.zero
                         
                         dragging = true
@@ -893,21 +954,11 @@ function StartMainScript(titleText)
                     local dt = RunService.Heartbeat:Wait()
                     orbitAngle = orbitAngle + circleSpinSpeed * dt
 
-                    local basePos = lockedPcldWorldPos or tRoot.Position
-
-                    local rayOrigin = basePos + Vector3.new(0, 10, 0)
-                    local rayDir = Vector3.new(0, -50, 0)
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                    rayParams.FilterDescendantsInstances = {tChar, myChar, blob}
-
-                    local groundY = basePos.Y
-                    local raycastResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
-                    if raycastResult then
-                        groundY = raycastResult.Position.Y
-                    end
-
-                    local orbitCenter = Vector3.new(basePos.X, groundY + currentHoldHeight, basePos.Z)
+                    local orbitCenter = Vector3.new(
+                        kickPosition.X, 
+                        kickPosition.Y + currentHoldHeight - 10, 
+                        kickPosition.Z
+                    )
                     
                     local offset = Vector3.new(
                         math.cos(orbitAngle) * ORBIT_RADIUS,
@@ -923,7 +974,6 @@ function StartMainScript(titleText)
                         blobRoot.AssemblyAngularVelocity = Vector3.zero
                     end)
 
-                    local targetPos = Vector3.new(basePos.X, groundY + currentHoldHeight, basePos.Z)
                     tRoot.CFrame = CFrame.new(targetPos) * tRoot.CFrame.Rotation
                     tHum.PlatformStand = true
                     tHum.Sit = true
@@ -950,12 +1000,6 @@ function StartMainScript(titleText)
                     
                     task.wait(circleGrabInterval)
                 end
-            else
-                dragging = false
-                grabStartTime = 0
-                lockedPcldWorldPos = nil
-                spamCounter = 0
-                task.wait(0.1)
             end
         end
 
