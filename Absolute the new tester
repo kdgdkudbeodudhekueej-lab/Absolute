@@ -868,7 +868,13 @@ function StartMainScript(titleText)
                                 grabStartTime = 0
                             end
                         else
-                            local lockPos = savedPos * CFrame.new(0, currentHoldHeight, 0)
+                            local targetPos = Vector3.new(
+                                savedPos.X,
+                                savedPos.Y + currentHoldHeight,
+                                savedPos.Z
+                            )
+                            
+                            local lockPos = CFrame.new(targetPos)
                             myRoot.CFrame = savedPos
                             tRoot.CFrame = lockPos
                             
@@ -876,8 +882,8 @@ function StartMainScript(titleText)
                             orbitAngle = orbitAngle + circleSpinSpeed * dt
 
                             local orbitCenter = Vector3.new(
-                                savedPos.X, 
-                                savedPos.Y + currentHoldHeight - 10, 
+                                savedPos.X,
+                                savedPos.Y + currentHoldHeight,
                                 savedPos.Z
                             )
                             
@@ -1695,10 +1701,6 @@ function StartMainScript(titleText)
         return parent:FindFirstChild(part) or parent:WaitForChild(part, timeOffset or 1)
     end
 
-    local function CFP(parent, part)
-        return parent:FindFirstChild(part) ~= nil  
-    end
-
     local function CheckNetworkOwnerOnPart(Part) 
         local po = Part:FindFirstChild("PartOwner")
         return po and po.Value == LocalPlayer.Name
@@ -1799,7 +1801,9 @@ function StartMainScript(titleText)
                 end
             end
         end)
-    end    local function StartAntiKickItem()
+    end
+
+    local function StartAntiKickItem()
         if antiKickItemTask then task.cancel(antiKickItemTask) end
         
         antiKickItemTask = task.spawn(function()
