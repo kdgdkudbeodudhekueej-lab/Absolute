@@ -548,6 +548,7 @@ function StartMainScript(titleText)
     })
 
     local useBothHandsBlodman = true
+    local useRightHandBlodman = true
 
     BlodmanSettingsBlock:CreateDropdown({
         Name = "Hand Mode",
@@ -606,6 +607,7 @@ function StartMainScript(titleText)
     })
 
     local useBothHandsCircle = true
+    local useRightHandCircle = true
 
     BlodmanCircleSettingsBlock:CreateDropdown({
         Name = "Hand Mode",
@@ -759,9 +761,13 @@ function StartMainScript(titleText)
                                     grab:FireServer(R_Det, tRoot, R_Weld)
                                     grab:FireServer(L_Det, tRoot, L_Weld)
                                 end)
-                            else
+                            elseif useRightHandBlodman then
                                 pcall(function()
                                     grab:FireServer(R_Det, tRoot, R_Weld)
+                                end)
+                            else
+                                pcall(function()
+                                    grab:FireServer(L_Det, tRoot, L_Weld)
                                 end)
                             end
                             
@@ -771,9 +777,13 @@ function StartMainScript(titleText)
                                         release:FireServer(R_Weld)
                                         release:FireServer(L_Weld)
                                     end)
-                                else
+                                elseif useRightHandBlodman then
                                     pcall(function()
                                         release:FireServer(R_Weld)
+                                    end)
+                                else
+                                    pcall(function()
+                                        release:FireServer(L_Weld)
                                     end)
                                 end
                             end
@@ -965,9 +975,13 @@ function StartMainScript(titleText)
                                     grab:FireServer(R_Det, tRoot, R_Weld)
                                     grab:FireServer(L_Det, tRoot, L_Weld)
                                 end)
-                            else
+                            elseif useRightHandCircle then
                                 pcall(function()
                                     grab:FireServer(R_Det, tRoot, R_Weld)
+                                end)
+                            else
+                                pcall(function()
+                                    grab:FireServer(L_Det, tRoot, L_Weld)
                                 end)
                             end
                             
@@ -977,9 +991,13 @@ function StartMainScript(titleText)
                                         release:FireServer(R_Weld)
                                         release:FireServer(L_Weld)
                                     end)
-                                else
+                                elseif useRightHandCircle then
                                     pcall(function()
                                         release:FireServer(R_Weld)
+                                    end)
+                                else
+                                    pcall(function()
+                                        release:FireServer(L_Weld)
                                     end)
                                 end
                             end
