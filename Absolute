@@ -92,6 +92,7 @@ function StartMainScript(titleText)
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
+    local PCLDESPBlock = VisualTab:CreateBlock({Name = "PCLD ESP", Side = "Right"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
@@ -1150,6 +1151,119 @@ function StartMainScript(titleText)
         end
     })
 
+    local pclespEnabled = false
+    local pclespAdornments = {}
+    local lastScan = 0
+    local scanInterval = 2
+    local smoothFactor = 0.15
+
+    local function CreateESP(part)
+        if not part or not part.Parent then return end
+        
+        local box = Instance.new("BoxHandleAdornment")
+        box.Size = part.Size
+        box.AlwaysOnTop = true
+        box.ZIndex = 5
+        box.Transparency = 0.2
+        box.Color3 = Color3.fromRGB(138, 43, 226)
+        box.Adornee = part
+        box.Parent = part
+
+        local outline = Instance.new("SelectionBox")
+        outline.LineThickness = 0.02
+        outline.Color3 = Color3.new(0, 0, 0)
+        outline.Transparency = 0.3
+        outline.Adornee = part
+        outline.Parent = part
+
+        pclespAdornments[part] = {
+            box = box, 
+            outline = outline,
+            currentSize = part.Size
+        }
+    end
+
+    local function UpdateESP(part)
+        local data = pclespAdornments[part]
+        if not data then return end
+        
+        local box = data.box
+        local outline = data.outline
+        
+        if not box or not box.Parent then return end
+        
+        local targetSize = part.Size
+        local currentSize = data.currentSize
+        
+        local newSize = currentSize:Lerp(targetSize, smoothFactor)
+        data.currentSize = newSize
+        
+        box.Size = newSize
+    end
+
+    local function ScanForESPParts()
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector" or obj.Name == "PlayerCharacterLocationDetector") then
+                if not pclespAdornments[obj] then
+                    CreateESP(obj)
+                end
+            end
+        end
+    end
+
+    local function CleanupESP()
+        local toRemove = {}
+        for part, data in pairs(pclespAdornments) do
+            if not part.Parent then
+                toRemove[#toRemove + 1] = part
+            end
+        end
+        
+        for _, part in pairs(toRemove) do
+            local data = pclespAdornments[part]
+            if data then
+                if data.box then data.box:Destroy() end
+                if data.outline then data.outline:Destroy() end
+            end
+            pclespAdornments[part] = nil
+        end
+    end
+
+    PCLDESPBlock:CreateToggle({
+        Name = "PCLD ESP",
+        Default = false,
+        Callback = function(Value)
+            pclespEnabled = Value
+            if Value then
+                lastScan = 0
+                Library:Notify({ Title = "PCLD ESP", Content = "Enabled", Duration = 2 })
+            else
+                for part, data in pairs(pclespAdornments) do
+                    if data.box then data.box:Destroy() end
+                    if data.outline then data.outline:Destroy() end
+                end
+                pclespAdornments = {}
+                Library:Notify({ Title = "PCLD ESP", Content = "Disabled", Duration = 2 })
+            end
+        end
+    })
+
+    RunService.Heartbeat:Connect(function()
+        if not pclespEnabled then return end
+        
+        local currentTime = tick()
+        
+        if currentTime - lastScan >= scanInterval then
+            lastScan = currentTime
+            ScanForESPParts()
+            CleanupESP()
+        end
+        
+        for part, data in pairs(pclespAdornments) do
+            UpdateESP(part)
+        end
+    end)
+
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
         if antiGrabEnabled then antiGrabTask = task.spawn(AntiGrabLoop) end
@@ -1675,6 +1789,12 @@ function StartMainScript(titleText)
             antiLagActive = false
             DisableAntiLag()
         end
+        pclespEnabled = false
+        for part, data in pairs(pclespAdornments) do
+            if data.box then data.box:Destroy() end
+            if data.outline then data.outline:Destroy() end
+        end
+        pclespAdornments = {}
         
         task.spawn(function()
             local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
@@ -1826,6 +1946,26 @@ function StartMainScript(titleText)
                 Item = inv:FindFirstChild("AntiKickItem") 
                 SoundPart = Item and Item:FindFirstChild("Hitbox")
                 
+                local needsRespawn = false
+                if Item then
+                    for _, v in pairs(Item:GetChildren()) do
+                        if v:IsA("BasePart") then
+                            local partOwner = v:FindFirstChild("PartOwner")
+                            if partOwner and partOwner.Value ~= LocalPlayer.Name then
+                                needsRespawn = true
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if needsRespawn and Item then
+                    pcall(function() destroyToy:FireServer(Item) end)
+                    task.wait(0.1)
+                    Item = nil
+                    SoundPart = nil
+                end
+                
                 if not Item or not SoundPart then
                     for _,v in pairs(inv:GetChildren()) do 
                         if v.Name == "AntiKickItem" then 
@@ -1841,9 +1981,11 @@ function StartMainScript(titleText)
                     
                     for _,v in pairs(Item:GetChildren()) do 
                         if v:IsA("BasePart") then 
-                            v.CanCollide = false 
-                            v.Transparency = 0.8
-                            v.Color = Color3.fromRGB(0, 255, 255)
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
                         end
                     end
                     
@@ -1856,13 +1998,28 @@ function StartMainScript(titleText)
                 
                 local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
                 if SoundPart and targetPart then
+                    local targetCF = targetPart.CFrame
                     if SelectedToy == "JapaneseLantern" then
-                        SoundPart.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
-                    else
-                        SoundPart.CFrame = targetPart.CFrame
+                        targetCF = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                     end
+                    
+                    local currentCF = SoundPart.CFrame
+                    local lerpFactor = 0.3
+                    local newCF = currentCF:Lerp(targetCF, lerpFactor)
+                    
+                    SoundPart.CFrame = newCF
                     SoundPart.AssemblyLinearVelocity = Vector3.zero
                     SoundPart.AssemblyAngularVelocity = Vector3.zero
+                    
+                    for _,v in pairs(Item:GetChildren()) do 
+                        if v:IsA("BasePart") then 
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
+                        end
+                    end
                 end
             end
         end)
@@ -1906,7 +2063,7 @@ function StartMainScript(titleText)
                 ["Spooky Candle"] = "SpookyCandle1",
             }
             SelectedToy = ToyList[Value] or "SpookyCandle1"
-            Library:Notify({ Title = "Anti-Kick", Content = "Selected: " .. Value, Duration = 2 })
+            Library:Notify({ Title = "Anti-Kick Item", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
