@@ -547,6 +547,26 @@ function StartMainScript(titleText)
         end
     })
 
+    local useBothHandsBlodman = true
+
+    BlodmanSettingsBlock:CreateDropdown({
+        Name = "Hand Mode",
+        Items = {"Both Hands", "Right Hand", "Left Hand"},
+        Default = "Both Hands",
+        Callback = function(Value)
+            if Value == "Both Hands" then
+                useBothHandsBlodman = true
+            elseif Value == "Right Hand" then
+                useBothHandsBlodman = false
+                useRightHandBlodman = true
+            elseif Value == "Left Hand" then
+                useBothHandsBlodman = false
+                useRightHandBlodman = false
+            end
+            Library:Notify({ Title = "Hand Mode", Content = "Set to: " .. Value, Duration = 2 })
+        end
+    })
+
     BlodmanSettingsBlock:CreateSlider({
         Name = "Blodman Interval (0.01 - 0.1)",
         Min = 0.01,
@@ -582,6 +602,26 @@ function StartMainScript(titleText)
         Callback = function()
             updateList()
             CircleTargetDropdown:Refresh(targetNames, true)
+        end
+    })
+
+    local useBothHandsCircle = true
+
+    BlodmanCircleSettingsBlock:CreateDropdown({
+        Name = "Hand Mode",
+        Items = {"Both Hands", "Right Hand", "Left Hand"},
+        Default = "Both Hands",
+        Callback = function(Value)
+            if Value == "Both Hands" then
+                useBothHandsCircle = true
+            elseif Value == "Right Hand" then
+                useBothHandsCircle = false
+                useRightHandCircle = true
+            elseif Value == "Left Hand" then
+                useBothHandsCircle = false
+                useRightHandCircle = false
+            end
+            Library:Notify({ Title = "Hand Mode", Content = "Set to: " .. Value, Duration = 2 })
         end
     })
 
@@ -714,16 +754,28 @@ function StartMainScript(titleText)
                             
                             spamCounter = spamCounter + 1
                             
-                            pcall(function()
-                                grab:FireServer(R_Det, tRoot, R_Weld)
-                                grab:FireServer(L_Det, tRoot, L_Weld)
-                            end)
+                            if useBothHandsBlodman then
+                                pcall(function()
+                                    grab:FireServer(R_Det, tRoot, R_Weld)
+                                    grab:FireServer(L_Det, tRoot, L_Weld)
+                                end)
+                            else
+                                pcall(function()
+                                    grab:FireServer(R_Det, tRoot, R_Weld)
+                                end)
+                            end
                             
                             if spamCounter % 2 == 0 then
-                                pcall(function()
-                                    release:FireServer(R_Weld)
-                                    release:FireServer(L_Weld)
-                                end)
+                                if useBothHandsBlodman then
+                                    pcall(function()
+                                        release:FireServer(R_Weld)
+                                        release:FireServer(L_Weld)
+                                    end)
+                                else
+                                    pcall(function()
+                                        release:FireServer(R_Weld)
+                                    end)
+                                end
                             end
                             
                             if GE then
@@ -908,16 +960,28 @@ function StartMainScript(titleText)
                             
                             spamCounter = spamCounter + 1
                             
-                            pcall(function()
-                                grab:FireServer(R_Det, tRoot, R_Weld)
-                                grab:FireServer(L_Det, tRoot, L_Weld)
-                            end)
+                            if useBothHandsCircle then
+                                pcall(function()
+                                    grab:FireServer(R_Det, tRoot, R_Weld)
+                                    grab:FireServer(L_Det, tRoot, L_Weld)
+                                end)
+                            else
+                                pcall(function()
+                                    grab:FireServer(R_Det, tRoot, R_Weld)
+                                end)
+                            end
                             
                             if spamCounter % 2 == 0 then
-                                pcall(function()
-                                    release:FireServer(R_Weld)
-                                    release:FireServer(L_Weld)
-                                end)
+                                if useBothHandsCircle then
+                                    pcall(function()
+                                        release:FireServer(R_Weld)
+                                        release:FireServer(L_Weld)
+                                    end)
+                                else
+                                    pcall(function()
+                                        release:FireServer(R_Weld)
+                                    end)
+                                end
                             end
                             
                             if GE then
