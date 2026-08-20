@@ -91,11 +91,8 @@ function StartMainScript(titleText)
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-    
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
-    local VisualESPTab = VisualTab:CreateBlock({Name = "ESP Settings", Side = "Right"})
+    local PCLDESPBlock = VisualTab:CreateBlock({Name = "PCLD ESP", Side = "Right"})
     
     local BlodmanMainBlock = BlodmanTab:CreateBlock({Name = "BLODMAN KICK", Side = "Left"})
     local BlodmanSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings", Side = "Right"})
@@ -1154,207 +1151,108 @@ function StartMainScript(titleText)
         end
     })
 
-    local espEnabled = false 
-    local espBoxes = {} 
-    local espTargetNames = {"partesp", "playercharacterlocationdetector"} 
-    local espColor = Color3.fromRGB(30, 30, 30)
+    local pclespEnabled = false
+    local pclespColor = Color3.fromRGB(255, 0, 0)
+    local pclespAdornments = {}
 
-    local function IsTarget(obj) 
-        if not obj:IsA("BasePart") then return false end 
-        for _, name in ipairs(espTargetNames) do 
-            if string.lower(obj.Name) == string.lower(name) then return true end 
-        end 
-        return false 
-    end 
-
-    local function AddBoxESP(obj) 
-        if espBoxes[obj] then return end 
-        local group = {} 
+    local function CreateESP(part)
+        if not part or not part.Parent then return end
         
-        local box = Instance.new("BoxHandleAdornment") 
-        box.Adornee = obj 
-        box.AlwaysOnTop = true 
-        box.ZIndex = 8 
-        box.Color3 = espColor 
-        box.Transparency = 0.6 
-        box.Size = obj.Size 
-        box.Parent = game.CoreGui 
-        table.insert(group, box) 
-        
-        local outline = Instance.new("SelectionBox") 
-        outline.Adornee = obj 
-        outline.Color3 = Color3.fromRGB(0, 0, 0) 
-        outline.LineThickness = 0.09
-        outline.SurfaceTransparency = 1 
-        outline.Parent = game.CoreGui 
-        table.insert(group, outline) 
-        
-        espBoxes[obj] = group 
-        
-        obj.AncestryChanged:Connect(function(_, parent) 
-            if not parent and espBoxes[obj] then 
-                for _, item in ipairs(espBoxes[obj]) do 
-                    if item then item:Destroy() end 
-                end 
-                espBoxes[obj] = nil 
-            end 
-        end) 
-    end 
+        local box = Instance.new("BoxHandleAdornment")
+        box.Size = part.Size + Vector3.new(0.5, 0.5, 0.5)
+        box.AlwaysOnTop = true
+        box.ZIndex = 5
+        box.Transparency = 0.5
+        box.Color3 = pclespColor
+        box.Adornee = part
+        box.Parent = part
 
-    local function RemoveAllBoxes() 
-        for obj, items in pairs(espBoxes) do 
-            for _, item in ipairs(items) do 
-                if item then item:Destroy() end 
-            end 
-        end 
-        espBoxes = {} 
-    end 
+        local outline = Instance.new("SelectionBox")
+        outline.LineThickness = 0.05
+        outline.Color3 = Color3.new(0, 0, 0)
+        outline.Transparency = 0
+        outline.Adornee = part
+        outline.Parent = part
 
-    local function Scan() 
-        for _, obj in ipairs(workspace:GetDescendants()) do 
-            if espEnabled and IsTarget(obj) then 
-                AddBoxESP(obj) 
-            end 
-        end 
-    end 
+        pclespAdornments[part] = {box, outline}
+    end
 
-    workspace.DescendantAdded:Connect(function(obj) 
-        if espEnabled and IsTarget(obj) then 
-            AddBoxESP(obj) 
-        end 
-    end) 
-
-    VisualESPTab:CreateToggle({ 
-        Name = "Player-Location (PCLD ESP)", 
-        Default = false, 
-        Callback = function(Value) 
-            espEnabled = Value 
-            if espEnabled then 
-                Scan() 
-            else 
-                RemoveAllBoxes() 
-            end 
+    local function RemoveESP(part)
+        if pclespAdornments[part] then
+            for _, adornment in pairs(pclespAdornments[part]) do
+                if adornment then adornment:Destroy() end
+            end
+            pclespAdornments[part] = nil
         end
-    })
+    end
 
-    VisualESPTab:CreateColorpicker({
-        Name = "PCLD ESP Color",
-        Default = Color3.fromRGB(0, 0, 0),
-        Callback = function(Value)
-            espColor = Value
-            for obj, group in pairs(espBoxes) do
-                if group and group[1] then
-                    group[1].Color3 = espColor
+    local function UpdateESPColor()
+        for _, adornments in pairs(pclespAdornments) do
+            if adornments[1] then
+                adornments[1].Color3 = pclespColor
+            end
+        end
+    end
+
+    local function ScanForESPParts()
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "partesp" or obj.Name == "playercharacterlocationdetector") then
+                if not pclespAdornments[obj] then
+                    CreateESP(obj)
                 end
             end
         end
-    })
-
-    local espNameEnabled = false
-    local espNameColor = Color3.fromRGB(255, 255, 255)
-    local espNames = {}
-
-    local function AddNameESP(player)
-        if player == LocalPlayer then return end
-
-        local function setupEsp(character)
-            if espNames[player.Name] then
-                espNames[player.Name]:Destroy()
-                espNames[player.Name] = nil
-            end
-
-            local head = character:WaitForChild("Head", 5)
-            if not head then return end
-
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = player.Name .. "_NameESP"
-            billboard.Adornee = head
-            billboard.Size = UDim2.new(0, 200, 0, 50)
-            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-            billboard.AlwaysOnTop = true
-
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Parent = billboard
-            textLabel.BackgroundTransparency = 1
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.Text = player.Name
-            textLabel.TextColor3 = espNameColor
-            textLabel.TextStrokeTransparency = 0.2
-            textLabel.TextSize = 14
-            textLabel.Font = Enum.Font.GothamBold
-
-            local success, _ = pcall(function()
-                billboard.Parent = game:GetService("CoreGui")
-            end)
-            if not success then
-                billboard.Parent = LocalPlayer:WaitForChild("PlayerGui")
-            end
-
-            espNames[player.Name] = billboard
-        end
-
-        if player.Character then
-            setupEsp(player.Character)
-        end
-
-        player.CharacterAdded:Connect(function(char)
-            if espNameEnabled then
-                setupEsp(char)
-            end
-        end)
     end
 
-    local function ScanPlayers()
-        for _, player in pairs(Players:GetPlayers()) do
-            AddNameESP(player)
+    local function CleanupESP()
+        for part, adornments in pairs(pclespAdornments) do
+            if not part.Parent then
+                for _, adornment in pairs(adornments) do
+                    if adornment then adornment:Destroy() end
+                end
+                pclespAdornments[part] = nil
+            end
         end
     end
 
-    local function RemoveAllNames()
-        for _, gui in pairs(espNames) do
-            if gui then gui:Destroy() end
-        end
-        table.clear(espNames)
-    end
-
-    Players.PlayerAdded:Connect(function(player)
-        if espNameEnabled then
-            AddNameESP(player)
-        end
-    end)
-
-    Players.PlayerRemoving:Connect(function(player)
-        if espNames[player.Name] then
-            espNames[player.Name]:Destroy()
-            espNames[player.Name] = nil
-        end
-    end)
-
-    VisualESPTab:CreateToggle({
-        Name = "Name ESP",
+    PCLDESPBlock:CreateToggle({
+        Name = "PCLD ESP",
         Default = false,
         Callback = function(Value)
-            espNameEnabled = Value
+            pclespEnabled = Value
             if Value then
-                ScanPlayers()
+                ScanForESPParts()
+                Library:Notify({ Title = "PCLD ESP", Content = "Enabled", Duration = 2 })
             else
-                RemoveAllNames()
+                for part, adornments in pairs(pclespAdornments) do
+                    for _, adornment in pairs(adornments) do
+                        if adornment then adornment:Destroy() end
+                    end
+                end
+                pclespAdornments = {}
+                Library:Notify({ Title = "PCLD ESP", Content = "Disabled", Duration = 2 })
             end
         end
     })
 
-    VisualESPTab:CreateColorpicker({
-        Name = "Name ESP Color",
-        Default = Color3.fromRGB(255, 255, 255),
-        Callback = function(Value)
-            espNameColor = Value
-            for _, gui in pairs(espNames) do
-                if gui and gui:FindFirstChild("TextLabel") then
-                    gui.TextLabel.TextColor3 = espNameColor
-                end
-            end
+    PCLDESPBlock:CreateColorPicker({
+        Name = "ESP Color",
+        Default = pclespColor,
+        Callback = function(Color)
+            pclespColor = Color
+            UpdateESPColor()
         end
     })
+
+    task.spawn(function()
+        while true do
+            if pclespEnabled then
+                ScanForESPParts()
+                CleanupESP()
+            end
+            task.wait(0.5)
+        end
+    end)
 
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
@@ -1470,6 +1368,8 @@ function StartMainScript(titleText)
             end
         end)
     end
+
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
@@ -2096,6 +1996,8 @@ function StartMainScript(titleText)
             end
         end)
     end
+
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
 
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
