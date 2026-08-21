@@ -82,7 +82,6 @@ function StartMainScript(titleText)
     local BlodmanTab = Window:CreateTab("Blodman", true)
 
     local SuperStrengthBlock = MainTab:CreateBlock({Name = "Super Strength", Side = "Left"})
-    local TeleportBlock = MainTab:CreateBlock({Name = "Teleport", Side = "Right"})
     
     local superStrengthActive = false
     local superStrengthValue = 500
@@ -151,89 +150,23 @@ function StartMainScript(titleText)
         end
     end)
 
-    local teleportKey = Enum.KeyCode.Z
-    local menuKey = Enum.KeyCode.RightShift
-
-    TeleportBlock:CreateBind({
-        Name = "Teleport Keybind",
-        Default = Enum.KeyCode.Z,
-        Callback = function(Value)
-            teleportKey = Value
-        end
-    })
-
-    TeleportBlock:CreateButton({
-        Name = "Teleport (Click)",
-        Callback = function()
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local cam = Workspace.CurrentCamera
-            if hrp and cam then
-                local ray = Ray.new(cam.CFrame.Position, cam.CFrame.LookVector * 1000)
-                local hit, pos = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
-                if pos then
-                    hrp.CFrame = CFrame.new(pos.X, pos.Y + 3, pos.Z)
-                end
-            end
-        end
-    })
-
-    TeleportBlock:CreateToggle({
-        Name = "Mobile Teleport Button",
-        Default = false,
-        Callback = function(Value)
-            if Value then
-                local button = Instance.new("ImageButton")
-                button.Name = "TeleportButton"
-                button.Size = UDim2.new(0, 70, 0, 70)
-                button.Position = UDim2.new(1, -85, 1, -85)
-                button.Image = "rbxassetid://6723742952"
-                button.BackgroundTransparency = 1
-                button.Parent = screenGui
-                
-                button.MouseButton1Click:Connect(function()
-                    local char = LocalPlayer.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    local cam = Workspace.CurrentCamera
-                    if hrp and cam then
-                        local ray = Ray.new(cam.CFrame.Position, cam.CFrame.LookVector * 1000)
-                        local hit, pos = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
-                        if pos then
-                            hrp.CFrame = CFrame.new(pos.X, pos.Y + 3, pos.Z)
-                        end
-                    end
-                end)
-                
-                _G.TeleportButton = button
-            else
-                if _G.TeleportButton then
-                    _G.TeleportButton:Destroy()
-                    _G.TeleportButton = nil
-                end
-            end
-        end
-    })
-
-    UserInputService.InputBegan:Connect(function(input)
-        if input.KeyCode == teleportKey then
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local cam = Workspace.CurrentCamera
-            if hrp and cam then
-                local ray = Ray.new(cam.CFrame.Position, cam.CFrame.LookVector * 1000)
-                local hit, pos = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
-                if pos then
-                    hrp.CFrame = CFrame.new(pos.X, pos.Y + 3, pos.Z)
-                end
-            end
-        end
-    end)
-
     local KickBlock = TargetTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
     local PalletBlock = TargetTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
     local TargetSelectBlock = TargetTab:CreateBlock({Name = "Target Select", Side = "Left"})
     local SettingsBlock = TargetTab:CreateBlock({Name = "Settings", Side = "Left"})
     local TargetTeleportBlock = TargetTab:CreateBlock({Name = "Target Teleport", Side = "Right"})
+    
+    TargetTeleportBlock:CreateButton({
+        Name = "Teleport To Target",
+        Callback = function()
+            if selectedTarget and selectedTarget.Character then
+                local hrp = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
+                end
+            end
+        end
+    })
     
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
@@ -252,18 +185,6 @@ function StartMainScript(titleText)
     local BlodmanCircleBlock = BlodmanTab:CreateBlock({Name = "KICK (CIRCLE)", Side = "Left"})
     local BlodmanCircleSettingsBlock = BlodmanTab:CreateBlock({Name = "Settings Circle", Side = "Right"})
     local BlodmanAutoSitBlock = BlodmanTab:CreateBlock({Name = "Auto Sit Blodman", Side = "Left"})
-
-    TargetTeleportBlock:CreateButton({
-        Name = "Teleport To Target",
-        Callback = function()
-            if selectedTarget and selectedTarget.Character then
-                local hrp = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
-                end
-            end
-        end
-    })
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
