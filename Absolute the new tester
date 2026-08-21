@@ -1544,7 +1544,7 @@ function StartMainScript(titleText)
             bodyGyro.MaxTorque = Vector3.new(2e9, 2e9, 2e9)
             bodyGyro.P = 5000000
             bodyGyro.D = 2500
-            bodyGyro.CFrame = CFrame.new(pos)
+            bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
             bodyGyro.Parent = targetRoot
 
             local mass = 0
@@ -1635,7 +1635,7 @@ function StartMainScript(titleText)
                     end
                     
                     if bodyGyro and bodyGyro.Parent then
-                        bodyGyro.CFrame = CFrame.new(lockPos)
+                        bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
                     end
 
                     if tRoot then
@@ -1851,8 +1851,7 @@ function StartMainScript(titleText)
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-        if fovEnabled then SetFOV(false) fovEnabled = false end
-        if isAntiKickActive then
+        if fovEnabled then SetFOV(false) fovEnabled = false end        if isAntiKickActive then
             isAntiKickActive = false
             if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
             ClearShuriken()
