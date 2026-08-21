@@ -88,12 +88,18 @@ function StartMainScript(titleText)
     local throwKeybind = Enum.KeyCode.E
     local currentGrabbedPart = nil
     local isHoldingObject = false
+    local canThrow = false
 
     SuperStrengthBlock:CreateToggle({
         Name = "Super Strength",
         Default = false,
         Callback = function(Value)
             superStrengthActive = Value
+            if not Value then
+                canThrow = false
+                isHoldingObject = false
+                currentGrabbedPart = nil
+            end
         end
     })
 
@@ -118,7 +124,7 @@ function StartMainScript(titleText)
     })
 
     local function ThrowObject()
-        if superStrengthActive and currentGrabbedPart and isHoldingObject then
+        if superStrengthActive and currentGrabbedPart and canThrow then
             local camera = Workspace.CurrentCamera
             local bodyVel = Instance.new("BodyVelocity")
             bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -128,6 +134,7 @@ function StartMainScript(titleText)
             task.delay(0.3, function()
                 if bodyVel then bodyVel:Destroy() end
             end)
+            canThrow = false
             isHoldingObject = false
             currentGrabbedPart = nil
         end
@@ -135,7 +142,7 @@ function StartMainScript(titleText)
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if input.KeyCode == throwKeybind then
+        if input.KeyCode == throwKeybind and superStrengthActive then
             ThrowObject()
         end
     end)
@@ -150,11 +157,12 @@ function StartMainScript(titleText)
                     if part1 and superStrengthActive then
                         currentGrabbedPart = part1
                         isHoldingObject = true
+                        canThrow = true
                         
                         task.spawn(function()
                             local parentChanged = grabParts:GetPropertyChangedSignal("Parent"):Connect(function()
                                 if not grabParts.Parent then
-                                    if isHoldingObject and currentGrabbedPart and superStrengthActive then
+                                    if canThrow and currentGrabbedPart and superStrengthActive then
                                         local camera = Workspace.CurrentCamera
                                         local bodyVel = Instance.new("BodyVelocity")
                                         bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -165,6 +173,7 @@ function StartMainScript(titleText)
                                             if bodyVel then bodyVel:Destroy() end
                                         end)
                                     end
+                                    canThrow = false
                                     isHoldingObject = false
                                     currentGrabbedPart = nil
                                     parentChanged:Disconnect()
@@ -1881,8 +1890,7 @@ function StartMainScript(titleText)
         if plots and plotItems then
             for i = 1, 5 do 
                 local Plot = plots:FindFirstChild("Plot"..i)
-                if Plot then
-                    local sign = Plot:FindFirstChild("PlotSign")
+                if Plot then                    local sign = Plot:FindFirstChild("PlotSign")
                     local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
                     if owners then
                         for _,v in pairs(owners:GetChildren()) do 
