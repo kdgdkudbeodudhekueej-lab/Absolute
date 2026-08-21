@@ -283,6 +283,9 @@ function StartMainScript(titleText)
     local holdHeight = 17
     local fovEnabled = false
     local originalFOV = 70
+    local offsetX = 0
+    local offsetY = 0
+    local offsetZ = 0
 
     local isAntiKickActive = false
     local antiKickTask = nil
@@ -309,6 +312,7 @@ function StartMainScript(titleText)
 
     local bodyPos = nil
     local bodyGyro = nil
+    local bodyForce = nil
 
     local antiLagActive = false
 
@@ -547,27 +551,6 @@ function StartMainScript(titleText)
         end
     })
 
-    local useBothHandsBlodman = true
-    local useRightHandBlodman = true
-
-    BlodmanSettingsBlock:CreateDropdown({
-        Name = "Hand Mode",
-        Items = {"Both Hands", "Right Hand", "Left Hand"},
-        Default = "Both Hands",
-        Callback = function(Value)
-            if Value == "Both Hands" then
-                useBothHandsBlodman = true
-            elseif Value == "Right Hand" then
-                useBothHandsBlodman = false
-                useRightHandBlodman = true
-            elseif Value == "Left Hand" then
-                useBothHandsBlodman = false
-                useRightHandBlodman = false
-            end
-            Library:Notify({ Title = "Hand Mode", Content = "Set to: " .. Value, Duration = 2 })
-        end
-    })
-
     BlodmanSettingsBlock:CreateSlider({
         Name = "Blodman Interval (0.01 - 0.1)",
         Min = 0.01,
@@ -606,27 +589,6 @@ function StartMainScript(titleText)
         end
     })
 
-    local useBothHandsCircle = true
-    local useRightHandCircle = true
-
-    BlodmanCircleSettingsBlock:CreateDropdown({
-        Name = "Hand Mode",
-        Items = {"Both Hands", "Right Hand", "Left Hand"},
-        Default = "Both Hands",
-        Callback = function(Value)
-            if Value == "Both Hands" then
-                useBothHandsCircle = true
-            elseif Value == "Right Hand" then
-                useBothHandsCircle = false
-                useRightHandCircle = true
-            elseif Value == "Left Hand" then
-                useBothHandsCircle = false
-                useRightHandCircle = false
-            end
-            Library:Notify({ Title = "Hand Mode", Content = "Set to: " .. Value, Duration = 2 })
-        end
-    })
-
     BlodmanCircleSettingsBlock:CreateSlider({
         Name = "Spin Speed (13 - 20)",
         Min = 13,
@@ -653,6 +615,7 @@ function StartMainScript(titleText)
         pcall(function()
             if bodyPos then bodyPos:Destroy() bodyPos = nil end
             if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+            if bodyForce then bodyForce:Destroy() bodyForce = nil end
         end)
     end
 
@@ -728,11 +691,9 @@ function StartMainScript(titleText)
                     local release = remoteFolder:FindFirstChild("CreatureRelease")
                     
                     local R_Det = blobman:FindFirstChild("RightDetector")
-                    local L_Det = blobman:FindFirstChild("LeftDetector")
                     local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
-                    local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-                    if grab and release and R_Weld and L_Weld then
+                    if grab and release and R_Weld then
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
@@ -756,36 +717,14 @@ function StartMainScript(titleText)
                             
                             spamCounter = spamCounter + 1
                             
-                            if useBothHandsBlodman then
-                                pcall(function()
-                                    grab:FireServer(R_Det, tRoot, R_Weld)
-                                    grab:FireServer(L_Det, tRoot, L_Weld)
-                                end)
-                            elseif useRightHandBlodman then
-                                pcall(function()
-                                    grab:FireServer(R_Det, tRoot, R_Weld)
-                                end)
-                            else
-                                pcall(function()
-                                    grab:FireServer(L_Det, tRoot, L_Weld)
-                                end)
-                            end
+                            pcall(function()
+                                grab:FireServer(R_Det, tRoot, R_Weld)
+                            end)
                             
                             if spamCounter % 2 == 0 then
-                                if useBothHandsBlodman then
-                                    pcall(function()
-                                        release:FireServer(R_Weld)
-                                        release:FireServer(L_Weld)
-                                    end)
-                                elseif useRightHandBlodman then
-                                    pcall(function()
-                                        release:FireServer(R_Weld)
-                                    end)
-                                else
-                                    pcall(function()
-                                        release:FireServer(L_Weld)
-                                    end)
-                                end
+                                pcall(function()
+                                    release:FireServer(R_Weld)
+                                end)
                             end
                             
                             if GE then
@@ -879,11 +818,9 @@ function StartMainScript(titleText)
         local grab = remoteFolder and remoteFolder:FindFirstChild("CreatureGrab")
         local release = remoteFolder and remoteFolder:FindFirstChild("CreatureRelease")
         local R_Det = blob:FindFirstChild("RightDetector")
-        local L_Det = blob:FindFirstChild("LeftDetector")
         local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
-        local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-        if not (grab and release and R_Det and R_Weld and L_Det and L_Weld) then
+        if not (grab and release and R_Det and R_Weld) then
             Library:Notify({ Title = "Error", Content = "Blobman components not found", Duration = 3 })
             return
         end
@@ -917,11 +854,9 @@ function StartMainScript(titleText)
                     local release = remoteFolder:FindFirstChild("CreatureRelease")
                     
                     local R_Det = blobman:FindFirstChild("RightDetector")
-                    local L_Det = blobman:FindFirstChild("LeftDetector")
                     local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
-                    local L_Weld = L_Det and (L_Det:FindFirstChild("LeftWeld") or L_Det:FindFirstChild("RigidConstraint"))
 
-                    if grab and release and R_Weld and L_Weld then
+                    if grab and release and R_Weld then
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
@@ -970,36 +905,14 @@ function StartMainScript(titleText)
                             
                             spamCounter = spamCounter + 1
                             
-                            if useBothHandsCircle then
-                                pcall(function()
-                                    grab:FireServer(R_Det, tRoot, R_Weld)
-                                    grab:FireServer(L_Det, tRoot, L_Weld)
-                                end)
-                            elseif useRightHandCircle then
-                                pcall(function()
-                                    grab:FireServer(R_Det, tRoot, R_Weld)
-                                end)
-                            else
-                                pcall(function()
-                                    grab:FireServer(L_Det, tRoot, L_Weld)
-                                end)
-                            end
+                            pcall(function()
+                                grab:FireServer(R_Det, tRoot, R_Weld)
+                            end)
                             
                             if spamCounter % 2 == 0 then
-                                if useBothHandsCircle then
-                                    pcall(function()
-                                        release:FireServer(R_Weld)
-                                        release:FireServer(L_Weld)
-                                    end)
-                                elseif useRightHandCircle then
-                                    pcall(function()
-                                        release:FireServer(R_Weld)
-                                    end)
-                                else
-                                    pcall(function()
-                                        release:FireServer(L_Weld)
-                                    end)
-                                end
+                                pcall(function()
+                                    release:FireServer(R_Weld)
+                                end)
                             end
                             
                             if GE then
@@ -1372,6 +1285,39 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
+    SettingsBlock:CreateSlider({
+        Name = "Offset X",
+        Min = -5,
+        Max = 8,
+        Default = 0,
+        Rounding = 1,
+        Callback = function(Value)
+            offsetX = Value
+        end
+    })
+
+    SettingsBlock:CreateSlider({
+        Name = "Offset Y",
+        Min = -5,
+        Max = 5,
+        Default = 0,
+        Rounding = 1,
+        Callback = function(Value)
+            offsetY = Value
+        end
+    })
+
+    SettingsBlock:CreateSlider({
+        Name = "Offset Z",
+        Min = -5,
+        Max = 8,
+        Default = 0,
+        Rounding = 1,
+        Callback = function(Value)
+            offsetZ = Value
+        end
+    })
+
     AntiGrabBlock:CreateToggle({
         Name = "Anti-Grab",
         Default = false,
@@ -1571,37 +1517,66 @@ function StartMainScript(titleText)
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myRoot then return end
 
-        local savedPos = myRoot.CFrame 
-        local dragging = false
-        local grabStartTime = 0
-        local checkStartTime = 0
-        
-        local currentFPS = 60
-        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
-            currentFPS = 1 / dt
-        end)
+        local ZERO_VECTOR = Vector3.new(0, 0, 0)
+        local GRAB_TIMEOUT = 0.10
+        local MAX_DISTANCE = 25
+        local savedPos = myRoot.CFrame
+        local isGrabbing = false
+        local startTime = nil
+        local checkStartTime = nil
+        local HOLD_HEIGHT = holdHeight
 
-        local bodyPos = nil
-        local bodyGyro = nil
+        local function getOffset()
+            return Vector3.new(offsetX or 0, offsetY or 0, offsetZ or 0)
+        end
 
-        local function createBodies(targetRoot, pos)
+        local function createConstraints(targetRoot, pos)
             cleanupBodies()
-            for _, v in pairs(targetRoot:GetChildren()) do
-                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                    v:Destroy()
-                end
-            end
+            
             bodyPos = Instance.new("BodyPosition")
-            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            bodyPos.D = 100
+            bodyPos.MaxForce = Vector3.new(2e9, 2e9, 2e9)
+            bodyPos.P = 5000000
+            bodyPos.D = 2500
             bodyPos.Position = pos
             bodyPos.Parent = targetRoot
+
             bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bodyGyro.D = 100
-            bodyGyro.CFrame = CFrame.new(pos)
+            bodyGyro.MaxTorque = Vector3.new(2e9, 2e9, 2e9)
+            bodyGyro.P = 5000000
+            bodyGyro.D = 2500
+            bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
             bodyGyro.Parent = targetRoot
+
+            local mass = 0
+            local char = targetRoot.Parent
+            if char then
+                for _, v in pairs(char:GetChildren()) do
+                    if v:IsA("BasePart") then
+                        mass = mass + v:GetMass()
+                    end
+                end
+            end
+            bodyForce = Instance.new("BodyForce")
+            bodyForce.Force = Vector3.new(0, mass * workspace.Gravity * 1.5, 0)
+            bodyForce.Parent = targetRoot
         end
+
+        task.spawn(function()
+            while kickActive do
+                if target and target.Parent and target.Character then
+                    local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        pcall(function()
+                            SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                            DestroyGrabLine:FireServer(tRoot)
+                            tRoot.AssemblyLinearVelocity = ZERO_VECTOR
+                            tRoot.AssemblyAngularVelocity = ZERO_VECTOR
+                        end)
+                    end
+                end
+                task.wait()
+            end
+        end)
 
         while kickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
@@ -1612,91 +1587,106 @@ function StartMainScript(titleText)
             
             myChar = LocalPlayer.Character
             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myRoot then
+                task.wait()
+                continue
+            end
+
             local tChar = currentTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            local tHum = tChar and tChar:FindFirstChild("Humanoid")
+            if not tChar then
+                task.wait()
+                continue
+            end
+
+            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar:FindFirstChild("Humanoid")
             
             if tRoot and tHum and tHum.Health > 0 and myRoot then
-                if not dragging then
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                    cleanupBodies()
-                    checkStartTime = 0
+                for _, part in ipairs(tChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+
+                if not isGrabbing then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -6, -10)
+                    myRoot.Velocity = ZERO_VECTOR
+                    tHum.PlatformStand = true
+                    tHum.Sit = false
+
+                    if not startTime then startTime = tick() end
+
+                    if tick() - startTime > GRAB_TIMEOUT then
+                        isGrabbing = true
+                        startTime = nil
+                        myRoot.CFrame = savedPos
+                        myRoot.Velocity = ZERO_VECTOR
+
+                        local lockPos = myRoot.Position + Vector3.new(0, HOLD_HEIGHT, 0) + getOffset()
+                        createConstraints(tRoot, lockPos)
+                        tHum:ChangeState(Enum.HumanoidStateType.Physics)
+                        checkStartTime = tick() + 0.25
+                    end
+                else
+                    local lockPos = myRoot.Position + Vector3.new(0, HOLD_HEIGHT, 0) + getOffset()
+                    
+                    if bodyPos and bodyPos.Parent then
+                        bodyPos.Position = lockPos
+                    end
+                    
+                    if bodyGyro and bodyGyro.Parent then
+                        bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
+                    end
+
+                    if tRoot then
+                        tRoot.AssemblyLinearVelocity = ZERO_VECTOR
+                        tRoot.AssemblyAngularVelocity = ZERO_VECTOR
+                    end
+
+                    if checkStartTime and tick() >= checkStartTime then
+                        local dist = (myRoot.Position - tRoot.Position).Magnitude
+                        if dist > MAX_DISTANCE then
+                            cleanupBodies()
+                            isGrabbing = false
+                            startTime = tick()
+                            checkStartTime = nil
+                            savedPos = myRoot.CFrame
+                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -8, 0)
+                            pcall(function()
+                                SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                                DestroyGrabLine:FireServer(tRoot)
+                            end)
+                            task.wait()
+                            continue
+                        end
+                        checkStartTime = tick() + 0.25
+                    end
+
                     pcall(function()
-                        tHum.PlatformStand = true
-                        tHum.Sit = true
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
                         SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
                         DestroyGrabLine:FireServer(tRoot)
                     end)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if grabStartTime == 0 then grabStartTime = tick() end
-                    if tick() - grabStartTime > 0.35 then
-                        dragging = true
-                        grabStartTime = 0
-                        checkStartTime = tick()
-                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                        createBodies(tRoot, lockPos.Position)
-                    end
-                else
-                    myRoot.CFrame = savedPos
-                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if bodyPos and bodyPos.Parent then
-                        bodyPos.Position = lockPos.Position
-                        if bodyGyro then bodyGyro.CFrame = lockPos end
-                    else
-                        createBodies(tRoot, lockPos.Position)
-                    end
-                    tHum.PlatformStand = true
-                    pcall(function()
-                        if currentFPS > 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        elseif currentFPS >= 155 and currentFPS <= 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        else
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        end
-                    end)
-                    if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
-                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
-                        if currentDist > 10 then
-                            dragging = false
-                            grabStartTime = 0
-                            checkStartTime = 0
-                            cleanupBodies()
-                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                        else
-                            checkStartTime = tick()
-                        end
-                    end
                 end
             else
-                dragging = false
-                grabStartTime = 0
-                checkStartTime = 0
+                isGrabbing = false
+                startTime = nil
+                checkStartTime = nil
                 cleanupBodies()
             end
-            RunService.Heartbeat:Wait()
+            task.wait()
         end
-        
-        fpsConnection:Disconnect()
+
         cleanupBodies()
-        if myRoot then myRoot.CFrame = savedPos end
+        if myRoot and savedPos then
+            myRoot.CFrame = savedPos
+            myRoot.Velocity = ZERO_VECTOR
+        end
         if target and target.Character then
             local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
             if tRoot then
-                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+                pcall(function()
+                    DestroyGrabLine:FireServer(tRoot)
+                end)
             end
         end
     end
@@ -1721,12 +1711,8 @@ function StartMainScript(titleText)
                 if selectedTarget and selectedTarget.Character then
                     local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
                     if tRoot then
-                        for _, v in pairs(tRoot:GetChildren()) do
-                            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                                pcall(function() v:Destroy() end)
-                            end
-                        end
                         pcall(function()
+                            DestroyGrabLine:FireServer(tRoot)
                             tRoot.AssemblyLinearVelocity = Vector3.zero
                             tRoot.AssemblyAngularVelocity = Vector3.zero
                         end)
@@ -1865,8 +1851,7 @@ function StartMainScript(titleText)
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-        if fovEnabled then SetFOV(false) fovEnabled = false end
-        if isAntiKickActive then
+        if fovEnabled then SetFOV(false) fovEnabled = false end        if isAntiKickActive then
             isAntiKickActive = false
             if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
             ClearShuriken()
