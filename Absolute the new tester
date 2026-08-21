@@ -81,25 +81,18 @@ function StartMainScript(titleText)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
 
+    -- ===== SUPER STRENGTH (КАК В BLIZT) =====
     local SuperStrengthBlock = MainTab:CreateBlock({Name = "Super Strength", Side = "Left"})
     
     local superStrengthActive = false
     local superStrengthValue = 500
-    local throwKeybind = Enum.KeyCode.E
     local currentGrabbedPart = nil
-    local isHoldingObject = false
-    local canThrow = false
 
     SuperStrengthBlock:CreateToggle({
         Name = "Super Strength",
         Default = false,
         Callback = function(Value)
             superStrengthActive = Value
-            if not Value then
-                canThrow = false
-                isHoldingObject = false
-                currentGrabbedPart = nil
-            end
         end
     })
 
@@ -115,38 +108,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local throwKeybindPicker = SuperStrengthBlock:CreateKeybind({
-        Name = "Throw Keybind",
-        Default = Enum.KeyCode.E,
-        Callback = function(Key)
-            throwKeybind = Key
-        end
-    })
-
-    local function ThrowObject()
-        if superStrengthActive and currentGrabbedPart and canThrow then
-            local camera = Workspace.CurrentCamera
-            local bodyVel = Instance.new("BodyVelocity")
-            bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bodyVel.Velocity = camera.CFrame.LookVector * superStrengthValue
-            bodyVel.Name = "SuperStrength"
-            bodyVel.Parent = currentGrabbedPart
-            task.delay(0.3, function()
-                if bodyVel then bodyVel:Destroy() end
-            end)
-            canThrow = false
-            isHoldingObject = false
-            currentGrabbedPart = nil
-        end
-    end
-
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == throwKeybind and superStrengthActive then
-            ThrowObject()
-        end
-    end)
-
+    -- Логика Super Strength как в BlizT
     Workspace.ChildAdded:Connect(function(grabParts)
         if grabParts.Name == "GrabParts" then
             local grabbedPart = grabParts:FindFirstChild("GrabPart")
@@ -156,26 +118,32 @@ function StartMainScript(titleText)
                     local part1 = weld.Part1
                     if part1 and superStrengthActive then
                         currentGrabbedPart = part1
-                        isHoldingObject = true
-                        canThrow = true
                         
+                        -- Создаем BodyVelocity для суперсилы
+                        local superStrengthBodyVelocity = Instance.new("BodyVelocity")
+                        superStrengthBodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+                        superStrengthBodyVelocity.Velocity = Vector3.new()
+                        superStrengthBodyVelocity.Name = "SuperStrength"
+                        superStrengthBodyVelocity.Parent = part1
+                        
+                        -- Отслеживаем момент когда линия исчезает
                         task.spawn(function()
                             local parentChanged = grabParts:GetPropertyChangedSignal("Parent"):Connect(function()
-                                if not grabParts.Parent then
-                                    if canThrow and currentGrabbedPart and superStrengthActive then
+                                if not grabParts.Parent and superStrengthBodyVelocity and superStrengthBodyVelocity.Parent then
+                                    if superStrengthActive then
                                         local camera = Workspace.CurrentCamera
-                                        local bodyVel = Instance.new("BodyVelocity")
-                                        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                        bodyVel.Velocity = camera.CFrame.LookVector * superStrengthValue
-                                        bodyVel.Name = "SuperStrength"
-                                        bodyVel.Parent = currentGrabbedPart
-                                        task.delay(0.3, function()
-                                            if bodyVel then bodyVel:Destroy() end
+                                        superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                        superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
+                                        task.delay(0.5, function()
+                                            if superStrengthBodyVelocity then
+                                                superStrengthBodyVelocity:Destroy()
+                                            end
                                         end)
+                                    else
+                                        if superStrengthBodyVelocity then
+                                            superStrengthBodyVelocity:Destroy()
+                                        end
                                     end
-                                    canThrow = false
-                                    isHoldingObject = false
-                                    currentGrabbedPart = nil
                                     parentChanged:Disconnect()
                                 end
                             end)
@@ -191,7 +159,271 @@ function StartMainScript(titleText)
     local TargetSelectBlock = TargetTab:CreateBlock({Name = "Target Select", Side = "Left"})
     local SettingsBlock = TargetTab:CreateBlock({Name = "Settings", Side = "Left"})
     
+    -- ===== ANTI-GRAB СТАРЫЙ =====
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
+    
+    local isHeld = LocalPlayer:WaitForChild("IsHeld")
+    local struggleEvent = RS:WaitForChild("CharacterEvents"):WaitForChild("Struggle")
+    local ragdollRemote = RS:WaitForChild("CharacterEvents"):WaitForChild("RagdollRemote")
+
+    local antiGrabEnabled = false
+    local antiGrabTask = nil
+
+    local function AntiGrabLoop()
+        while antiGrabEnabled do
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if isHeld.Value then
+                    pcall(function() struggleEvent:FireServer(LocalPlayer) end)
+                    if hrp then
+                        hrp.Anchored = true
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                    end
+                    if hum then
+                        hum.Sit = false
+                        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                    end
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        local partOwner = head:FindFirstChild("PartOwner")
+                        if partOwner then partOwner:Destroy() end
+                    end
+                    pcall(function()
+                        ragdollRemote:FireServer(hrp, 0)
+                    end)
+                else
+                    if hrp and hrp.Anchored then hrp.Anchored = false end
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    AntiGrabBlock:CreateToggle({
+        Name = "Anti-Grab",
+        Default = false,
+        Callback = function(Value)
+            antiGrabEnabled = Value
+            if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+            if Value then
+                antiGrabTask = task.spawn(AntiGrabLoop)
+            else
+                local char = LocalPlayer.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.Anchored = false end
+                end
+            end
+        end
+    })
+
+    -- ===== COOL ANTI-GRAB (КАК В BLIZT) =====
+    local CoolAntiGrabBlock = DefenseTab:CreateBlock({Name = "Cool Anti-Grab", Side = "Left"})
+    
+    local coolAntiGrabEnabled = false
+    local coolAntiGrabTask = nil
+    local heldObjectName = nil
+
+    local function CoolAntiGrabLoop()
+        while coolAntiGrabEnabled do
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                
+                if isHeld.Value then
+                    pcall(function() 
+                        struggleEvent:FireServer(LocalPlayer) 
+                    end)
+                    
+                    if hrp then
+                        hrp.Anchored = true
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                    end
+                    
+                    if hum then
+                        hum.Sit = false
+                        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                    end
+                    
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        local partOwner = head:FindFirstChild("PartOwner")
+                        if partOwner then 
+                            pcall(function() partOwner:Destroy() end)
+                        end
+                    end
+                    
+                    pcall(function()
+                        ragdollRemote:FireServer(hrp, 0)
+                    end)
+                else
+                    if hrp and hrp.Anchored then 
+                        hrp.Anchored = false 
+                    end
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    local function SetupCoolAntiGrab()
+        if coolAntiGrabTask then task.cancel(coolAntiGrabTask) coolAntiGrabTask = nil end
+        
+        isHeld.Changed:Connect(function()
+            if isHeld.Value and coolAntiGrabEnabled then
+                pcall(function()
+                    struggleEvent:FireServer(LocalPlayer)
+                    local char = LocalPlayer.Character
+                    if char then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.Anchored = true
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                        end
+                    end
+                end)
+            end
+        end)
+        
+        LocalPlayer.CharacterAdded:Connect(function(char)
+            char:WaitForChild("Head", 5)
+            local head = char:FindFirstChild("Head")
+            if head then
+                head.DescendantAdded:Connect(function(descendant)
+                    if descendant.Name == "PartOwner" and coolAntiGrabEnabled then
+                        pcall(function()
+                            descendant:Destroy()
+                            struggleEvent:FireServer(LocalPlayer)
+                        end)
+                    end
+                end)
+            end
+        end)
+    end
+
+    CoolAntiGrabBlock:CreateToggle({
+        Name = "Cool Anti-Grab",
+        Default = false,
+        Callback = function(Value)
+            coolAntiGrabEnabled = Value
+            if coolAntiGrabTask then task.cancel(coolAntiGrabTask) coolAntiGrabTask = nil end
+            
+            if Value then
+                coolAntiGrabTask = task.spawn(CoolAntiGrabLoop)
+                SetupCoolAntiGrab()
+            else
+                local char = LocalPlayer.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.Anchored = false end
+                end
+            end
+        end
+    })
+
+    -- ===== ANTI-BURN =====
+    local AntiBurnBlock = DefenseTab:CreateBlock({Name = "Anti-Burn", Side = "Right"})
+    
+    local antiBurnActive = false
+    local antiBurnCon = nil
+    local apagarfogo = workspace.Map.Hole.PoisonBigHole.ExtinguishPart
+
+    apagarfogo.Size = Vector3.new(0.5, 0.5, 0.5)
+    apagarfogo.Transparency = 1
+    if apagarfogo:FindFirstChild("Tex") then 
+        apagarfogo.Tex.Transparency = 1 
+    end
+
+    local function StartAntiBurn()
+        antiBurnActive = true
+        
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if hrp then
+            local firePlayerPart = hrp:FindFirstChild("FirePlayerPart")
+            if firePlayerPart then
+                local canBurn = firePlayerPart:FindFirstChild("CanBurn")
+                
+                if canBurn then
+                    antiBurnCon = canBurn.Changed:Connect(function()
+                        while canBurn.Value and antiBurnActive do
+                            pcall(function()
+                                if firetouchinterest then
+                                    firetouchinterest(firePlayerPart, apagarfogo, 0)
+                                    task.wait()
+                                    firetouchinterest(firePlayerPart, apagarfogo, 1)
+                                else
+                                    apagarfogo.CFrame = firePlayerPart.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+                                    task.wait()
+                                    apagarfogo.Position = Vector3.new(0, -100, 0)
+                                end
+                            end)
+                            task.wait()
+                        end
+                    end)
+                end
+            end
+        end
+        
+        LocalPlayer.CharacterAdded:Connect(function(char)
+            task.wait(1)
+            if antiBurnActive then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local firePlayerPart = hrp:FindFirstChild("FirePlayerPart")
+                    if firePlayerPart then
+                        local canBurn = firePlayerPart:FindFirstChild("CanBurn")
+                        if canBurn then
+                            if antiBurnCon then antiBurnCon:Disconnect() end
+                            antiBurnCon = canBurn.Changed:Connect(function()
+                                while canBurn.Value and antiBurnActive do
+                                    pcall(function()
+                                        if firetouchinterest then
+                                            firetouchinterest(firePlayerPart, apagarfogo, 0)
+                                            task.wait()
+                                            firetouchinterest(firePlayerPart, apagarfogo, 1)
+                                        else
+                                            apagarfogo.CFrame = firePlayerPart.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+                                            task.wait()
+                                            apagarfogo.Position = Vector3.new(0, -100, 0)
+                                        end
+                                    end)
+                                    task.wait()
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function StopAntiBurn()
+        antiBurnActive = false
+        if antiBurnCon then
+            antiBurnCon:Disconnect()
+            antiBurnCon = nil
+        end
+    end
+
+    AntiBurnBlock:CreateToggle({
+        Name = "Anti-Burn",
+        Default = false,
+        Callback = function(Value)
+            if Value then
+                StartAntiBurn()
+            else
+                StopAntiBurn()
+            end
+        end
+    })
+
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
     local AntiExplosionBlock = DefenseTab:CreateBlock({Name = "Anti-Explosion", Side = "Right"})
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
@@ -378,9 +610,6 @@ function StartMainScript(titleText)
     local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
     local DestroyGrabLine = GrabEvents:WaitForChild("DestroyGrabLine")
     local CreateGrabLine = GrabEvents:WaitForChild("CreateGrabLine")
-    local isHeld = LocalPlayer:WaitForChild("IsHeld")
-    local struggleEvent = RS:WaitForChild("CharacterEvents"):WaitForChild("Struggle")
-    local ragdollRemote = RS:WaitForChild("CharacterEvents"):WaitForChild("RagdollRemote")
 
     local selectedTarget = nil
     local kickActive = false
@@ -393,8 +622,6 @@ function StartMainScript(titleText)
     local antiKickTask = nil
     local infiniteRagdoll = false
     local infiniteRagdollTask = nil
-    local antiGrabEnabled = false
-    local antiGrabTask = nil
 
     local blobmanKickActive = false
     local blobmanKickTask = nil
@@ -712,39 +939,6 @@ function StartMainScript(titleText)
             if bodyPos then bodyPos:Destroy() bodyPos = nil end
             if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
         end)
-    end
-
-    local function AntiGrabLoop()
-        while antiGrabEnabled do
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if isHeld.Value then
-                    pcall(function() struggleEvent:FireServer(LocalPlayer) end)
-                    if hrp then
-                        hrp.Anchored = true
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                    end
-                    if hum then
-                        hum.Sit = false
-                        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                    end
-                    local head = char:FindFirstChild("Head")
-                    if head then
-                        local partOwner = head:FindFirstChild("PartOwner")
-                        if partOwner then partOwner:Destroy() end
-                    end
-                    pcall(function()
-                        ragdollRemote:FireServer(hrp, 0)
-                    end)
-                else
-                    if hrp and hrp.Anchored then hrp.Anchored = false end
-                end
-            end
-            RunService.Heartbeat:Wait()
-        end
     end
 
     local function BlodmanKickLoop()
@@ -1342,6 +1536,7 @@ function StartMainScript(titleText)
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
         if antiGrabEnabled then antiGrabTask = task.spawn(AntiGrabLoop) end
+        if coolAntiGrabEnabled then coolAntiGrabTask = task.spawn(CoolAntiGrabLoop) end
         if fovEnabled then SetFOV(true) end
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
@@ -1353,150 +1548,6 @@ function StartMainScript(titleText)
         Default = 17,
         Rounding = 0,
         Callback = function(Value) holdHeight = Value end
-    })
-
-    AntiGrabBlock:CreateToggle({
-        Name = "Anti-Grab",
-        Default = false,
-        Callback = function(Value)
-            antiGrabEnabled = Value
-            if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-            if Value then
-                antiGrabTask = task.spawn(AntiGrabLoop)
-            else
-                local char = LocalPlayer.Character
-                if char then
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    if hrp then hrp.Anchored = false end
-                end
-            end
-        end
-    })
-
-    AntiKickBlock:CreateToggle({
-        Name = "Anti-Kick [Shuriken]",
-        Default = false,
-        Callback = function(Value)
-            if Value then 
-                StartAntiKick() 
-            else 
-                StopAntiKick() 
-            end
-        end
-    })
-
-    do
-        local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
-        local AutoResetCon = nil
-        
-        AntiKickBlock:CreateToggle({
-            Name = "Auto Reset",
-            Default = false,
-            Callback = function(Value)
-                if AutoResetCon then
-                    AutoResetCon:Disconnect()
-                    AutoResetCon = nil
-                end
-
-                if Value then
-                    AutoResetCon = GameCorrectionEvents.GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-                        if reason == "Flying" then
-                            local char = LocalPlayer.Character
-                            local hum = char and char:FindFirstChild("Humanoid")
-                            
-                            if hum then
-                                char:BreakJoints()
-                                hum.Health = 0
-                            end
-                        end
-                    end)
-                end
-            end
-        })
-    end
-
-    local antiBanActive = false
-    local antiBanCon = nil
-    local warnTimestamps = {}
-
-    local function startAntiBan()
-        if antiBanCon then antiBanCon:Disconnect() end
-        
-        antiBanCon = RS:WaitForChild("GameCorrectionEvents", 5).GameCorrectionsNotify.OnClientEvent:Connect(function(reason)
-            if reason == "Flying" then
-                local currentTime = os.clock()
-                table.insert(warnTimestamps, currentTime)
-                
-                for i = #warnTimestamps, 1, -1 do
-                    if currentTime - warnTimestamps[i] > 1 then
-                        table.remove(warnTimestamps, i)
-                    end
-                end
-                
-                if #warnTimestamps >= 3 then
-                    task.wait(0.5)
-                    LocalPlayer:Kick("Anti Ban: Preventing ban.")
-                end
-            end
-        end)
-    end
-
-    AntiBanBlock:CreateToggle({
-        Name = "Anti Ban",
-        Default = false,
-        Callback = function(Value)
-            antiBanActive = Value
-            if Value then
-                startAntiBan()
-            else
-                if antiBanCon then
-                    antiBanCon:Disconnect()
-                    antiBanCon = nil
-                end
-                warnTimestamps = {}
-            end
-        end
-    })
-
-    local antiExplosionActive = false
-    local antiExplosionConn = nil
-    local function antiExplosionStart()
-        antiExplosionActive = true
-        antiExplosionConn = Workspace.ChildAdded:Connect(function(model)
-            if not antiExplosionActive then return end
-            if model:IsA("BasePart") and model.Name == "Part" then
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChild("Humanoid")
-                if hrp and (model.Position - hrp.Position).Magnitude <= 25 then
-                    pcall(function()
-                        hrp.Anchored = true
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                        model:Destroy()
-                        task.wait(0.05)
-                        hrp.Anchored = false
-                        if hum then
-                            hum.PlatformStand = false
-                            hum:ChangeState(Enum.HumanoidStateType.Running)
-                        end
-                    end)
-                end
-            end
-        end)
-    end
-
-    AntiExplosionBlock:CreateToggle({
-        Name = "Anti-Explosion",
-        Default = false,
-        Callback = function(Value)
-            if Value then 
-                antiExplosionStart() 
-            else 
-                antiExplosionActive = false 
-                if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
-            end
-        end
     })
 
     local function InfiniteRagdollLoop()
@@ -1820,6 +1871,8 @@ function StartMainScript(titleText)
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+        coolAntiGrabEnabled = false
+        if coolAntiGrabTask then task.cancel(coolAntiGrabTask) coolAntiGrabTask = nil end
         if fovEnabled then SetFOV(false) fovEnabled = false end
         if isAntiKickActive then
             isAntiKickActive = false
@@ -1829,8 +1882,7 @@ function StartMainScript(titleText)
         infiniteRagdoll = false
         if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
         blobmanKickActive = false
-        if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
-        circleKickActive = false
+        if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end        circleKickActive = false
         if circleKickTask then task.cancel(circleKickTask) circleKickTask = nil end
         if antiLagActive then
             antiLagActive = false
@@ -1890,7 +1942,8 @@ function StartMainScript(titleText)
         if plots and plotItems then
             for i = 1, 5 do 
                 local Plot = plots:FindFirstChild("Plot"..i)
-                if Plot then                    local sign = Plot:FindFirstChild("PlotSign")
+                if Plot then
+                    local sign = Plot:FindFirstChild("PlotSign")
                     local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
                     if owners then
                         for _,v in pairs(owners:GetChildren()) do 
