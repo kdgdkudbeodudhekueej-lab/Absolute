@@ -76,14 +76,85 @@ function StartMainScript(titleText)
     end
 
     local MainTab = Window:CreateTab("Main", true)
+    local TargetTab = Window:CreateTab("Target", true)
     local DefenseTab = Window:CreateTab("Defense", true)
     local VisualTab = Window:CreateTab("Visual", true)
     local BlodmanTab = Window:CreateTab("Blodman", true)
 
-    local KickBlock = MainTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
-    local PalletBlock = MainTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
-    local TargetBlock = MainTab:CreateBlock({Name = "Target", Side = "Left"})
-    local SettingsBlock = MainTab:CreateBlock({Name = "Settings", Side = "Left"})
+    local SuperStrengthBlock = MainTab:CreateBlock({Name = "Super Strength", Side = "Left"})
+    
+    local superStrengthActive = false
+    local superStrengthValue = 500
+    local superStrengthBodyVelocity = nil
+
+    SuperStrengthBlock:CreateToggle({
+        Name = "Super Strength",
+        Default = false,
+        Callback = function(Value)
+            superStrengthActive = Value
+        end
+    })
+
+    SuperStrengthBlock:CreateSlider({
+        Name = "Strength",
+        Min = 100,
+        Max = 10000,
+        Default = 500,
+        Rounding = 0,
+        Suffix = "",
+        Callback = function(Value)
+            superStrengthValue = Value
+        end
+    })
+
+    Workspace.ChildAdded:Connect(function(grabParts)
+        if grabParts.Name == "GrabParts" then
+            local grabbedPart = grabParts:FindFirstChild("GrabPart")
+            if grabbedPart then
+                local weld = grabbedPart:FindFirstChild("WeldConstraint")
+                if weld then
+                    local part1 = weld.Part1
+                    if part1 and superStrengthActive then
+                        superStrengthBodyVelocity = Instance.new("BodyVelocity")
+                        superStrengthBodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+                        superStrengthBodyVelocity.Velocity = Vector3.new()
+                        superStrengthBodyVelocity.Name = "SuperStrength"
+                        superStrengthBodyVelocity.Parent = part1
+                        
+                        task.spawn(function()
+                            local parentChanged = grabParts:GetPropertyChangedSignal("Parent"):Connect(function()
+                                if not grabParts.Parent and superStrengthBodyVelocity and superStrengthBodyVelocity.Parent then
+                                    if superStrengthActive then
+                                        local camera = Workspace.CurrentCamera
+                                        superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                        superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
+                                        task.delay(0.5, function()
+                                            if superStrengthBodyVelocity then
+                                                superStrengthBodyVelocity:Destroy()
+                                                superStrengthBodyVelocity = nil
+                                            end
+                                        end)
+                                    else
+                                        if superStrengthBodyVelocity then
+                                            superStrengthBodyVelocity:Destroy()
+                                            superStrengthBodyVelocity = nil
+                                        end
+                                    end
+                                    parentChanged:Disconnect()
+                                end
+                            end)
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+
+    local KickBlock = TargetTab:CreateBlock({Name = "Ownership Kick", Side = "Left"})
+    local PalletBlock = TargetTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
+    local TargetSelectBlock = TargetTab:CreateBlock({Name = "Target Select", Side = "Left"})
+    local SettingsBlock = TargetTab:CreateBlock({Name = "Settings", Side = "Left"})
+    local TargetTeleportBlock = TargetTab:CreateBlock({Name = "Target Teleport", Side = "Right"})
     
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
@@ -91,6 +162,9 @@ function StartMainScript(titleText)
     local AntiSnowBlock = DefenseTab:CreateBlock({Name = "Infinite Ragdoll", Side = "Right"})
     local AntiLagBlock = DefenseTab:CreateBlock({Name = "Anti-Lag", Side = "Left"})
     local AntiInputLagBlock = DefenseTab:CreateBlock({Name = "Anti-Input Lag", Side = "Left"})
+    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
+    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
+    
     local VisualBlock = VisualTab:CreateBlock({Name = "Visual Settings", Side = "Left"})
     local PCLDESPBlock = VisualTab:CreateBlock({Name = "PCLD ESP", Side = "Right"})
     
@@ -148,7 +222,6 @@ function StartMainScript(titleText)
         Default = "White Mug",
         Callback = function(Value)
             SelectedInputToy = InputToyList[Value] or "CupMugWhite"
-            Library:Notify({ Title = "Anti-Input", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
@@ -161,7 +234,6 @@ function StartMainScript(titleText)
         Suffix = "sec",
         Callback = function(Value)
             antiInputSpeed = Value
-            Library:Notify({ Title = "Anti-Input", Content = "Speed: " .. string.format("%.2f", Value) .. " sec", Duration = 2 })
         end
     })
 
@@ -255,16 +327,14 @@ function StartMainScript(titleText)
     end
 
     AntiInputLagBlock:CreateToggle({
-        Name = "Anti-Input (Protection from input lag)",
+        Name = "Anti-Input Lag",
         Default = false,
         Callback = function(Value)
             antiInputActive = Value
             if Value then 
                 StartAntiInput() 
-                Library:Notify({ Title = "Anti-Input", Content = "Enabled (Speed: " .. string.format("%.2f", antiInputSpeed) .. " sec)", Duration = 2 })
             else 
                 StopAntiInput() 
-                Library:Notify({ Title = "Anti-Input", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -283,9 +353,6 @@ function StartMainScript(titleText)
     local holdHeight = 17
     local fovEnabled = false
     local originalFOV = 70
-    local offsetX = 0
-    local offsetY = 0
-    local offsetZ = 0
 
     local isAntiKickActive = false
     local antiKickTask = nil
@@ -312,7 +379,6 @@ function StartMainScript(titleText)
 
     local bodyPos = nil
     local bodyGyro = nil
-    local bodyForce = nil
 
     local antiLagActive = false
 
@@ -429,10 +495,8 @@ function StartMainScript(titleText)
             antiLagActive = Value
             if Value then
                 EnableAntiLag()
-                Library:Notify({ Title = "Anti-Lag", Content = "Enabled", Duration = 2 })
             else
                 DisableAntiLag()
-                Library:Notify({ Title = "Anti-Lag", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -492,9 +556,6 @@ function StartMainScript(titleText)
             if autoSitBlodmanTask then task.cancel(autoSitBlodmanTask) end
             if Value then
                 autoSitBlodmanTask = task.spawn(AutoSitBlodmanLoop)
-                Library:Notify({ Title = "Auto Sit Blodman", Content = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "Auto Sit Blodman", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -519,7 +580,7 @@ function StartMainScript(titleText)
         return nil
     end
 
-    local TargetDropdown = TargetBlock:CreateDropdown({
+    local TargetDropdown = TargetSelectBlock:CreateDropdown({
         Name = "Select Target",
         Options = targetNames,
         Callback = function(v)
@@ -527,7 +588,7 @@ function StartMainScript(titleText)
         end
     })
 
-    TargetBlock:CreateButton({
+    TargetSelectBlock:CreateButton({
         Name = "Refresh List",
         Callback = function()
             updateList()
@@ -615,7 +676,6 @@ function StartMainScript(titleText)
         pcall(function()
             if bodyPos then bodyPos:Destroy() bodyPos = nil end
             if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
-            if bodyForce then bodyForce:Destroy() bodyForce = nil end
         end)
     end
 
@@ -762,42 +822,28 @@ function StartMainScript(titleText)
             if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
             if Value then
                 if not blobmanTarget then
-                    Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
                     return
                 end
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChild("Humanoid")
                 if not hum or not hum.SeatPart then
-                    Library:Notify({ Title = "Error", Content = "Sit on Blobman", Duration = 3 })
                     return
                 end
                 blobmanKickTask = task.spawn(BlodmanKickLoop)
-                Library:Notify({ Title = "BLODMAN KICK", Content = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "BLODMAN KICK", Content = "Disabled", Duration = 2 })
             end
         end
     })
 
     local function CircleKickLoop()
         local target = circleTarget
-        if not target then 
-            Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
-            return 
-        end
+        if not target then return end
 
         local GE = RS:WaitForChild("GrabEvents")
-        if not GE then 
-            Library:Notify({ Title = "Error", Content = "GrabEvents not found", Duration = 3 })
-            return 
-        end
+        if not GE then return end
         
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not myRoot then 
-            Library:Notify({ Title = "Error", Content = "Character not found", Duration = 3 })
-            return 
-        end
+        if not myRoot then return end
 
         local currentHoldHeight = circleHoldHeight
         local dragging = false
@@ -808,7 +854,6 @@ function StartMainScript(titleText)
         local hum = myChar and myChar:FindFirstChild("Humanoid")
         local seat = hum and hum.SeatPart
         if not seat or seat.Parent.Name ~= "CreatureBlobman" then
-            Library:Notify({ Title = "Error", Content = "Sit on Blobman first!", Duration = 3 })
             return
         end
 
@@ -821,14 +866,11 @@ function StartMainScript(titleText)
         local R_Weld = R_Det and (R_Det:FindFirstChild("RightWeld") or R_Det:FindFirstChild("RigidConstraint"))
 
         if not (grab and release and R_Det and R_Weld) then
-            Library:Notify({ Title = "Error", Content = "Blobman components not found", Duration = 3 })
             return
         end
 
         local savedPos = myRoot.CFrame
         local spamCounter = 0
-
-        Library:Notify({ Title = "Kick (Circle)", Content = "Started!", Duration = 2 })
 
         while circleKickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
@@ -940,8 +982,6 @@ function StartMainScript(titleText)
             myRoot.CFrame = savedPos
         end
         circleKickActive = false
-        
-        Library:Notify({ Title = "Kick (Circle)", Content = "Stopped", Duration = 2 })
     end
 
     BlodmanCircleBlock:CreateToggle({
@@ -953,19 +993,16 @@ function StartMainScript(titleText)
 
             if Value then
                 if not circleTarget then
-                    Library:Notify({ Title = "Error", Content = "Select target first", Duration = 3 })
                     return
                 end
 
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChild("Humanoid")
                 if not hum or not hum.SeatPart then
-                    Library:Notify({ Title = "Error", Content = "Sit on Blobman first!", Duration = 3 })
                     return
                 end
 
                 if hum.SeatPart.Parent.Name ~= "CreatureBlobman" then
-                    Library:Notify({ Title = "Error", Content = "Sit on Blobman!", Duration = 3 })
                     return
                 end
 
@@ -1029,7 +1066,7 @@ function StartMainScript(titleText)
                 if currentHRP then
                     task.spawn(function()
                         pcall(function()
-                            spawnRemote:InvokeServer("NinjaShuriken", currentHRP.CFrame * CFrame.new(0, 12, 20), Vector3.new(0,0,0))
+                            spawnRemote:InvokeServer("NinjaShuriken", currentHRP.CFrame * CFrame.new(0, 12, 20), Vector3.zero)
                         end)
                     end)
                 end
@@ -1241,14 +1278,12 @@ function StartMainScript(titleText)
             pclespEnabled = Value
             if Value then
                 lastScan = 0
-                Library:Notify({ Title = "PCLD ESP", Content = "Enabled", Duration = 2 })
             else
                 for part, data in pairs(pclespAdornments) do
                     if data.box then data.box:Destroy() end
                     if data.outline then data.outline:Destroy() end
                 end
                 pclespAdornments = {}
-                Library:Notify({ Title = "PCLD ESP", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1285,39 +1320,6 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
-    SettingsBlock:CreateSlider({
-        Name = "Offset X",
-        Min = -5,
-        Max = 8,
-        Default = 0,
-        Rounding = 1,
-        Callback = function(Value)
-            offsetX = Value
-        end
-    })
-
-    SettingsBlock:CreateSlider({
-        Name = "Offset Y",
-        Min = -5,
-        Max = 5,
-        Default = 0,
-        Rounding = 1,
-        Callback = function(Value)
-            offsetY = Value
-        end
-    })
-
-    SettingsBlock:CreateSlider({
-        Name = "Offset Z",
-        Min = -5,
-        Max = 8,
-        Default = 0,
-        Rounding = 1,
-        Callback = function(Value)
-            offsetZ = Value
-        end
-    })
-
     AntiGrabBlock:CreateToggle({
         Name = "Anti-Grab",
         Default = false,
@@ -1326,14 +1328,12 @@ function StartMainScript(titleText)
             if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
             if Value then
                 antiGrabTask = task.spawn(AntiGrabLoop)
-                Library:Notify({ Title = "Anti-Grab", Content = "Enabled", Duration = 2 })
             else
                 local char = LocalPlayer.Character
                 if char then
                     local hrp = char:FindFirstChild("HumanoidRootPart")
                     if hrp then hrp.Anchored = false end
                 end
-                Library:Notify({ Title = "Anti-Grab", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1344,10 +1344,8 @@ function StartMainScript(titleText)
         Callback = function(Value)
             if Value then 
                 StartAntiKick() 
-                Library:Notify({ Title = "Anti-Kick", Content = "Enabled", Duration = 2 })
             else 
                 StopAntiKick() 
-                Library:Notify({ Title = "Anti-Kick", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1372,19 +1370,11 @@ function StartMainScript(titleText)
                             local hum = char and char:FindFirstChild("Humanoid")
                             
                             if hum then
-                                Library:Notify({ 
-                                    Title = "Auto Reset", 
-                                    Content = "Resetting to prevent Ban!", 
-                                    Duration = 3 
-                                })
                                 char:BreakJoints()
                                 hum.Health = 0
                             end
                         end
                     end)
-                    Library:Notify({ Title = "Auto Reset", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto Reset", Content = "Disabled", Duration = 2 })
                 end
             end
         })
@@ -1409,15 +1399,12 @@ function StartMainScript(titleText)
                 end
                 
                 if #warnTimestamps >= 3 then
-                    Library:Notify({ Title = "Anti Ban", Content = "3 warnings! Leaving...", Duration = 3 })
                     task.wait(0.5)
                     LocalPlayer:Kick("Anti Ban: Preventing ban.")
                 end
             end
         end)
     end
-
-    local AntiBanBlock = DefenseTab:CreateBlock({Name = "Anti Ban", Side = "Left"})
 
     AntiBanBlock:CreateToggle({
         Name = "Anti Ban",
@@ -1426,14 +1413,12 @@ function StartMainScript(titleText)
             antiBanActive = Value
             if Value then
                 startAntiBan()
-                Library:Notify({ Title = "Anti Ban", Content = "Enabled", Duration = 2 })
             else
                 if antiBanCon then
                     antiBanCon:Disconnect()
                     antiBanCon = nil
                 end
                 warnTimestamps = {}
-                Library:Notify({ Title = "Anti Ban", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1472,11 +1457,9 @@ function StartMainScript(titleText)
         Callback = function(Value)
             if Value then 
                 antiExplosionStart() 
-                Library:Notify({ Title = "Anti-Explosion", Content = "Enabled", Duration = 2 })
             else 
                 antiExplosionActive = false 
                 if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
-                Library:Notify({ Title = "Anti-Explosion", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1502,9 +1485,6 @@ function StartMainScript(titleText)
             if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
             if Value then
                 infiniteRagdollTask = task.spawn(InfiniteRagdollLoop)
-                Library:Notify({ Title = "Infinite Ragdoll", Content = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "Infinite Ragdoll", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1517,66 +1497,37 @@ function StartMainScript(titleText)
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myRoot then return end
 
-        local ZERO_VECTOR = Vector3.new(0, 0, 0)
-        local GRAB_TIMEOUT = 0.10
-        local MAX_DISTANCE = 25
-        local savedPos = myRoot.CFrame
-        local isGrabbing = false
-        local startTime = nil
-        local checkStartTime = nil
-        local HOLD_HEIGHT = holdHeight
+        local savedPos = myRoot.CFrame 
+        local dragging = false
+        local grabStartTime = 0
+        local checkStartTime = 0
+        
+        local currentFPS = 60
+        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
+            currentFPS = 1 / dt
+        end)
 
-        local function getOffset()
-            return Vector3.new(offsetX or 0, offsetY or 0, offsetZ or 0)
-        end
+        local bodyPos = nil
+        local bodyGyro = nil
 
-        local function createConstraints(targetRoot, pos)
+        local function createBodies(targetRoot, pos)
             cleanupBodies()
-            
+            for _, v in pairs(targetRoot:GetChildren()) do
+                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
             bodyPos = Instance.new("BodyPosition")
-            bodyPos.MaxForce = Vector3.new(2e9, 2e9, 2e9)
-            bodyPos.P = 5000000
-            bodyPos.D = 2500
+            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyPos.D = 100
             bodyPos.Position = pos
             bodyPos.Parent = targetRoot
-
             bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(2e9, 2e9, 2e9)
-            bodyGyro.P = 5000000
-            bodyGyro.D = 2500
-            bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
+            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro.D = 100
+            bodyGyro.CFrame = CFrame.new(pos)
             bodyGyro.Parent = targetRoot
-
-            local mass = 0
-            local char = targetRoot.Parent
-            if char then
-                for _, v in pairs(char:GetChildren()) do
-                    if v:IsA("BasePart") then
-                        mass = mass + v:GetMass()
-                    end
-                end
-            end
-            bodyForce = Instance.new("BodyForce")
-            bodyForce.Force = Vector3.new(0, mass * workspace.Gravity * 1.5, 0)
-            bodyForce.Parent = targetRoot
         end
-
-        task.spawn(function()
-            while kickActive do
-                if target and target.Parent and target.Character then
-                    local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
-                    if tRoot then
-                        pcall(function()
-                            SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                            DestroyGrabLine:FireServer(tRoot)
-                            tRoot.AssemblyLinearVelocity = ZERO_VECTOR
-                            tRoot.AssemblyAngularVelocity = ZERO_VECTOR
-                        end)
-                    end
-                end
-                task.wait()
-            end
-        end)
 
         while kickActive do
             local currentTarget = Players:FindFirstChild(target.Name)
@@ -1587,106 +1538,91 @@ function StartMainScript(titleText)
             
             myChar = LocalPlayer.Character
             myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            if not myRoot then
-                task.wait()
-                continue
-            end
-
             local tChar = currentTarget.Character
-            if not tChar then
-                task.wait()
-                continue
-            end
-
-            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-            local tHum = tChar:FindFirstChild("Humanoid")
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChild("Humanoid")
             
             if tRoot and tHum and tHum.Health > 0 and myRoot then
-                for _, part in ipairs(tChar:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-
-                if not isGrabbing then
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -6, -10)
-                    myRoot.Velocity = ZERO_VECTOR
-                    tHum.PlatformStand = true
-                    tHum.Sit = false
-
-                    if not startTime then startTime = tick() end
-
-                    if tick() - startTime > GRAB_TIMEOUT then
-                        isGrabbing = true
-                        startTime = nil
-                        myRoot.CFrame = savedPos
-                        myRoot.Velocity = ZERO_VECTOR
-
-                        local lockPos = myRoot.Position + Vector3.new(0, HOLD_HEIGHT, 0) + getOffset()
-                        createConstraints(tRoot, lockPos)
-                        tHum:ChangeState(Enum.HumanoidStateType.Physics)
-                        checkStartTime = tick() + 0.25
-                    end
-                else
-                    local lockPos = myRoot.Position + Vector3.new(0, HOLD_HEIGHT, 0) + getOffset()
-                    
-                    if bodyPos and bodyPos.Parent then
-                        bodyPos.Position = lockPos
-                    end
-                    
-                    if bodyGyro and bodyGyro.Parent then
-                        bodyGyro.CFrame = myRoot.CFrame * CFrame.Angles(math.rad(-120), 0, 0)
-                    end
-
-                    if tRoot then
-                        tRoot.AssemblyLinearVelocity = ZERO_VECTOR
-                        tRoot.AssemblyAngularVelocity = ZERO_VECTOR
-                    end
-
-                    if checkStartTime and tick() >= checkStartTime then
-                        local dist = (myRoot.Position - tRoot.Position).Magnitude
-                        if dist > MAX_DISTANCE then
-                            cleanupBodies()
-                            isGrabbing = false
-                            startTime = tick()
-                            checkStartTime = nil
-                            savedPos = myRoot.CFrame
-                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, -8, 0)
-                            pcall(function()
-                                SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                                DestroyGrabLine:FireServer(tRoot)
-                            end)
-                            task.wait()
-                            continue
-                        end
-                        checkStartTime = tick() + 0.25
-                    end
-
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    cleanupBodies()
+                    checkStartTime = 0
                     pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
                         SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
                         DestroyGrabLine:FireServer(tRoot)
                     end)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.35 then
+                        dragging = true
+                        grabStartTime = 0
+                        checkStartTime = tick()
+                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                else
+                    myRoot.CFrame = savedPos
+                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    if bodyPos and bodyPos.Parent then
+                        bodyPos.Position = lockPos.Position
+                        if bodyGyro then bodyGyro.CFrame = lockPos end
+                    else
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                    tHum.PlatformStand = true
+                    pcall(function()
+                        if currentFPS > 200 then
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        elseif currentFPS >= 155 and currentFPS <= 200 then
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        else
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            SetNetworkOwner:FireServer(tRoot, lockPos)
+                            DestroyGrabLine:FireServer(tRoot)
+                        end
+                    end)
+                    if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                        if currentDist > 10 then
+                            dragging = false
+                            grabStartTime = 0
+                            checkStartTime = 0
+                            cleanupBodies()
+                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                        else
+                            checkStartTime = tick()
+                        end
+                    end
                 end
             else
-                isGrabbing = false
-                startTime = nil
-                checkStartTime = nil
+                dragging = false
+                grabStartTime = 0
+                checkStartTime = 0
                 cleanupBodies()
             end
-            task.wait()
+            RunService.Heartbeat:Wait()
         end
-
+        
+        fpsConnection:Disconnect()
         cleanupBodies()
-        if myRoot and savedPos then
-            myRoot.CFrame = savedPos
-            myRoot.Velocity = ZERO_VECTOR
-        end
+        if myRoot then myRoot.CFrame = savedPos end
         if target and target.Character then
             local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
             if tRoot then
-                pcall(function()
-                    DestroyGrabLine:FireServer(tRoot)
-                end)
+                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
             end
         end
     end
@@ -1697,13 +1633,11 @@ function StartMainScript(titleText)
         Callback = function(Value)
             if Value then
                 if not selectedTarget then
-                    Library:Notify({ Title = "Error", Content = "Select target", Duration = 3 })
                     return
                 end
                 kickActive = true
                 if kickTask then task.cancel(kickTask) kickTask = nil end
                 kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
-                Library:Notify({ Title = "Ownership Kick", Content = "Enabled", Duration = 2 })
             else
                 kickActive = false
                 if kickTask then task.cancel(kickTask) kickTask = nil end
@@ -1711,14 +1645,17 @@ function StartMainScript(titleText)
                 if selectedTarget and selectedTarget.Character then
                     local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
                     if tRoot then
+                        for _, v in pairs(tRoot:GetChildren()) do
+                            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                                pcall(function() v:Destroy() end)
+                            end
+                        end
                         pcall(function()
-                            DestroyGrabLine:FireServer(tRoot)
                             tRoot.AssemblyLinearVelocity = Vector3.zero
                             tRoot.AssemblyAngularVelocity = Vector3.zero
                         end)
                     end
                 end
-                Library:Notify({ Title = "Ownership Kick", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -1799,14 +1736,12 @@ function StartMainScript(titleText)
             if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
             if Value then
                 if not selectedTarget then
-                    Library:Notify({Title = "Error", Content = "Select target first", Duration = 3})
                     ownershipRagdollActive = false
                     return
                 end
                 ownershipRagdollTask = task.spawn(function() 
                     PalletRagdollFunction(selectedTarget.Name) 
                 end)
-                Library:Notify({Title = "Pallet Ragdoll", Content = "Enabled", Duration = 2})
             else
                 task.spawn(function()
                     local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
@@ -1822,7 +1757,6 @@ function StartMainScript(titleText)
                         end
                     end
                 end)
-                Library:Notify({Title = "Pallet Ragdoll", Content = "Disabled", Duration = 2})
             end
         end
     })
@@ -1851,7 +1785,8 @@ function StartMainScript(titleText)
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
         antiGrabEnabled = false
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-        if fovEnabled then SetFOV(false) fovEnabled = false end        if isAntiKickActive then
+        if fovEnabled then SetFOV(false) fovEnabled = false end
+        if isAntiKickActive then
             isAntiKickActive = false
             if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
             ClearShuriken()
@@ -2127,8 +2062,6 @@ function StartMainScript(titleText)
         end)
     end
 
-    local AntiKickItemBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [ITEM]", Side = "Left"})
-
     AntiKickItemBlock:CreateDropdown({
         Name = "Anti Kick Item",
         Items = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
@@ -2140,7 +2073,6 @@ function StartMainScript(titleText)
                 ["Spooky Candle"] = "SpookyCandle1",
             }
             SelectedToy = ToyList[Value] or "SpookyCandle1"
-            Library:Notify({ Title = "Anti-Kick Item", Content = "Selected: " .. Value, Duration = 2 })
         end
     })
 
@@ -2151,10 +2083,8 @@ function StartMainScript(titleText)
             antiKickItemActive = Value
             if Value then 
                 StartAntiKickItem() 
-                Library:Notify({ Title = "Anti-Kick [ITEM]", Content = "Enabled", Duration = 2 })
             else 
                 StopAntiKickItem() 
-                Library:Notify({ Title = "Anti-Kick [ITEM]", Content = "Disabled", Duration = 2 })
             end
         end
     })
@@ -2229,9 +2159,6 @@ function StartMainScript(titleText)
                             end
                         end
                     end)
-                    Library:Notify({ Title = "Auto PCLD Break", Content = "Enabled", Duration = 2 })
-                else
-                    Library:Notify({ Title = "Auto PCLD Break", Content = "Disabled", Duration = 2 })
                 end
             end
         })
