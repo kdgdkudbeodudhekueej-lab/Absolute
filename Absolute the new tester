@@ -86,6 +86,8 @@ function StartMainScript(titleText)
     local superStrengthActive = false
     local superStrengthValue = 500
     local superStrengthBodyVelocity = nil
+    local currentGrabbedPart = nil
+    local isHoldingObject = false
 
     SuperStrengthBlock:CreateToggle({
         Name = "Super Strength",
@@ -107,6 +109,29 @@ function StartMainScript(titleText)
         end
     })
 
+    SuperStrengthBlock:CreateKeybind({
+        Name = "Throw Keybind",
+        Default = Enum.KeyCode.E,
+        Callback = function()
+            if superStrengthActive and currentGrabbedPart and isHoldingObject then
+                local camera = Workspace.CurrentCamera
+                superStrengthBodyVelocity = Instance.new("BodyVelocity")
+                superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
+                superStrengthBodyVelocity.Name = "SuperStrength"
+                superStrengthBodyVelocity.Parent = currentGrabbedPart
+                task.delay(0.3, function()
+                    if superStrengthBodyVelocity then
+                        superStrengthBodyVelocity:Destroy()
+                        superStrengthBodyVelocity = nil
+                    end
+                end)
+                isHoldingObject = false
+                currentGrabbedPart = nil
+            end
+        end
+    })
+
     Workspace.ChildAdded:Connect(function(grabParts)
         if grabParts.Name == "GrabParts" then
             local grabbedPart = grabParts:FindFirstChild("GrabPart")
@@ -115,30 +140,29 @@ function StartMainScript(titleText)
                 if weld then
                     local part1 = weld.Part1
                     if part1 and superStrengthActive then
-                        superStrengthBodyVelocity = Instance.new("BodyVelocity")
-                        superStrengthBodyVelocity.MaxForce = Vector3.new(0, 0, 0)
-                        superStrengthBodyVelocity.Velocity = Vector3.new()
-                        superStrengthBodyVelocity.Name = "SuperStrength"
-                        superStrengthBodyVelocity.Parent = part1
+                        currentGrabbedPart = part1
+                        isHoldingObject = true
                         
                         task.spawn(function()
                             local parentChanged = grabParts:GetPropertyChangedSignal("Parent"):Connect(function()
-                                if not grabParts.Parent and superStrengthBodyVelocity and superStrengthBodyVelocity.Parent then
-                                    if superStrengthActive then
-                                        local camera = Workspace.CurrentCamera
-                                        superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                        superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
-                                        task.delay(0.5, function()
-                                            if superStrengthBodyVelocity then
-                                                superStrengthBodyVelocity:Destroy()
-                                                superStrengthBodyVelocity = nil
-                                            end
-                                        end)
-                                    else
-                                        if superStrengthBodyVelocity then
-                                            superStrengthBodyVelocity:Destroy()
-                                            superStrengthBodyVelocity = nil
+                                if not grabParts.Parent then
+                                    if isHoldingObject and currentGrabbedPart then
+                                        if superStrengthActive then
+                                            local camera = Workspace.CurrentCamera
+                                            superStrengthBodyVelocity = Instance.new("BodyVelocity")
+                                            superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                            superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
+                                            superStrengthBodyVelocity.Name = "SuperStrength"
+                                            superStrengthBodyVelocity.Parent = currentGrabbedPart
+                                            task.delay(0.3, function()
+                                                if superStrengthBodyVelocity then
+                                                    superStrengthBodyVelocity:Destroy()
+                                                    superStrengthBodyVelocity = nil
+                                                end
+                                            end)
                                         end
+                                        isHoldingObject = false
+                                        currentGrabbedPart = nil
                                     end
                                     parentChanged:Disconnect()
                                 end
@@ -154,19 +178,6 @@ function StartMainScript(titleText)
     local PalletBlock = TargetTab:CreateBlock({Name = "Pallet Ragdoll", Side = "Right"})
     local TargetSelectBlock = TargetTab:CreateBlock({Name = "Target Select", Side = "Left"})
     local SettingsBlock = TargetTab:CreateBlock({Name = "Settings", Side = "Left"})
-    local TargetTeleportBlock = TargetTab:CreateBlock({Name = "Target Teleport", Side = "Right"})
-    
-    TargetTeleportBlock:CreateButton({
-        Name = "Teleport To Target",
-        Callback = function()
-            if selectedTarget and selectedTarget.Character then
-                local hrp = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, 3, 0)
-                end
-            end
-        end
-    })
     
     local AntiGrabBlock = DefenseTab:CreateBlock({Name = "Anti-Grab", Side = "Left"})
     local AntiKickBlock = DefenseTab:CreateBlock({Name = "Anti-Kick [Shuriken]", Side = "Left"})
