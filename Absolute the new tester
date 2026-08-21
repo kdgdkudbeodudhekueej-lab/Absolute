@@ -85,7 +85,7 @@ function StartMainScript(titleText)
     
     local superStrengthActive = false
     local superStrengthValue = 500
-    local superStrengthBodyVelocity = nil
+    local throwKeybind = Enum.KeyCode.E
     local currentGrabbedPart = nil
     local isHoldingObject = false
 
@@ -109,28 +109,36 @@ function StartMainScript(titleText)
         end
     })
 
-    SuperStrengthBlock:CreateKeybind({
+    local throwKeybindPicker = SuperStrengthBlock:CreateKeybind({
         Name = "Throw Keybind",
         Default = Enum.KeyCode.E,
-        Callback = function()
-            if superStrengthActive and currentGrabbedPart and isHoldingObject then
-                local camera = Workspace.CurrentCamera
-                superStrengthBodyVelocity = Instance.new("BodyVelocity")
-                superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
-                superStrengthBodyVelocity.Name = "SuperStrength"
-                superStrengthBodyVelocity.Parent = currentGrabbedPart
-                task.delay(0.3, function()
-                    if superStrengthBodyVelocity then
-                        superStrengthBodyVelocity:Destroy()
-                        superStrengthBodyVelocity = nil
-                    end
-                end)
-                isHoldingObject = false
-                currentGrabbedPart = nil
-            end
+        Callback = function(Key)
+            throwKeybind = Key
         end
     })
+
+    local function ThrowObject()
+        if superStrengthActive and currentGrabbedPart and isHoldingObject then
+            local camera = Workspace.CurrentCamera
+            local bodyVel = Instance.new("BodyVelocity")
+            bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyVel.Velocity = camera.CFrame.LookVector * superStrengthValue
+            bodyVel.Name = "SuperStrength"
+            bodyVel.Parent = currentGrabbedPart
+            task.delay(0.3, function()
+                if bodyVel then bodyVel:Destroy() end
+            end)
+            isHoldingObject = false
+            currentGrabbedPart = nil
+        end
+    end
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == throwKeybind then
+            ThrowObject()
+        end
+    end)
 
     Workspace.ChildAdded:Connect(function(grabParts)
         if grabParts.Name == "GrabParts" then
@@ -146,24 +154,19 @@ function StartMainScript(titleText)
                         task.spawn(function()
                             local parentChanged = grabParts:GetPropertyChangedSignal("Parent"):Connect(function()
                                 if not grabParts.Parent then
-                                    if isHoldingObject and currentGrabbedPart then
-                                        if superStrengthActive then
-                                            local camera = Workspace.CurrentCamera
-                                            superStrengthBodyVelocity = Instance.new("BodyVelocity")
-                                            superStrengthBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                            superStrengthBodyVelocity.Velocity = camera.CFrame.LookVector * superStrengthValue
-                                            superStrengthBodyVelocity.Name = "SuperStrength"
-                                            superStrengthBodyVelocity.Parent = currentGrabbedPart
-                                            task.delay(0.3, function()
-                                                if superStrengthBodyVelocity then
-                                                    superStrengthBodyVelocity:Destroy()
-                                                    superStrengthBodyVelocity = nil
-                                                end
-                                            end)
-                                        end
-                                        isHoldingObject = false
-                                        currentGrabbedPart = nil
+                                    if isHoldingObject and currentGrabbedPart and superStrengthActive then
+                                        local camera = Workspace.CurrentCamera
+                                        local bodyVel = Instance.new("BodyVelocity")
+                                        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                        bodyVel.Velocity = camera.CFrame.LookVector * superStrengthValue
+                                        bodyVel.Name = "SuperStrength"
+                                        bodyVel.Parent = currentGrabbedPart
+                                        task.delay(0.3, function()
+                                            if bodyVel then bodyVel:Destroy() end
+                                        end)
                                     end
+                                    isHoldingObject = false
+                                    currentGrabbedPart = nil
                                     parentChanged:Disconnect()
                                 end
                             end)
