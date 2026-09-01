@@ -112,10 +112,25 @@ function StartMainScript(titleText)
 
     local Window = Library:CreateWindow({
         Title = titleText,
-        Theme = "Night",
+enableCompacting = true,
+Center = true,
+	SidebarCompacted = true,
+	MenuFadeTime = 1,
+	CornerRadius = 10
+Footer = "Project Resonanse",
         ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
         ToggleKey = Enum.KeyCode.RightShift,
     })
+
+ThemeManager:SetLibrary(Library)
+ThemeManager:SetDefaultTheme({
+	BackgroundColor = Color3.fromRGB(10, 10, 10), -- Р§РµСЂРЅС‹Р№ С„РѕРЅ
+	MainColor = Color3.fromRGB(18, 18, 18),        -- РўРµРјРЅРѕ-СЃРµСЂС‹Рµ РїР°РЅРµР»Рё
+	AccentColor = Color3.fromRGB(255, 215, 0),     -- РЇСЂРєРѕ-Р¶РµР»С‚С‹Рµ РёРєРѕРЅРєРё Рё Р°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+	OutlineColor = Color3.fromRGB(255, 200, 0),    -- Р–РµР»С‚С‹Рµ РєРѕРЅС‚СѓСЂС‹ Рё Р»РёРЅРёРё
+	FontColor = Color3.fromRGB(255, 255, 255),      -- Р‘РµР»С‹Р№ С‚РµРєСЃС‚
+	FontFace = "Code",
+})
 
     AddCreateTabAPI(Window)
     Library.ToggleKeybind = Enum.KeyCode.RightShift
