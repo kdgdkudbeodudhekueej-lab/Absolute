@@ -9,8 +9,101 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 function StartMainScript(titleText)
-    local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/fleksmi-bot/Library2/refs/heads/main/Library1.lua"))()
+    local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
     local Players = game:GetService("Players")
+    -- Obsidian compatibility adapter for the original Create* API
+    -- Keeps the rest of the script unchanged while using Obsidian Groupboxes.
+    local function AddCreateAPI(groupbox)
+        function groupbox:CreateToggle(info)
+            return self:AddToggle(info.Name, {
+                Text = info.Name,
+                Default = info.Default or false,
+                Callback = info.Callback,
+            })
+        end
+
+        function groupbox:CreateSlider(info)
+            return self:AddSlider(info.Name, {
+                Text = info.Name,
+                Min = info.Min,
+                Max = info.Max,
+                Default = info.Default,
+                Rounding = info.Rounding or 0,
+                Suffix = info.Suffix,
+                Callback = info.Callback,
+            })
+        end
+
+        function groupbox:CreateDropdown(info)
+            local values = info.Options or info.Items or {}
+            local default = info.Default
+            if default == nil and #values > 0 then
+                default = values[1]
+            end
+            local dropdown = self:AddDropdown(info.Name, {
+                Text = info.Name,
+                Values = values,
+                Default = default,
+                Callback = info.Callback,
+            })
+            -- Compatibility with the original library's :Refresh(values, keepSelection).
+            function dropdown:Refresh(newValues, keepSelection)
+                local oldValue = self.Value
+                self:SetValues(newValues or {})
+                if keepSelection and oldValue ~= nil then
+                    pcall(function() self:SetValue(oldValue) end)
+                end
+            end
+            return dropdown
+        end
+
+        function groupbox:CreateButton(info)
+            return self:AddButton({
+                Text = info.Name,
+                Func = info.Callback,
+            })
+        end
+
+        function groupbox:CreateKeybind(info)
+            local label = self:AddLabel(info.Name)
+            local key = info.Default
+            local defaultName = typeof(key) == "EnumItem" and key.Name or tostring(key)
+            return label:AddKeyPicker(info.Name, {
+                Text = info.Name,
+                Default = defaultName,
+                Mode = "Press",
+                Callback = function() end,
+                ChangedCallback = function(newKey)
+                    key = newKey
+                    if info.Callback then
+                        info.Callback(newKey)
+                    end
+                end,
+            })
+        end
+    end
+
+    local oldCreateTab = nil
+    local function AddCreateTabAPI(window)
+        oldCreateTab = window.AddTab
+        function window:CreateTab(name, _)
+            local tab = oldCreateTab(self, name)
+            local oldLeft = tab.AddLeftGroupbox
+            local oldRight = tab.AddRightGroupbox
+            function tab:CreateBlock(info)
+                local block
+                if info.Side == "Right" then
+                    block = oldRight(self, info.Name)
+                else
+                    block = oldLeft(self, info.Name)
+                end
+                AddCreateAPI(block)
+                return block
+            end
+            return tab
+        end
+    end
+
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local RunService = game:GetService("RunService")
     local Workspace = game:GetService("Workspace")
@@ -23,6 +116,9 @@ function StartMainScript(titleText)
         ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
         ToggleKey = Enum.KeyCode.RightShift,
     })
+
+    AddCreateTabAPI(Window)
+    Library.ToggleKeybind = Enum.KeyCode.RightShift
 
     local mainGui = Window.Parent
     if mainGui then
