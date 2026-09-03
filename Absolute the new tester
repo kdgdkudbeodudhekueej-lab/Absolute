@@ -11,8 +11,7 @@ screenGui.Parent = playerGui
 function StartMainScript(titleText)
     local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
     local Players = game:GetService("Players")
-    -- Obsidian compatibility adapter for the original Create* API
-    -- Keeps the rest of the script unchanged while using Obsidian Groupboxes.
+    
     local function AddCreateAPI(groupbox)
         function groupbox:CreateToggle(info)
             return self:AddToggle(info.Name, {
@@ -46,7 +45,6 @@ function StartMainScript(titleText)
                 Default = default,
                 Callback = info.Callback,
             })
-            -- Compatibility with the original library's :Refresh(values, keepSelection).
             function dropdown:Refresh(newValues, keepSelection)
                 local oldValue = self.Value
                 self:SetValues(newValues or {})
@@ -104,33 +102,16 @@ function StartMainScript(titleText)
         end
     end
 
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RS = game:GetService("ReplicatedStorage")
     local RunService = game:GetService("RunService")
     local Workspace = game:GetService("Workspace")
-    local LocalPlayer = Players.LocalPlayer
-    local RS = ReplicatedStorage
 
     local Window = Library:CreateWindow({
         Title = titleText,
-enableCompacting = true,
-Center = true,
-	SidebarCompacted = true,
-	MenuFadeTime = 1,
-	CornerRadius = 10
-Footer = "Project Resonanse",
+        Theme = "Night",
         ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time= false },
         ToggleKey = Enum.KeyCode.RightShift,
     })
-
-ThemeManager:SetLibrary(Library)
-ThemeManager:SetDefaultTheme({
-	BackgroundColor = Color3.fromRGB(10, 10, 10), -- Р§РµСЂРЅС‹Р№ С„РѕРЅ
-	MainColor = Color3.fromRGB(18, 18, 18),        -- РўРµРјРЅРѕ-СЃРµСЂС‹Рµ РїР°РЅРµР»Рё
-	AccentColor = Color3.fromRGB(255, 215, 0),     -- РЇСЂРєРѕ-Р¶РµР»С‚С‹Рµ РёРєРѕРЅРєРё Рё Р°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
-	OutlineColor = Color3.fromRGB(255, 200, 0),    -- Р–РµР»С‚С‹Рµ РєРѕРЅС‚СѓСЂС‹ Рё Р»РёРЅРёРё
-	FontColor = Color3.fromRGB(255, 255, 255),      -- Р‘РµР»С‹Р№ С‚РµРєСЃС‚
-	FontFace = "Code",
-})
 
     AddCreateTabAPI(Window)
     Library.ToggleKeybind = Enum.KeyCode.RightShift
@@ -220,7 +201,7 @@ ThemeManager:SetDefaultTheme({
         end
     })
 
-    local throwKeybindPicker = SuperStrengthBlock:CreateKeybind({
+    SuperStrengthBlock:CreateKeybind({
         Name = "Throw Keybind",
         Default = Enum.KeyCode.E,
         Callback = function(Key)
@@ -377,9 +358,7 @@ ThemeManager:SetDefaultTheme({
     local function StartAntiInput()
         if antiInputTask then task.cancel(antiInputTask) end
         antiInputTask = task.spawn(function()
-            local RS = ReplicatedStorage
             local SpawnRemote = RS:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-            local HoldDuration = 0.02
 
             while antiInputActive do
                 local char = LocalPlayer.Character
@@ -424,7 +403,7 @@ ThemeManager:SetDefaultTheme({
                                 end)
                             end)
 
-                            task.wait(HoldDuration)
+                            task.wait(0.02)
 
                             task.spawn(function()
                                 pcall(function()
@@ -853,7 +832,6 @@ ThemeManager:SetDefaultTheme({
         local target = blobmanTarget
         if not target then return end
 
-        local GE = RS:WaitForChild("GrabEvents")
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myRoot then return end
@@ -894,13 +872,11 @@ ThemeManager:SetDefaultTheme({
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
-                            if GE then
-                                pcall(function()
-                                    tHum.PlatformStand = true
-                                    GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                end)
-                            end
+                            pcall(function()
+                                tHum.PlatformStand = true
+                                SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
+                                CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                            end)
                             
                             if grabStartTime == 0 then grabStartTime = tick() end
                             if tick() - grabStartTime > 0.3 then
@@ -924,14 +900,12 @@ ThemeManager:SetDefaultTheme({
                                 end)
                             end
                             
-                            if GE then
-                                pcall(function()
-                                    tHum.PlatformStand = true
-                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
-                                    GE.DestroyGrabLine:FireServer(tRoot)
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                end)
-                            end
+                            pcall(function()
+                                tHum.PlatformStand = true
+                                SetNetworkOwner:FireServer(tRoot, lockPos)
+                                DestroyGrabLine:FireServer(tRoot)
+                                CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                            end)
                         end
                     end
                 end
@@ -974,9 +948,6 @@ ThemeManager:SetDefaultTheme({
     local function CircleKickLoop()
         local target = circleTarget
         if not target then return end
-
-        local GE = RS:WaitForChild("GrabEvents")
-        if not GE then return end
         
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -1039,13 +1010,11 @@ ThemeManager:SetDefaultTheme({
                         
                         if not dragging then
                             myRoot.CFrame = tRoot.CFrame
-                            if GE then
-                                pcall(function()
-                                    tHum.PlatformStand = true
-                                    GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                end)
-                            end
+                            pcall(function()
+                                tHum.PlatformStand = true
+                                SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
+                                CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                            end)
                             
                             if grabStartTime == 0 then grabStartTime = tick() end
                             if tick() - grabStartTime > 0.3 then
@@ -1094,14 +1063,12 @@ ThemeManager:SetDefaultTheme({
                                 end)
                             end
                             
-                            if GE then
-                                pcall(function()
-                                    tHum.PlatformStand = true
-                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
-                                    GE.DestroyGrabLine:FireServer(tRoot)
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                end)
-                            end
+                            pcall(function()
+                                tHum.PlatformStand = true
+                                SetNetworkOwner:FireServer(tRoot, lockPos)
+                                DestroyGrabLine:FireServer(tRoot)
+                                CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                            end)
                         end
                     end
                 end
@@ -1367,7 +1334,6 @@ ThemeManager:SetDefaultTheme({
         if not data then return end
         
         local box = data.box
-        local outline = data.outline
         
         if not box or not box.Parent then return end
         
@@ -1644,9 +1610,6 @@ ThemeManager:SetDefaultTheme({
             currentFPS = 1 / dt
         end)
 
-        local bodyPos = nil
-        local bodyGyro = nil
-
         local function createBodies(targetRoot, pos)
             cleanupBodies()
             for _, v in pairs(targetRoot:GetChildren()) do
@@ -1688,7 +1651,6 @@ ThemeManager:SetDefaultTheme({
                         tHum.PlatformStand = true
                         tHum.Sit = true
                         SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
                         DestroyGrabLine:FireServer(tRoot)
                     end)
                     myRoot.AssemblyLinearVelocity = Vector3.zero
@@ -1716,15 +1678,12 @@ ThemeManager:SetDefaultTheme({
                     pcall(function()
                         if currentFPS > 200 then
                             SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
                             DestroyGrabLine:FireServer(tRoot)
                         elseif currentFPS >= 155 and currentFPS <= 200 then
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
                             DestroyGrabLine:FireServer(tRoot)
                         else
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
                             SetNetworkOwner:FireServer(tRoot, lockPos)
@@ -1951,8 +1910,7 @@ ThemeManager:SetDefaultTheme({
                 local pallet = toysFolder:FindFirstChild("PalletLightBrown")
                 if pallet then
                     pcall(function() RS.MenuToys.DestroyToy:FireServer(pallet) end)
-                end
-            end
+                end            end
         end)
     end)
 
