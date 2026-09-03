@@ -2,14 +2,134 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
 
+local SCRIPT_NAME = "Absolute"
+local SCRIPT_VERSION = "v???"
+local ICON_ID = "rbxassetid://10723416652"
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WatermarkGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "WatermarkFrame"
+MainFrame.Size = UDim2.new(0, 0, 0, 26)
+MainFrame.Position = UDim2.new({0, 840}, {0, 0})
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BackgroundTransparency = 0
+MainFrame.BorderSizePixel = 0
+MainFrame.AutomaticSize = Enum.AutomaticSize.X
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 6)
+UIListLayout.Parent = MainFrame
+
+local UIPadding = Instance.new("UIPadding")
+UIPadding.PaddingLeft = UDim.new(0, 8)
+UIPadding.PaddingRight = UDim.new(0, 10)
+UIPadding.Parent = MainFrame
+
+local Icon = Instance.new("ImageLabel")
+Icon.Name = "Icon"
+Icon.Size = UDim2.new(0, 14, 0, 14)
+Icon.BackgroundTransparency = 1
+Icon.Image = ICON_ID
+Icon.LayoutOrder = 1
+Icon.Parent = MainFrame
+
+local Label = Instance.new("TextLabel")
+Label.Name = "InfoLabel"
+Label.Size = UDim2.new(0, 0, 1, 0)
+Label.AutomaticSize = Enum.AutomaticSize.X
+Label.BackgroundTransparency = 1
+Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+Label.TextSize = 13
+Label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
+Label.LayoutOrder = 2
+Label.Parent = MainFrame
+
+local dragging, dragInput, dragStart, startPos
+local tweenInfo = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    TweenService:Create(MainFrame, tweenInfo, {Position = targetPos}):Play()
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateDrag(input)
+    end
+end)
+
+task.spawn(function()
+    local frames = 0
+    local lastTime = os.clock()
+    local ping = 0
+
+    while MainFrame and MainFrame.Parent do
+        RunService.RenderStepped:Wait()
+        frames = frames + 1
+        local now = os.clock()
+
+        if now - lastTime >= 0.2 then
+            local fps = math.round(frames / (now - lastTime))
+            frames = 0
+            lastTime = now
+
+            pcall(function()
+                ping = math.round(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+            end)
+
+            Label.Text = string.format("%s %s  |  %d fps  |  %d ms", SCRIPT_NAME, SCRIPT_VERSION, fps, ping)
+        end
+    end
+end)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Absolute_Startup"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
 function StartMainScript(titleText)
-    local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
     local Players = game:GetService("Players")
 
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,11 +139,23 @@ function StartMainScript(titleText)
 
     local Window = Library:CreateWindow({
         Title = titleText,
+        Icon = "zap",
+        Footer = "Script By Joker",
         Theme = "Night",
-        ShowWatermark = { Enabled = true, Title = true, User = false, FPS = true, Duration = false, Ping = true, Time = false },
         ToggleKey = Enum.KeyCode.RightShift,
+        EnableCompacting = true,
+	SidebarCompacted = true,
+	CornerRadius = 20
     })
-
+ThemeManager:SetLibrary(Library)
+ThemeManager:SetDefaultTheme({
+	BackgroundColor = Color3.fromRGB(10, 10, 10), -- Р§РµСЂРЅС‹Р№ С„РѕРЅ
+	MainColor = Color3.fromRGB(18, 18, 18),        -- РўРµРјРЅРѕ-СЃРµСЂС‹Рµ РїР°РЅРµР»Рё
+	AccentColor = Color3.fromRGB(255, 215, 0),     -- РЇСЂРєРѕ-Р¶РµР»С‚С‹Рµ РёРєРѕРЅРєРё Рё Р°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
+	OutlineColor = Color3.fromRGB(10, 10, 10),    -- Р–РµР»С‚С‹Рµ РєРѕРЅС‚СѓСЂС‹ Рё Р»РёРЅРёРё
+	FontColor = Color3.fromRGB(255, 255, 255),      -- Р‘РµР»С‹Р№ С‚РµРєСЃС‚
+	FontFace = "Code"
+})
     Library.ToggleKeybind = Enum.KeyCode.RightShift
 
     local mainGui = Window.Parent
@@ -77,12 +209,51 @@ function StartMainScript(titleText)
         recolor(Window)
     end
 
-    local MainTab = Window:AddTab("Main")
-    local TargetTab = Window:AddTab("Target")
-    local DefenseTab = Window:AddTab("Defense")
-    local VisualTab = Window:AddTab("Visual")
-    local BlodmanTab = Window:AddTab("Blodman")
-    local SettingsTab = Window:AddTab("Settings")
+    local MainTab = Window:AddTab("Main", "house")
+    local TargetTab = Window:AddTab("Target", "crosshair")
+    local DefenseTab = Window:AddTab("Defense", "shield")
+    local VisualTab = Window:AddTab("Visual", "eye")
+    local BlodmanTab = Window:AddTab("Blobman", "venetian-mask")
+    local Settings = Window:AddTab("Settings", "settings")
+    local MenuGroup = Settings:AddLeftGroupbox("Menu", "wrench")
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default = Library.KeybindFrame.Visible,
+    Text = "Binds Menu",
+    Callback = function(value)
+        Library.KeybindFrame.Visible = value
+    end,
+})
+--
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor",
+    Default = true,
+    Callback = function(Value)
+        Library.ShowCustomCursor = Value
+    end,
+})
+--
+MenuGroup:AddButton("Unload", function()
+    Library:Unload()
+end)
+--
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", { Default = "Tab", NoUI = true, Text = "Keybind Menu" })
+--
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+ThemeManager:SetFolder("Absolute")
+SaveManager:SetFolder("Absolute/Configs")
+SaveManager:BuildConfigSection(Settings)
+ThemeManager:ApplyToTab(Settings)
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default = Library.KeybindFrame.Visible,
+    Text = "Binds Menu",
+    Callback = function(value)
+        Library.KeybindFrame.Visible = value
+    end,
+})
 
     local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength")
     
@@ -92,7 +263,7 @@ function StartMainScript(titleText)
     local currentGrabbedPart = nil
     local isHoldingObject = false
 
-    local superStrengthToggle = SuperStrengthBlock:AddToggle("Super Strength", {
+    SuperStrengthBlock:AddToggle("Super Strength", {
         Text = "Super Strength",
         Default = false,
         Callback = function(Value)
@@ -100,7 +271,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local superStrengthSlider = SuperStrengthBlock:AddSlider("Strength", {
+    SuperStrengthBlock:AddSlider("Strength", {
         Text = "Strength",
         Min = 100,
         Max = 10000,
@@ -180,31 +351,28 @@ function StartMainScript(titleText)
         end
     end)
 
-    local KickBlock = TargetTab:AddLeftGroupbox("Ownership Kick")
-    local PalletBlock = TargetTab:AddRightGroupbox("Pallet Ragdoll")
-    local TargetSelectBlock = TargetTab:AddLeftGroupbox("Target Select")
-    local SettingsBlock = TargetTab:AddLeftGroupbox("Settings")
+    local KickBlock = TargetTab:AddLeftGroupbox("Ownership Kick", "swords")
+    local PalletBlock = TargetTab:AddRightGroupbox("Pallet Ragdoll", "sword")
+    local TargetSelectBlock = TargetTab:AddLeftGroupbox("Target Select", "crosshair")
+    local SettingsBlock = TargetTab:AddLeftGroupbox("Settings", "file-lock")
     
-    local AntiGrabBlock = DefenseTab:AddLeftGroupbox("Anti-Grab")
-    local AntiKickBlock = DefenseTab:AddLeftGroupbox("Anti-Kick [Shuriken]")
-    local AntiExplosionBlock = DefenseTab:AddRightGroupbox("Anti-Explosion")
-    local AntiSnowBlock = DefenseTab:AddRightGroupbox("Infinite Ragdoll")
-    local AntiLagBlock = DefenseTab:AddLeftGroupbox("Anti-Lag")
-    local AntiInputLagBlock = DefenseTab:AddLeftGroupbox("Anti-Input Lag")
-    local AntiBanBlock = DefenseTab:AddLeftGroupbox("Anti Ban")
-    local AntiKickItemBlock = DefenseTab:AddLeftGroupbox("Anti-Kick [ITEM]")
+    local AntiGrabBlock = DefenseTab:AddLeftGroupbox("Anti-Grab", "shield-plus")
+    local AntiKickBlock = DefenseTab:AddLeftGroupbox("Anti-Kick [Shuriken]", "shield-plus")
+    local AntiExplosionBlock = DefenseTab:AddRightGroupbox("Anti-Explosion", "bomb")
+    local AntiSnowBlock = DefenseTab:AddRightGroupbox("Infinite Ragdoll", "shield-plus")
+    local AntiLagBlock = DefenseTab:AddLeftGroupbox("Anti-Lag", "shield-cog-corner")
+    local AntiInputLagBlock = DefenseTab:AddLeftGroupbox("Anti-Input Lag", "shield-cog-corner")
+    local AntiBanBlock = DefenseTab:AddLeftGroupbox("Anti Ban", "shield-alert")
+    local AntiKickItemBlock = DefenseTab:AddLeftGroupbox("Anti-Kick [ITEM]", "shield-lock")
     
-    local VisualBlock = VisualTab:AddLeftGroupbox("Visual Settings")
-    local PCLDESPBlock = VisualTab:AddRightGroupbox("PCLD ESP")
+    local VisualBlock = VisualTab:AddLeftGroupbox("Visual Settings", "wallpaper")
+    local PCLDESPBlock = VisualTab:AddRightGroupbox("PCLD ESP", "wallpaper")
     
-    local BlodmanMainBlock = BlodmanTab:AddLeftGroupbox("BLODMAN KICK")
-    local BlodmanSettingsBlock = BlodmanTab:AddRightGroupbox("Settings")
-    local BlodmanCircleBlock = BlodmanTab:AddLeftGroupbox("KICK (CIRCLE)")
-    local BlodmanCircleSettingsBlock = BlodmanTab:AddRightGroupbox("Settings Circle")
-    local BlodmanAutoSitBlock = BlodmanTab:AddLeftGroupbox("Auto Sit Blodman")
-
-    local SettingsConfigBlock = SettingsTab:AddLeftGroupbox("Configuration Manager")
-    local SettingsUIBlock = SettingsTab:AddRightGroupbox("UI Settings")
+    local BlodmanMainBlock = BlodmanTab:AddLeftGroupbox("Blob Man Kick", "venetian-mask")
+    local BlodmanSettingsBlock = BlodmanTab:AddRightGroupbox("Settings", "settings")
+    local BlodmanCircleBlock = BlodmanTab:AddLeftGroupbox("Blob Kick (CIRCLE)", "venetian-mask")
+    local BlodmanCircleSettingsBlock = BlodmanTab:AddRightGroupbox("Settings Circle", "settings")
+    local BlodmanAutoSitBlock = BlodmanTab:AddLeftGroupbox("Auto Sit Blodman", "robot-arm")
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -248,7 +416,7 @@ function StartMainScript(titleText)
     end
     table.sort(InputDropdownValues)
 
-    local inputDropdown = AntiInputLagBlock:AddDropdown("Select Item", {
+    AntiInputLagBlock:AddDropdown("Select Item", {
         Text = "Select Item",
         Values = InputDropdownValues,
         Default = "White Mug",
@@ -257,7 +425,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local inputSpeedSlider = AntiInputLagBlock:AddSlider("Cycle Speed", {
+    AntiInputLagBlock:AddSlider("Cycle Speed", {
         Text = "Cycle Speed (0.02 - 0.5 sec)",
         Min = 0.02,
         Max = 0.5,
@@ -357,7 +525,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    local antiInputToggle = AntiInputLagBlock:AddToggle("Anti-Input Lag", {
+    AntiInputLagBlock:AddToggle("Anti-Input Lag", {
         Text = "Anti-Input Lag",
         Default = false,
         Callback = function(Value)
@@ -519,7 +687,7 @@ function StartMainScript(titleText)
 
     SaveCharacterMoveStates()
 
-    local antiLagToggle = AntiLagBlock:AddToggle("Anti-Lag", {
+    AntiLagBlock:AddToggle("Anti-Lag", {
         Text = "Anti-Lag",
         Default = false,
         Callback = function(Value)
@@ -579,7 +747,7 @@ function StartMainScript(titleText)
         end
     end
 
-    local autoSitBlodmanToggle = BlodmanAutoSitBlock:AddToggle("Auto Sit Blodman", {
+    BlodmanAutoSitBlock:AddToggle("Auto Sit Blodman", {
         Text = "Auto Sit Blodman",
         Default = false,
         Callback = function(Value)
@@ -645,7 +813,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local blobmanIntervalSlider = BlodmanSettingsBlock:AddSlider("Blodman Interval", {
+    BlodmanSettingsBlock:AddSlider("Blodman Interval", {
         Text = "Blodman Interval (0.01 - 0.1)",
         Min = 0.01,
         Max = 0.1,
@@ -655,7 +823,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local blobmanHoldHeightSlider = BlodmanSettingsBlock:AddSlider("Hold Height", {
+    BlodmanSettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height",
         Min = 5,
         Max = 40,
@@ -682,7 +850,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local circleSpinSpeedSlider = BlodmanCircleSettingsBlock:AddSlider("Spin Speed", {
+    BlodmanCircleSettingsBlock:AddSlider("Spin Speed", {
         Text = "Spin Speed (13 - 20)",
         Min = 13,
         Max = 20,
@@ -692,7 +860,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local circleHoldHeightSlider = BlodmanCircleSettingsBlock:AddSlider("Hold Height", {
+    BlodmanCircleSettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height (5 - 40)",
         Min = 5,
         Max = 40,
@@ -844,7 +1012,7 @@ function StartMainScript(titleText)
         blobmanKickActive = false
     end
 
-    local blobmanKickToggle = BlodmanMainBlock:AddToggle("BLODMAN KICK", {
+    BlodmanMainBlock:AddToggle("BLODMAN KICK", {
         Text = "BLODMAN KICK",
         Default = false,
         Callback = function(Value)
@@ -1014,7 +1182,7 @@ function StartMainScript(titleText)
         circleKickActive = false
     end
 
-    local circleKickToggle = BlodmanCircleBlock:AddToggle("KICK (CIRCLE)", {
+    BlodmanCircleBlock:AddToggle("KICK (CIRCLE)", {
         Text = "KICK (CIRCLE)",
         Default = false,
         Callback = function(Value)
@@ -1185,18 +1353,6 @@ function StartMainScript(titleText)
         ClearShuriken()
     end
 
-    local antiKickToggle = AntiKickBlock:AddToggle("Anti-Kick [Shuriken]", {
-        Text = "Anti-Kick [Shuriken]",
-        Default = false,
-        Callback = function(Value)
-            if Value then 
-                StartAntiKick() 
-            else 
-                StopAntiKick() 
-            end
-        end
-    })
-
     local function SetFOV(value)
         if value then
             originalFOV = Workspace.CurrentCamera.FieldOfView
@@ -1218,7 +1374,7 @@ function StartMainScript(titleText)
         end
     end
 
-    local fovToggle = VisualBlock:AddToggle("FOV 120", {
+    VisualBlock:AddToggle("FOV 120", {
         Text = "FOV 120",
         Default = false,
         Callback = function(Value)
@@ -1227,7 +1383,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local thirdPersonToggle = VisualBlock:AddToggle("Third Person", {
+    VisualBlock:AddToggle("Third Person", {
         Text = "Third Person",
         Default = false,
         Callback = function(Value)
@@ -1312,7 +1468,7 @@ function StartMainScript(titleText)
         end
     end
 
-    local pcldEspToggle = PCLDESPBlock:AddToggle("PCLD ESP", {
+    PCLDESPBlock:AddToggle("PCLD ESP", {
         Text = "PCLD ESP",
         Default = false,
         Callback = function(Value)
@@ -1352,7 +1508,7 @@ function StartMainScript(titleText)
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
 
-    local holdHeightSlider = SettingsBlock:AddSlider("Hold Height", {
+    SettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height",
         Min = 5,
         Max = 40,
@@ -1360,7 +1516,7 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
-    local antiGrabToggle = AntiGrabBlock:AddToggle("Anti-Grab", {
+    AntiGrabBlock:AddToggle("Anti-Grab", {
         Text = "Anti-Grab",
         Default = false,
         Callback = function(Value)
@@ -1378,11 +1534,23 @@ function StartMainScript(titleText)
         end
     })
 
+    AntiKickBlock:AddToggle("Anti-Kick [Shuriken]", {
+        Text = "Anti-Kick [Shuriken]",
+        Default = false,
+        Callback = function(Value)
+            if Value then 
+                StartAntiKick() 
+            else 
+                StopAntiKick() 
+            end
+        end
+    })
+
     do
         local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
         local AutoResetCon = nil
         
-        local autoResetToggle = AntiKickBlock:AddToggle("Auto Reset", {
+        AntiKickBlock:AddToggle("Auto Reset", {
             Text = "Auto Reset",
             Default = false,
             Callback = function(Value)
@@ -1434,7 +1602,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    local antiBanToggle = AntiBanBlock:AddToggle("Anti Ban", {
+    AntiBanBlock:AddToggle("Anti Ban", {
         Text = "Anti Ban",
         Default = false,
         Callback = function(Value)
@@ -1479,7 +1647,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    local antiExplosionToggle = AntiExplosionBlock:AddToggle("Anti-Explosion", {
+    AntiExplosionBlock:AddToggle("Anti-Explosion", {
         Text = "Anti-Explosion",
         Default = false,
         Callback = function(Value)
@@ -1505,7 +1673,7 @@ function StartMainScript(titleText)
         end
     end
 
-    local infiniteRagdollToggle = AntiSnowBlock:AddToggle("Infinite Ragdoll", {
+    AntiSnowBlock:AddToggle("Infinite Ragdoll", {
         Text = "Infinite Ragdoll",
         Default = false,
         Callback = function(Value)
@@ -1517,142 +1685,131 @@ function StartMainScript(titleText)
         end
     })
 
-    local function OwnershipKickFunction(targetName)
-        local target = Players:FindFirstChild(targetName)
-        if not target then return end
-        
-        local myChar = LocalPlayer.Character
-        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not myRoot then return end
+local function OwnershipKickFunction(targetName)
+	local target = Players:FindFirstChild(targetName)
+	if not target then return end
+	
+	local myChar = LocalPlayer.Character
+	local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
 
-        local savedPos = myRoot.CFrame 
-        local dragging = false
-        local grabStartTime = 0
-        local checkStartTime = 0
-        
-        local currentFPS = 60
-        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
-            currentFPS = 1 / dt
-        end)
+	local savedPos = myRoot.CFrame 
+	local dragging = false
+	local grabStartTime = 0
+	local checkStartTime = 0
+	
+	local currentFPS = 60
+	local fpsConnection = RunService.RenderStepped:Connect(function(dt)
+		currentFPS = 1 / dt
+	end)
 
-        local function createBodies(targetRoot, pos)
-            cleanupBodies()
-            for _, v in pairs(targetRoot:GetChildren()) do
-                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                    v:Destroy()
-                end
-            end
-            bodyPos = Instance.new("BodyPosition")
-            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            bodyPos.D = 100
-            bodyPos.Position = pos
-            bodyPos.Parent = targetRoot
-            bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bodyGyro.D = 100
-            bodyGyro.CFrame = CFrame.new(pos)
-            bodyGyro.Parent = targetRoot
-        end
+	local function createBodies(targetRoot, pos)
+		cleanupBodies()
+		for _, v in pairs(targetRoot:GetChildren()) do
+			if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+				v:Destroy()
+			end
+		end
+		bodyPos = Instance.new("BodyPosition")
+		bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+		bodyPos.D = 100
+		bodyPos.Position = pos
+		bodyPos.Parent = targetRoot
+		bodyGyro = Instance.new("BodyGyro")
+		bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+		bodyGyro.D = 100
+		bodyGyro.CFrame = CFrame.new(pos)
+		bodyGyro.Parent = targetRoot
+	end
 
-        while kickActive do
-            local currentTarget = Players:FindFirstChild(target.Name)
-            if not currentTarget or not currentTarget.Parent then 
-                cleanupBodies()
-                break 
-            end
-            
-            myChar = LocalPlayer.Character
-            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local tChar = currentTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            local tHum = tChar and tChar:FindFirstChild("Humanoid")
-            
-            if tRoot and tHum and tHum.Health > 0 and myRoot then
-                if not dragging then
-                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                    cleanupBodies()
-                    checkStartTime = 0
-                    pcall(function()
-                        tHum.PlatformStand = true
-                        tHum.Sit = true
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                        DestroyGrabLine:FireServer(tRoot)
-                    end)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if grabStartTime == 0 then grabStartTime = tick() end
-                    if tick() - grabStartTime > 0.35 then
-                        dragging = true
-                        grabStartTime = 0
-                        checkStartTime = tick()
-                        local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                        createBodies(tRoot, lockPos.Position)
-                    end
-                else
-                    myRoot.CFrame = savedPos
-                    local lockPos = savedPos * CFrame.new(0, holdHeight, 0)
-                    myRoot.AssemblyLinearVelocity = Vector3.zero
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-                    if bodyPos and bodyPos.Parent then
-                        bodyPos.Position = lockPos.Position
-                        if bodyGyro then bodyGyro.CFrame = lockPos end
-                    else
-                        createBodies(tRoot, lockPos.Position)
-                    end
-                    tHum.PlatformStand = true
-                    pcall(function()
-                        if currentFPS > 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        elseif currentFPS >= 155 and currentFPS <= 200 then
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        else
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            SetNetworkOwner:FireServer(tRoot, lockPos)
-                            DestroyGrabLine:FireServer(tRoot)
-                        end
-                    end)
-                    if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
-                        local currentDist = (tRoot.Position - lockPos.Position).Magnitude
-                        if currentDist > 10 then
-                            dragging = false
-                            grabStartTime = 0
-                            checkStartTime = 0
-                            cleanupBodies()
-                            myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                        else
-                            checkStartTime = tick()
-                        end
-                    end
-                end
-            else
-                dragging = false
-                grabStartTime = 0
-                checkStartTime = 0
-                cleanupBodies()
-            end
-            RunService.Heartbeat:Wait()
-        end
-        
-        fpsConnection:Disconnect()
-        cleanupBodies()
-        if myRoot then myRoot.CFrame = savedPos end
-        if target and target.Character then
-            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
-            if tRoot then
-                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
-            end
-        end
-    end
+	while kickActive do
+		local currentTarget = Players:FindFirstChild(target.Name)
+		if not currentTarget or not currentTarget.Parent then 
+			cleanupBodies()
+			break 
+		end
+		
+		myChar = LocalPlayer.Character
+		myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+		local tChar = currentTarget.Character
+		local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+		local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+		
+		if tRoot and tHum and tHum.Health > 0 and myRoot then
+			local lockPos = savedPos * CFrame.new(0, holdHeight or 0, 0)
 
-    local ownershipKickToggle = KickBlock:AddToggle("Enable Ownership Kick", {
+			if not dragging then
+				myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+				cleanupBodies()
+				checkStartTime = 0
+				pcall(function()
+					tHum.PlatformStand = true
+					tHum.Sit = true
+					SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+					DestroyGrabLine:FireServer(tRoot)
+				end)
+				myRoot.AssemblyLinearVelocity = Vector3.zero
+				myRoot.AssemblyAngularVelocity = Vector3.zero
+				
+				if grabStartTime == 0 then grabStartTime = tick() end
+				if tick() - grabStartTime > 0.35 then
+					dragging = true
+					grabStartTime = 0
+					checkStartTime = tick()
+					createBodies(tRoot, lockPos.Position)
+				end
+			else
+				myRoot.CFrame = savedPos
+				myRoot.AssemblyLinearVelocity = Vector3.zero
+				myRoot.AssemblyAngularVelocity = Vector3.zero
+				
+				if bodyPos and bodyPos.Parent then
+					bodyPos.Position = lockPos.Position
+					if bodyGyro then bodyGyro.CFrame = lockPos end
+				else
+					createBodies(tRoot, lockPos.Position)
+				end
+				
+				tHum.PlatformStand = true
+				pcall(function()
+					SetNetworkOwner:FireServer(tRoot, lockPos)
+					DestroyGrabLine:FireServer(tRoot)
+				end)
+			end
+
+			if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+				local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+				if currentDist > 10 then
+					dragging = false
+					grabStartTime = 0
+					checkStartTime = 0
+					cleanupBodies()
+					myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+				else
+					checkStartTime = tick()
+				end
+			end
+		else
+			dragging = false
+			grabStartTime = 0
+			checkStartTime = 0
+			cleanupBodies()
+		end
+		RunService.Heartbeat:Wait()
+	end
+	
+	fpsConnection:Disconnect()
+	cleanupBodies()
+	if myRoot then myRoot.CFrame = savedPos end
+	if target and target.Character then
+		local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+		if tRoot then
+			pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+		end
+	end
+end
+
+    KickBlock:AddToggle("Enable Ownership Kick", {
         Text = "Enable Ownership Kick",
         Default = false,
         Callback = function(Value)
@@ -1685,106 +1842,173 @@ function StartMainScript(titleText)
         end
     })
 
-    local function PalletRagdollFunction(targetName)
-        local target = Players:FindFirstChild(targetName)
-        if not target or not target.Character then return end
-        
-        local skyPos = CFrame.new(0, 800000, 0)
-        
-        RS.MenuToys.SpawnToyRemoteFunction:InvokeServer("PalletLightBrown", skyPos, Vector3.zero)
-        
-        local pallet
-        repeat
-            pallet = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys") 
-                and workspace[LocalPlayer.Name.."SpawnedInToys"]:FindFirstChild("PalletLightBrown")
-            RunService.Heartbeat:Wait()
-        until pallet or not ownershipRagdollActive
-        
-        if not pallet then return end
-        
-        local mainPart = pallet:FindFirstChild("SoundPart")
-        if not mainPart then return end
-        
-        mainPart.CanCollide = false
-        mainPart.Anchored = false
-        
-        local function claim(part)
-            SetNetworkOwner:FireServer(part, part.CFrame)
-            CreateGrabLine:FireServer(part, Vector3.zero, part.Position, false)
-            DestroyGrabLine:FireServer(part)
-        end
-        
-        claim(mainPart)
-        
-        while ownershipRagdollActive do
-            for i = 1, 20 do
-                RunService.Heartbeat:Wait()
-            end
-            
-            if not target or not target.Parent or not target.Character then break end
-            
-            local head = target.Character:FindFirstChild("Head")
-            if not head then continue end
-            
-            local targetPos = head.Position
-            mainPart.CFrame = CFrame.new(targetPos.X, targetPos.Y + 0.2, targetPos.Z)
-            mainPart.AssemblyLinearVelocity = Vector3.zero
-            mainPart.AssemblyAngularVelocity = Vector3.new(1000, 1000, 1000)
-            
-            claim(mainPart)
-            
-            mainPart.CanCollide = true
-            for i = 1, 3 do
-                RunService.Heartbeat:Wait()
-            end
-            
-            mainPart.CanCollide = false
-            mainPart.CFrame = skyPos
-            mainPart.AssemblyAngularVelocity = Vector3.zero
-        end
-        
-        if pallet then
-            pcall(function()
-                RS.MenuToys.DestroyToy:FireServer(pallet)
-            end)
-            if pallet.Parent then 
-                pallet:Destroy() 
-            end
-        end
-    end
+    local SpamSetOwner = {
+        AutoRagdoll = false,
+        Segments = 8,
+        ImpactPower = 10
+    }
+PalletBlock:AddToggle("PalletRagdoll", {
+    Text = "Pallet Ragdoll",
+    Default = false,
+    Callback = function(Value)
+        SetToggleState("Ragdoll Target", Value)
+        local RS = game:GetService("ReplicatedStorage")
+        local RunService = game:GetService("RunService")
+        local DestroyToy = RS:WaitForChild("MenuToys"):WaitForChild("DestroyToy")
+        local SetNetOwner = RS:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner")
+        local DestroyLine = RS:WaitForChild("GrabEvents"):WaitForChild("DestroyGrabLine")
+        local toysFolder = workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
+        local lpName = LocalPlayer.Name
 
-    local palletRagdollToggle = PalletBlock:AddToggle("Enable Pallet Ragdoll", {
-        Text = "Enable Pallet Ragdoll",
-        Default = false,
-        Callback = function(Value)
-            ownershipRagdollActive = Value
-            if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
-            if Value then
-                if not selectedTarget then
-                    ownershipRagdollActive = false
-                    return
-                end
-                ownershipRagdollTask = task.spawn(function() 
-                    PalletRagdollFunction(selectedTarget.Name) 
+        -- Clean up existing frame connections
+        local function clearAttackLoop()
+            if getgenv().ragdollSteppedConn then
+                getgenv().ragdollSteppedConn:Disconnect()
+                getgenv().ragdollSteppedConn = nil
+            end
+        end
+
+        if Value then
+            if not selectedKickPlayer then
+                notify("Warning", "Select Target first", 3)
+                return
+            end
+
+            getgenv().palletRagdollActive = true
+            getgenv().PalletForRagdoll = nil
+            
+            if getgenv().palletCacheConn then
+                getgenv().palletCacheConn:Disconnect()
+            end
+            clearAttackLoop()
+
+            -- 1. Cache and Setup Pallet
+            getgenv().palletCacheConn = toysFolder.ChildAdded:Connect(function(child)
+                if not getgenv().palletRagdollActive then return end
+                if child.Name ~= "PalletLightBrown" and child.Name ~= "PalletForRagdoll" then return end
+
+                local soundPart = child:WaitForChild("SoundPart", 3)
+                if not soundPart then return end
+
+                -- Claim network ownership instantly
+                pcall(function()
+                    SetNetOwner:FireServer(soundPart, soundPart.CFrame)
+                    DestroyLine:FireServer(soundPart)
                 end)
-            else
-                task.spawn(function()
-                    local toysFolder = workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-                    if toysFolder then
-                        local pallet = toysFolder:FindFirstChild("PalletLightBrown")
-                        if pallet then
-                            pcall(function()
-                                RS.MenuToys.DestroyToy:FireServer(pallet)
-                            end)
-                            if pallet.Parent then
-                                pallet:Destroy()
-                            end
+
+                local partOwner = soundPart:WaitForChild("PartOwner", 1)
+                if partOwner and partOwner.Value == lpName then
+                    -- Make fully invisible and non-collidable for local player
+                    for _, v in pairs(child:GetChildren()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = false
+                            v.CanQuery = false
+                            v.Transparency = 1 
                         end
                     end
+
+                    child.Name = "PalletForRagdoll"
+                    getgenv().PalletForRagdoll = child
+
+                    -- Toggle flag for the alternating strike directions
+                    local strikePhase = false
+
+                    -- 2. Engine-Synced Attack Loop (Stepped runs right before physics simulation)
+                    getgenv().ragdollSteppedConn = RunService.Stepped:Connect(function()
+                        if not getgenv().palletRagdollActive or not child.Parent then 
+                            clearAttackLoop()
+                            return 
+                        end
+
+                        local tChar = selectedKickPlayer and selectedKickPlayer.Character
+                        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                        local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+
+                        if tRoot and tHum and soundPart.Parent and tHum.Health > 0 then
+                            local ragdolledVal = tHum:FindFirstChild("Ragdolled")
+                            local isRagdolled = ragdolledVal and ragdolledVal.Value or false
+
+                            if not isRagdolled then
+                                -- Alternating hyper-velocity strikes every single frame
+                                strikePhase = not strikePhase
+                                if strikePhase then
+                                    soundPart.CFrame = tRoot.CFrame * CFrame.new(0, 2, 0)
+                                    soundPart.AssemblyLinearVelocity = Vector3.new(0, -9e5, 0)
+                                else
+                                    soundPart.CFrame = tRoot.CFrame * CFrame.new(0, -1, 0)
+                                    soundPart.AssemblyLinearVelocity = Vector3.new(0, 9e5, 0)
+                                end
+                            else
+                                -- Instantly pull away to reduce lag once ragdolled
+                                soundPart.CFrame = CFrame.new(0, 9e9, 0)
+                                soundPart.AssemblyLinearVelocity = Vector3.zero
+                            end
+                        else
+                            soundPart.CFrame = CFrame.new(0, 9e9, 0)
+                            soundPart.AssemblyLinearVelocity = Vector3.zero
+                        end
+                    end)
+
+                    -- Handle respawn/destruction
+                    child.AncestryChanged:Connect(function()
+                        if not child.Parent then
+                            clearAttackLoop()
+                            getgenv().PalletForRagdoll = nil
+                            if getgenv().palletRagdollActive then
+                                task.wait(0.03)
+                                if getgenv().spawnNewPallet then getgenv().spawnNewPallet() end
+                            end
+                        end
+                    end)
+                else
+                    pcall(function() DestroyToy:FireServer(child) end)
+                end
+            end)
+
+            -- 3. Toy Spawner Function
+            getgenv().spawnNewPallet = function()
+                if not getgenv().palletRagdollActive then return end
+                if getgenv().PalletForRagdoll and getgenv().PalletForRagdoll.Parent then return end
+                
+                local c = LocalPlayer.Character
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                if not h then return end
+
+                task.spawn(function()
+                    pcall(function()
+                        RS.MenuToys.SpawnToyRemoteFunction:InvokeServer(
+                            "PalletLightBrown",
+                            h.CFrame * CFrame.new(0, 10, 20),
+                            Vector3.zero
+                        )
+                    end)
                 end)
             end
+
+            getgenv().spawnNewPallet()
+        else
+            -- Clean up everything completely
+            getgenv().palletRagdollActive = false
+            clearAttackLoop()
+
+            if getgenv().palletCacheConn then
+                getgenv().palletCacheConn:Disconnect()
+                getgenv().palletCacheConn = nil
+            end
+
+            local pallet = getgenv().PalletForRagdoll
+            if pallet and pallet.Parent then
+                pcall(function() DestroyToy:FireServer(pallet) end)
+            end
+
+            getgenv().PalletForRagdoll = nil
+
+            if toysFolder:FindFirstChild("PalletForRagdoll") then
+                pcall(function() DestroyToy:FireServer(toysFolder.PalletForRagdoll) end)
+            end
         end
-    })
+    end,
+})
 
     task.spawn(function()
         while true do
@@ -1894,9 +2118,7 @@ function StartMainScript(titleText)
             end
         end
         return nil
-    end    
-
-    local function SpawnToyItem(ToyName)
+    end    local function SpawnToyItem(ToyName)
         local InPlot = LocalPlayer:FindFirstChild("InPlot")
         local InOwnedPlot = LocalPlayer:FindFirstChild("InOwnedPlot")
         local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
@@ -2087,7 +2309,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    local antiKickItemDropdown = AntiKickItemBlock:AddDropdown("Anti Kick Item", {
+    AntiKickItemBlock:AddDropdown("Anti Kick Item", {
         Text = "Anti Kick Item",
         Values = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
         Default = "Spooky Candle",
@@ -2101,7 +2323,7 @@ function StartMainScript(titleText)
         end
     })
 
-    local antiKickItemToggle = AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
+    AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
         Text = "Anti-Kick [ITEM]",
         Default = false,
         Callback = function(Value)
@@ -2117,7 +2339,7 @@ function StartMainScript(titleText)
     do
         local PCLD_Auto_Active = false
 
-        local pcldAutoToggle = AntiKickItemBlock:AddToggle("Auto PCLD Break", {
+        AntiKickItemBlock:AddToggle("Auto PCLD Break", {
             Text = "Auto PCLD Break",
             Default = false,
             Callback = function(Value)
@@ -2202,489 +2424,6 @@ function StartMainScript(titleText)
             StopAntiKickItem()
         end
     end)
-
-    local configFolder = "Absolute_Configs/"
-    local currentConfigName = "Default"
-    local configList = {}
-    local autoLoadEnabled = false
-    
-    local function ensureConfigFolder()
-        pcall(function()
-            if not isfolder(configFolder) then
-                makefolder(configFolder)
-            end
-        end)
-    end
-    
-    local function getConfigList()
-        ensureConfigFolder()
-        local list = {"Default"}
-        pcall(function()
-            local files = listfiles(configFolder)
-            for _, file in pairs(files) do
-                local name = file:match("([^/]+)%.json$")
-                if name and name ~= "Default" then
-                    table.insert(list, name)
-                end
-            end
-        end)
-        table.sort(list)
-        return list
-    end
-
-    local function collectFullConfig()
-        local config = {}
-        config.superStrength = superStrengthActive
-        config.superStrengthValue = superStrengthValue
-        config.throwKeybind = tostring(throwKeybind)
-        config.selectedTarget = selectedTarget and selectedTarget.Name or ""
-        config.holdHeight = holdHeight
-        config.ownershipKick = kickActive
-        config.palletRagdoll = ownershipRagdollActive
-        config.antiGrab = antiGrabEnabled
-        config.antiKick = isAntiKickActive
-        config.antiExplosion = antiExplosionActive
-        config.infiniteRagdoll = infiniteRagdoll
-        config.antiLag = antiLagActive
-        config.antiInputLag = antiInputActive
-        config.antiInputItem = SelectedInputToy
-        config.antiInputSpeed = antiInputSpeed
-        config.antiKickItem = antiKickItemActive
-        config.antiKickItemToy = SelectedToy
-        config.antiBan = antiBanActive
-        config.blodmanKick = blobmanKickActive
-        config.blodmanTarget = blobmanTarget and blobmanTarget.Name or ""
-        config.blodmanInterval = blobmanGrabInterval
-        config.blodmanHoldHeight = blobmanHoldHeight
-        config.circleKick = circleKickActive
-        config.circleTarget = circleTarget and circleTarget.Name or ""
-        config.circleSpinSpeed = circleSpinSpeed
-        config.circleHoldHeight = circleHoldHeight
-        config.autoSitBlodman = autoSitBlodmanActive
-        config.fov120 = fovEnabled
-        config.thirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic)
-        config.pcldEsp = pclespEnabled
-        config.cornerRadius = cornerRadiusValue or 0
-        return config
-    end
-
-    local function applyFullConfig(config)
-        if not config then return end
-        
-        if config.superStrength ~= nil then
-            superStrengthActive = config.superStrength
-            superStrengthToggle:SetValue(config.superStrength)
-        end
-        if config.superStrengthValue then
-            superStrengthValue = config.superStrengthValue
-            superStrengthSlider:SetValue(config.superStrengthValue)
-        end
-        if config.throwKeybind then
-            throwKeybind = Enum.KeyCode[config.throwKeybind] or Enum.KeyCode.E
-        end
-        if config.selectedTarget and config.selectedTarget ~= "" then
-            selectedTarget = Players:FindFirstChild(config.selectedTarget)
-        end
-        if config.holdHeight then
-            holdHeight = config.holdHeight
-            holdHeightSlider:SetValue(config.holdHeight)
-        end
-        if config.ownershipKick ~= nil then
-            kickActive = config.ownershipKick
-            ownershipKickToggle:SetValue(config.ownershipKick)
-        end
-        if config.palletRagdoll ~= nil then
-            ownershipRagdollActive = config.palletRagdoll
-            palletRagdollToggle:SetValue(config.palletRagdoll)
-        end
-        if config.antiGrab ~= nil then
-            antiGrabEnabled = config.antiGrab
-            antiGrabToggle:SetValue(config.antiGrab)
-        end
-        if config.antiKick ~= nil then
-            if config.antiKick then
-                StartAntiKick()
-            else
-                StopAntiKick()
-            end
-            antiKickToggle:SetValue(config.antiKick)
-        end
-        if config.antiExplosion ~= nil then
-            antiExplosionActive = config.antiExplosion
-            antiExplosionToggle:SetValue(config.antiExplosion)
-        end
-        if config.infiniteRagdoll ~= nil then
-            infiniteRagdoll = config.infiniteRagdoll
-            infiniteRagdollToggle:SetValue(config.infiniteRagdoll)
-        end
-        if config.antiLag ~= nil then
-            antiLagActive = config.antiLag
-            antiLagToggle:SetValue(config.antiLag)
-        end
-        if config.antiInputLag ~= nil then
-            antiInputActive = config.antiInputLag
-            antiInputToggle:SetValue(config.antiInputLag)
-        end
-        if config.antiInputItem then
-            SelectedInputToy = config.antiInputItem
-            inputDropdown:SetValue(config.antiInputItem)
-        end
-        if config.antiInputSpeed then
-            antiInputSpeed = config.antiInputSpeed
-            inputSpeedSlider:SetValue(config.antiInputSpeed)
-        end
-        if config.antiKickItem ~= nil then
-            antiKickItemActive = config.antiKickItem
-            antiKickItemToggle:SetValue(config.antiKickItem)
-        end
-        if config.antiKickItemToy then
-            SelectedToy = config.antiKickItemToy
-            antiKickItemDropdown:SetValue(config.antiKickItemToy)
-        end
-        if config.antiBan ~= nil then
-            antiBanActive = config.antiBan
-            antiBanToggle:SetValue(config.antiBan)
-        end
-        if config.blodmanTarget and config.blodmanTarget ~= "" then
-            blobmanTarget = Players:FindFirstChild(config.blodmanTarget)
-        end
-        if config.blodmanKick ~= nil then
-            blobmanKickActive = config.blodmanKick
-            blobmanKickToggle:SetValue(config.blodmanKick)
-        end
-        if config.blodmanInterval then
-            blobmanGrabInterval = config.blodmanInterval
-            blobmanIntervalSlider:SetValue(config.blodmanInterval)
-        end
-        if config.blodmanHoldHeight then
-            blobmanHoldHeight = config.blodmanHoldHeight
-            blobmanHoldHeightSlider:SetValue(config.blodmanHoldHeight)
-        end
-        if config.circleTarget and config.circleTarget ~= "" then
-            circleTarget = Players:FindFirstChild(config.circleTarget)
-        end
-        if config.circleKick ~= nil then
-            circleKickActive = config.circleKick
-            circleKickToggle:SetValue(config.circleKick)
-        end
-        if config.circleSpinSpeed then
-            circleSpinSpeed = config.circleSpinSpeed
-            circleSpinSpeedSlider:SetValue(config.circleSpinSpeed)
-        end
-        if config.circleHoldHeight then
-            circleHoldHeight = config.circleHoldHeight
-            circleHoldHeightSlider:SetValue(config.circleHoldHeight)
-        end
-        if config.autoSitBlodman ~= nil then
-            autoSitBlodmanActive = config.autoSitBlodman
-            autoSitBlodmanToggle:SetValue(config.autoSitBlodman)
-        end
-        if config.fov120 ~= nil then
-            fovEnabled = config.fov120
-            SetFOV(config.fov120)
-            fovToggle:SetValue(config.fov120)
-        end
-        if config.thirdPerson ~= nil then
-            SetThirdPerson(config.thirdPerson)
-            thirdPersonToggle:SetValue(config.thirdPerson)
-        end
-        if config.pcldEsp ~= nil then
-            pclespEnabled = config.pcldEsp
-            pcldEspToggle:SetValue(config.pcldEsp)
-        end
-        if config.cornerRadius then
-            cornerRadiusValue = config.cornerRadius
-            cornerRadiusSlider:SetValue(config.cornerRadius)
-            applyCornerRadius(Window.Parent, config.cornerRadius)
-        end
-    end
-
-    local function saveConfig(name)
-        ensureConfigFolder()
-        local config = collectFullConfig()
-        config.configName = name
-        config.saveDate = os.date("%Y-%m-%d %H:%M:%S")
-        
-        local jsonString = game:GetService("HttpService"):JSONEncode(config)
-        local filePath = configFolder .. name .. ".json"
-        
-        local success, err = pcall(function()
-            writefile(filePath, jsonString)
-        end)
-        
-        if success then
-            currentConfigName = name
-            configList = getConfigList()
-            configDropdown:SetValues(configList)
-            return true
-        end
-        return false
-    end
-
-    local function loadConfig(name)
-        ensureConfigFolder()
-        local filePath = configFolder .. name .. ".json"
-        
-        local success, data = pcall(function()
-            return readfile(filePath)
-        end)
-        
-        if success and data then
-            local config = game:GetService("HttpService"):JSONDecode(data)
-            currentConfigName = name
-            applyFullConfig(config)
-            return true
-        end
-        return false
-    end
-
-    local function deleteConfig(name)
-        if name == "Default" then return false end
-        
-        local filePath = configFolder .. name .. ".json"
-        local success, err = pcall(function()
-            delfile(filePath)
-        end)
-        
-        if success then
-            configList = getConfigList()
-            configDropdown:SetValues(configList)
-            return true
-        end
-        return false
-    end
-
-    local function renameConfig(oldName, newName)
-        if oldName == "Default" then return false end
-        
-        local oldPath = configFolder .. oldName .. ".json"
-        local newPath = configFolder .. newName .. ".json"
-        
-        local success, err = pcall(function()
-            local content = readfile(oldPath)
-            writefile(newPath, content)
-            delfile(oldPath)
-        end)
-        
-        if success then
-            configList = getConfigList()
-            configDropdown:SetValues(configList)
-            configDropdown:SetValue(newName)
-            currentConfigName = newName
-            return true
-        end
-        return false
-    end
-
-    local function resetToDefault()
-        superStrengthActive = false
-        superStrengthValue = 500
-        throwKeybind = Enum.KeyCode.E
-        selectedTarget = nil
-        holdHeight = 17
-        kickActive = false
-        ownershipRagdollActive = false
-        antiGrabEnabled = false
-        isAntiKickActive = false
-        antiExplosionActive = false
-        infiniteRagdoll = false
-        antiLagActive = false
-        antiInputActive = false
-        antiInputSpeed = 0.1
-        antiKickItemActive = false
-        antiBanActive = false
-        blobmanKickActive = false
-        blobmanTarget = nil
-        blobmanGrabInterval = 0.02
-        blobmanHoldHeight = 15
-        circleKickActive = false
-        circleTarget = nil
-        circleSpinSpeed = 13.576
-        circleHoldHeight = 20
-        autoSitBlodmanActive = false
-        fovEnabled = false
-        SetFOV(false)
-        SetThirdPerson(false)
-        pclespEnabled = false
-        cornerRadiusValue = 0
-        applyCornerRadius(Window.Parent, 0)
-        
-        if kickTask then task.cancel(kickTask) kickTask = nil end
-        if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
-        if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-        if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
-        StopAntiKick()
-        if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
-        if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
-        if antiLagActive then DisableAntiLag() antiLagActive = false end
-        StopAntiInput()
-        if antiKickItemActive then StopAntiKickItem() end
-        if antiBanCon then antiBanCon:Disconnect() antiBanCon = nil end
-        if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
-        if circleKickTask then task.cancel(circleKickTask) circleKickTask = nil end
-        if autoSitBlodmanTask then task.cancel(autoSitBlodmanTask) autoSitBlodmanTask = nil end
-        cleanupBodies()
-        
-        superStrengthToggle:SetValue(false)
-        strengthSlider:SetValue(500)
-        holdHeightSlider:SetValue(17)
-        ownershipKickToggle:SetValue(false)
-        palletRagdollToggle:SetValue(false)
-        antiGrabToggle:SetValue(false)
-        antiKickToggle:SetValue(false)
-        antiExplosionToggle:SetValue(false)
-        infiniteRagdollToggle:SetValue(false)
-        antiLagToggle:SetValue(false)
-        antiInputToggle:SetValue(false)
-        antiKickItemToggle:SetValue(false)
-        antiBanToggle:SetValue(false)
-        blobmanKickToggle:SetValue(false)
-        circleKickToggle:SetValue(false)
-        autoSitBlodmanToggle:SetValue(false)
-        fovToggle:SetValue(false)
-        thirdPersonToggle:SetValue(false)
-        pcldEspToggle:SetValue(false)
-        cornerRadiusSlider:SetValue(0)
-    end
-
-    configList = getConfigList()
-    local configDropdown = SettingsConfigBlock:AddDropdown("Select Config", {
-        Text = "Select Config",
-        Values = configList,
-        Default = "Default",
-        Callback = function(Value)
-            currentConfigName = Value
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "Save Config",
-        Func = function()
-            local name = currentConfigName
-            if name == "Default" then
-                local newName = "Config_" .. os.date("%Y%m%d_%H%M%S")
-                if saveConfig(newName) then
-                    currentConfigName = newName
-                    configDropdown:SetValue(newName)
-                end
-            else
-                saveConfig(name)
-            end
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "Load Config",
-        Func = function()
-            if currentConfigName then
-                loadConfig(currentConfigName)
-            end
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "Delete Config",
-        Func = function()
-            if currentConfigName and currentConfigName ~= "Default" then
-                if deleteConfig(currentConfigName) then
-                    configDropdown:SetValue("Default")
-                    currentConfigName = "Default"
-                end
-            end
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "Rename Config",
-        Func = function()
-            if currentConfigName and currentConfigName ~= "Default" then
-                local newName = game:GetService("GuiService"):PromptUserInput("Enter new config name:", currentConfigName)
-                if newName and newName ~= "" and newName ~= currentConfigName then
-                    renameConfig(currentConfigName, newName)
-                end
-            end
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "New Config",
-        Func = function()
-            local name = game:GetService("GuiService"):PromptUserInput("Enter config name:", "Config_" .. os.date("%Y%m%d_%H%M%S"))
-            if name and name ~= "" then
-                if saveConfig(name) then
-                    configDropdown:SetValue(name)
-                    currentConfigName = name
-                end
-            end
-        end
-    })
-
-    SettingsConfigBlock:AddButton({
-        Text = "Reset All",
-        Func = function()
-            resetToDefault()
-            currentConfigName = "Default"
-            configDropdown:SetValue("Default")
-        end
-    })
-
-    local autoLoadToggle = SettingsConfigBlock:AddToggle("Auto Load", {
-        Text = "Auto Load Config on Start",
-        Default = false,
-        Callback = function(Value)
-            autoLoadEnabled = Value
-        end
-    })
-
-    local cornerRadiusValue = 0
-    local function applyCornerRadius(parent, radius)
-        for _, child in pairs(parent:GetDescendants()) do
-            if child:IsA("Frame") or child:IsA("ScrollingFrame") or child:IsA("TextButton") or child:IsA("ImageButton") then
-                local corner = child:FindFirstChild("UICorner")
-                if not corner then
-                    corner = Instance.new("UICorner")
-                    corner.Parent = child
-                end
-                corner.CornerRadius = UDim.new(0, radius)
-            end
-        end
-    end
-
-    local cornerRadiusSlider = SettingsUIBlock:AddSlider("Corner Radius", {
-        Text = "Corner Radius",
-        Min = 0,
-        Max = 20,
-        Default = 0,
-        Suffix = "px",
-        Callback = function(Value)
-            cornerRadiusValue = Value
-            applyCornerRadius(Window.Parent, Value)
-        end
-    })
-
-    task.spawn(function()
-        wait(0.5)
-        applyCornerRadius(Window.Parent, 0)
-        if autoLoadEnabled then
-            local configs = getConfigList()
-            if #configs > 0 and configs[1] ~= "Default" then
-                loadConfig(configs[1])
-            end
-        end
-    end)
-
-    if autoLoadEnabled then
-        task.spawn(function()
-            wait(1)
-            local configs = getConfigList()
-            for _, name in pairs(configs) do
-                if name ~= "Default" then
-                    loadConfig(name)
-                    break
-                end
-            end
-        end)
-    end
 end
 
 StartMainScript("Absolute")
