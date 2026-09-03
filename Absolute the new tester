@@ -82,6 +82,7 @@ function StartMainScript(titleText)
     local DefenseTab = Window:AddTab("Defense")
     local VisualTab = Window:AddTab("Visual")
     local BlodmanTab = Window:AddTab("Blodman")
+    local SettingsTab = Window:AddTab("Settings")
 
     local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength")
     
@@ -91,7 +92,7 @@ function StartMainScript(titleText)
     local currentGrabbedPart = nil
     local isHoldingObject = false
 
-    SuperStrengthBlock:AddToggle("Super Strength", {
+    local superStrengthToggle = SuperStrengthBlock:AddToggle("Super Strength", {
         Text = "Super Strength",
         Default = false,
         Callback = function(Value)
@@ -99,7 +100,7 @@ function StartMainScript(titleText)
         end
     })
 
-    SuperStrengthBlock:AddSlider("Strength", {
+    local superStrengthSlider = SuperStrengthBlock:AddSlider("Strength", {
         Text = "Strength",
         Min = 100,
         Max = 10000,
@@ -202,6 +203,9 @@ function StartMainScript(titleText)
     local BlodmanCircleSettingsBlock = BlodmanTab:AddRightGroupbox("Settings Circle")
     local BlodmanAutoSitBlock = BlodmanTab:AddLeftGroupbox("Auto Sit Blodman")
 
+    local SettingsConfigBlock = SettingsTab:AddLeftGroupbox("Configuration Manager")
+    local SettingsUIBlock = SettingsTab:AddRightGroupbox("UI Settings")
+
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
         ["Brown Mug"] = "CupMugBrown",
@@ -244,7 +248,7 @@ function StartMainScript(titleText)
     end
     table.sort(InputDropdownValues)
 
-    AntiInputLagBlock:AddDropdown("Select Item", {
+    local inputDropdown = AntiInputLagBlock:AddDropdown("Select Item", {
         Text = "Select Item",
         Values = InputDropdownValues,
         Default = "White Mug",
@@ -253,7 +257,7 @@ function StartMainScript(titleText)
         end
     })
 
-    AntiInputLagBlock:AddSlider("Cycle Speed", {
+    local inputSpeedSlider = AntiInputLagBlock:AddSlider("Cycle Speed", {
         Text = "Cycle Speed (0.02 - 0.5 sec)",
         Min = 0.02,
         Max = 0.5,
@@ -353,7 +357,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    AntiInputLagBlock:AddToggle("Anti-Input Lag", {
+    local antiInputToggle = AntiInputLagBlock:AddToggle("Anti-Input Lag", {
         Text = "Anti-Input Lag",
         Default = false,
         Callback = function(Value)
@@ -515,7 +519,7 @@ function StartMainScript(titleText)
 
     SaveCharacterMoveStates()
 
-    AntiLagBlock:AddToggle("Anti-Lag", {
+    local antiLagToggle = AntiLagBlock:AddToggle("Anti-Lag", {
         Text = "Anti-Lag",
         Default = false,
         Callback = function(Value)
@@ -575,7 +579,7 @@ function StartMainScript(titleText)
         end
     end
 
-    BlodmanAutoSitBlock:AddToggle("Auto Sit Blodman", {
+    local autoSitBlodmanToggle = BlodmanAutoSitBlock:AddToggle("Auto Sit Blodman", {
         Text = "Auto Sit Blodman",
         Default = false,
         Callback = function(Value)
@@ -641,7 +645,7 @@ function StartMainScript(titleText)
         end
     })
 
-    BlodmanSettingsBlock:AddSlider("Blodman Interval", {
+    local blobmanIntervalSlider = BlodmanSettingsBlock:AddSlider("Blodman Interval", {
         Text = "Blodman Interval (0.01 - 0.1)",
         Min = 0.01,
         Max = 0.1,
@@ -651,7 +655,7 @@ function StartMainScript(titleText)
         end
     })
 
-    BlodmanSettingsBlock:AddSlider("Hold Height", {
+    local blobmanHoldHeightSlider = BlodmanSettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height",
         Min = 5,
         Max = 40,
@@ -678,7 +682,7 @@ function StartMainScript(titleText)
         end
     })
 
-    BlodmanCircleSettingsBlock:AddSlider("Spin Speed", {
+    local circleSpinSpeedSlider = BlodmanCircleSettingsBlock:AddSlider("Spin Speed", {
         Text = "Spin Speed (13 - 20)",
         Min = 13,
         Max = 20,
@@ -688,7 +692,7 @@ function StartMainScript(titleText)
         end
     })
 
-    BlodmanCircleSettingsBlock:AddSlider("Hold Height", {
+    local circleHoldHeightSlider = BlodmanCircleSettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height (5 - 40)",
         Min = 5,
         Max = 40,
@@ -840,7 +844,7 @@ function StartMainScript(titleText)
         blobmanKickActive = false
     end
 
-    BlodmanMainBlock:AddToggle("BLODMAN KICK", {
+    local blobmanKickToggle = BlodmanMainBlock:AddToggle("BLODMAN KICK", {
         Text = "BLODMAN KICK",
         Default = false,
         Callback = function(Value)
@@ -1010,7 +1014,7 @@ function StartMainScript(titleText)
         circleKickActive = false
     end
 
-    BlodmanCircleBlock:AddToggle("KICK (CIRCLE)", {
+    local circleKickToggle = BlodmanCircleBlock:AddToggle("KICK (CIRCLE)", {
         Text = "KICK (CIRCLE)",
         Default = false,
         Callback = function(Value)
@@ -1181,6 +1185,18 @@ function StartMainScript(titleText)
         ClearShuriken()
     end
 
+    local antiKickToggle = AntiKickBlock:AddToggle("Anti-Kick [Shuriken]", {
+        Text = "Anti-Kick [Shuriken]",
+        Default = false,
+        Callback = function(Value)
+            if Value then 
+                StartAntiKick() 
+            else 
+                StopAntiKick() 
+            end
+        end
+    })
+
     local function SetFOV(value)
         if value then
             originalFOV = Workspace.CurrentCamera.FieldOfView
@@ -1202,7 +1218,7 @@ function StartMainScript(titleText)
         end
     end
 
-    VisualBlock:AddToggle("FOV 120", {
+    local fovToggle = VisualBlock:AddToggle("FOV 120", {
         Text = "FOV 120",
         Default = false,
         Callback = function(Value)
@@ -1211,7 +1227,7 @@ function StartMainScript(titleText)
         end
     })
 
-    VisualBlock:AddToggle("Third Person", {
+    local thirdPersonToggle = VisualBlock:AddToggle("Third Person", {
         Text = "Third Person",
         Default = false,
         Callback = function(Value)
@@ -1296,7 +1312,7 @@ function StartMainScript(titleText)
         end
     end
 
-    PCLDESPBlock:AddToggle("PCLD ESP", {
+    local pcldEspToggle = PCLDESPBlock:AddToggle("PCLD ESP", {
         Text = "PCLD ESP",
         Default = false,
         Callback = function(Value)
@@ -1336,7 +1352,7 @@ function StartMainScript(titleText)
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
 
-    SettingsBlock:AddSlider("Hold Height", {
+    local holdHeightSlider = SettingsBlock:AddSlider("Hold Height", {
         Text = "Hold Height",
         Min = 5,
         Max = 40,
@@ -1344,7 +1360,7 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
-    AntiGrabBlock:AddToggle("Anti-Grab", {
+    local antiGrabToggle = AntiGrabBlock:AddToggle("Anti-Grab", {
         Text = "Anti-Grab",
         Default = false,
         Callback = function(Value)
@@ -1362,23 +1378,11 @@ function StartMainScript(titleText)
         end
     })
 
-    AntiKickBlock:AddToggle("Anti-Kick [Shuriken]", {
-        Text = "Anti-Kick [Shuriken]",
-        Default = false,
-        Callback = function(Value)
-            if Value then 
-                StartAntiKick() 
-            else 
-                StopAntiKick() 
-            end
-        end
-    })
-
     do
         local GameCorrectionEvents = RS:WaitForChild("GameCorrectionEvents", 5)
         local AutoResetCon = nil
         
-        AntiKickBlock:AddToggle("Auto Reset", {
+        local autoResetToggle = AntiKickBlock:AddToggle("Auto Reset", {
             Text = "Auto Reset",
             Default = false,
             Callback = function(Value)
@@ -1430,7 +1434,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    AntiBanBlock:AddToggle("Anti Ban", {
+    local antiBanToggle = AntiBanBlock:AddToggle("Anti Ban", {
         Text = "Anti Ban",
         Default = false,
         Callback = function(Value)
@@ -1475,7 +1479,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    AntiExplosionBlock:AddToggle("Anti-Explosion", {
+    local antiExplosionToggle = AntiExplosionBlock:AddToggle("Anti-Explosion", {
         Text = "Anti-Explosion",
         Default = false,
         Callback = function(Value)
@@ -1501,7 +1505,7 @@ function StartMainScript(titleText)
         end
     end
 
-    AntiSnowBlock:AddToggle("Infinite Ragdoll", {
+    local infiniteRagdollToggle = AntiSnowBlock:AddToggle("Infinite Ragdoll", {
         Text = "Infinite Ragdoll",
         Default = false,
         Callback = function(Value)
@@ -1648,7 +1652,7 @@ function StartMainScript(titleText)
         end
     end
 
-    KickBlock:AddToggle("Enable Ownership Kick", {
+    local ownershipKickToggle = KickBlock:AddToggle("Enable Ownership Kick", {
         Text = "Enable Ownership Kick",
         Default = false,
         Callback = function(Value)
@@ -1749,7 +1753,7 @@ function StartMainScript(titleText)
         end
     end
 
-    PalletBlock:AddToggle("Enable Pallet Ragdoll", {
+    local palletRagdollToggle = PalletBlock:AddToggle("Enable Pallet Ragdoll", {
         Text = "Enable Pallet Ragdoll",
         Default = false,
         Callback = function(Value)
@@ -1890,7 +1894,9 @@ function StartMainScript(titleText)
             end
         end
         return nil
-    end    local function SpawnToyItem(ToyName)
+    end    
+
+    local function SpawnToyItem(ToyName)
         local InPlot = LocalPlayer:FindFirstChild("InPlot")
         local InOwnedPlot = LocalPlayer:FindFirstChild("InOwnedPlot")
         local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
@@ -2081,7 +2087,7 @@ function StartMainScript(titleText)
         end)
     end
 
-    AntiKickItemBlock:AddDropdown("Anti Kick Item", {
+    local antiKickItemDropdown = AntiKickItemBlock:AddDropdown("Anti Kick Item", {
         Text = "Anti Kick Item",
         Values = {"Japanese Lantern", "Spray Can", "Spooky Candle"},
         Default = "Spooky Candle",
@@ -2095,7 +2101,7 @@ function StartMainScript(titleText)
         end
     })
 
-    AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
+    local antiKickItemToggle = AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
         Text = "Anti-Kick [ITEM]",
         Default = false,
         Callback = function(Value)
@@ -2111,7 +2117,7 @@ function StartMainScript(titleText)
     do
         local PCLD_Auto_Active = false
 
-        AntiKickItemBlock:AddToggle("Auto PCLD Break", {
+        local pcldAutoToggle = AntiKickItemBlock:AddToggle("Auto PCLD Break", {
             Text = "Auto PCLD Break",
             Default = false,
             Callback = function(Value)
@@ -2196,6 +2202,489 @@ function StartMainScript(titleText)
             StopAntiKickItem()
         end
     end)
+
+    local configFolder = "Absolute_Configs/"
+    local currentConfigName = "Default"
+    local configList = {}
+    local autoLoadEnabled = false
+    
+    local function ensureConfigFolder()
+        pcall(function()
+            if not isfolder(configFolder) then
+                makefolder(configFolder)
+            end
+        end)
+    end
+    
+    local function getConfigList()
+        ensureConfigFolder()
+        local list = {"Default"}
+        pcall(function()
+            local files = listfiles(configFolder)
+            for _, file in pairs(files) do
+                local name = file:match("([^/]+)%.json$")
+                if name and name ~= "Default" then
+                    table.insert(list, name)
+                end
+            end
+        end)
+        table.sort(list)
+        return list
+    end
+
+    local function collectFullConfig()
+        local config = {}
+        config.superStrength = superStrengthActive
+        config.superStrengthValue = superStrengthValue
+        config.throwKeybind = tostring(throwKeybind)
+        config.selectedTarget = selectedTarget and selectedTarget.Name or ""
+        config.holdHeight = holdHeight
+        config.ownershipKick = kickActive
+        config.palletRagdoll = ownershipRagdollActive
+        config.antiGrab = antiGrabEnabled
+        config.antiKick = isAntiKickActive
+        config.antiExplosion = antiExplosionActive
+        config.infiniteRagdoll = infiniteRagdoll
+        config.antiLag = antiLagActive
+        config.antiInputLag = antiInputActive
+        config.antiInputItem = SelectedInputToy
+        config.antiInputSpeed = antiInputSpeed
+        config.antiKickItem = antiKickItemActive
+        config.antiKickItemToy = SelectedToy
+        config.antiBan = antiBanActive
+        config.blodmanKick = blobmanKickActive
+        config.blodmanTarget = blobmanTarget and blobmanTarget.Name or ""
+        config.blodmanInterval = blobmanGrabInterval
+        config.blodmanHoldHeight = blobmanHoldHeight
+        config.circleKick = circleKickActive
+        config.circleTarget = circleTarget and circleTarget.Name or ""
+        config.circleSpinSpeed = circleSpinSpeed
+        config.circleHoldHeight = circleHoldHeight
+        config.autoSitBlodman = autoSitBlodmanActive
+        config.fov120 = fovEnabled
+        config.thirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic)
+        config.pcldEsp = pclespEnabled
+        config.cornerRadius = cornerRadiusValue or 0
+        return config
+    end
+
+    local function applyFullConfig(config)
+        if not config then return end
+        
+        if config.superStrength ~= nil then
+            superStrengthActive = config.superStrength
+            superStrengthToggle:SetValue(config.superStrength)
+        end
+        if config.superStrengthValue then
+            superStrengthValue = config.superStrengthValue
+            superStrengthSlider:SetValue(config.superStrengthValue)
+        end
+        if config.throwKeybind then
+            throwKeybind = Enum.KeyCode[config.throwKeybind] or Enum.KeyCode.E
+        end
+        if config.selectedTarget and config.selectedTarget ~= "" then
+            selectedTarget = Players:FindFirstChild(config.selectedTarget)
+        end
+        if config.holdHeight then
+            holdHeight = config.holdHeight
+            holdHeightSlider:SetValue(config.holdHeight)
+        end
+        if config.ownershipKick ~= nil then
+            kickActive = config.ownershipKick
+            ownershipKickToggle:SetValue(config.ownershipKick)
+        end
+        if config.palletRagdoll ~= nil then
+            ownershipRagdollActive = config.palletRagdoll
+            palletRagdollToggle:SetValue(config.palletRagdoll)
+        end
+        if config.antiGrab ~= nil then
+            antiGrabEnabled = config.antiGrab
+            antiGrabToggle:SetValue(config.antiGrab)
+        end
+        if config.antiKick ~= nil then
+            if config.antiKick then
+                StartAntiKick()
+            else
+                StopAntiKick()
+            end
+            antiKickToggle:SetValue(config.antiKick)
+        end
+        if config.antiExplosion ~= nil then
+            antiExplosionActive = config.antiExplosion
+            antiExplosionToggle:SetValue(config.antiExplosion)
+        end
+        if config.infiniteRagdoll ~= nil then
+            infiniteRagdoll = config.infiniteRagdoll
+            infiniteRagdollToggle:SetValue(config.infiniteRagdoll)
+        end
+        if config.antiLag ~= nil then
+            antiLagActive = config.antiLag
+            antiLagToggle:SetValue(config.antiLag)
+        end
+        if config.antiInputLag ~= nil then
+            antiInputActive = config.antiInputLag
+            antiInputToggle:SetValue(config.antiInputLag)
+        end
+        if config.antiInputItem then
+            SelectedInputToy = config.antiInputItem
+            inputDropdown:SetValue(config.antiInputItem)
+        end
+        if config.antiInputSpeed then
+            antiInputSpeed = config.antiInputSpeed
+            inputSpeedSlider:SetValue(config.antiInputSpeed)
+        end
+        if config.antiKickItem ~= nil then
+            antiKickItemActive = config.antiKickItem
+            antiKickItemToggle:SetValue(config.antiKickItem)
+        end
+        if config.antiKickItemToy then
+            SelectedToy = config.antiKickItemToy
+            antiKickItemDropdown:SetValue(config.antiKickItemToy)
+        end
+        if config.antiBan ~= nil then
+            antiBanActive = config.antiBan
+            antiBanToggle:SetValue(config.antiBan)
+        end
+        if config.blodmanTarget and config.blodmanTarget ~= "" then
+            blobmanTarget = Players:FindFirstChild(config.blodmanTarget)
+        end
+        if config.blodmanKick ~= nil then
+            blobmanKickActive = config.blodmanKick
+            blobmanKickToggle:SetValue(config.blodmanKick)
+        end
+        if config.blodmanInterval then
+            blobmanGrabInterval = config.blodmanInterval
+            blobmanIntervalSlider:SetValue(config.blodmanInterval)
+        end
+        if config.blodmanHoldHeight then
+            blobmanHoldHeight = config.blodmanHoldHeight
+            blobmanHoldHeightSlider:SetValue(config.blodmanHoldHeight)
+        end
+        if config.circleTarget and config.circleTarget ~= "" then
+            circleTarget = Players:FindFirstChild(config.circleTarget)
+        end
+        if config.circleKick ~= nil then
+            circleKickActive = config.circleKick
+            circleKickToggle:SetValue(config.circleKick)
+        end
+        if config.circleSpinSpeed then
+            circleSpinSpeed = config.circleSpinSpeed
+            circleSpinSpeedSlider:SetValue(config.circleSpinSpeed)
+        end
+        if config.circleHoldHeight then
+            circleHoldHeight = config.circleHoldHeight
+            circleHoldHeightSlider:SetValue(config.circleHoldHeight)
+        end
+        if config.autoSitBlodman ~= nil then
+            autoSitBlodmanActive = config.autoSitBlodman
+            autoSitBlodmanToggle:SetValue(config.autoSitBlodman)
+        end
+        if config.fov120 ~= nil then
+            fovEnabled = config.fov120
+            SetFOV(config.fov120)
+            fovToggle:SetValue(config.fov120)
+        end
+        if config.thirdPerson ~= nil then
+            SetThirdPerson(config.thirdPerson)
+            thirdPersonToggle:SetValue(config.thirdPerson)
+        end
+        if config.pcldEsp ~= nil then
+            pclespEnabled = config.pcldEsp
+            pcldEspToggle:SetValue(config.pcldEsp)
+        end
+        if config.cornerRadius then
+            cornerRadiusValue = config.cornerRadius
+            cornerRadiusSlider:SetValue(config.cornerRadius)
+            applyCornerRadius(Window.Parent, config.cornerRadius)
+        end
+    end
+
+    local function saveConfig(name)
+        ensureConfigFolder()
+        local config = collectFullConfig()
+        config.configName = name
+        config.saveDate = os.date("%Y-%m-%d %H:%M:%S")
+        
+        local jsonString = game:GetService("HttpService"):JSONEncode(config)
+        local filePath = configFolder .. name .. ".json"
+        
+        local success, err = pcall(function()
+            writefile(filePath, jsonString)
+        end)
+        
+        if success then
+            currentConfigName = name
+            configList = getConfigList()
+            configDropdown:SetValues(configList)
+            return true
+        end
+        return false
+    end
+
+    local function loadConfig(name)
+        ensureConfigFolder()
+        local filePath = configFolder .. name .. ".json"
+        
+        local success, data = pcall(function()
+            return readfile(filePath)
+        end)
+        
+        if success and data then
+            local config = game:GetService("HttpService"):JSONDecode(data)
+            currentConfigName = name
+            applyFullConfig(config)
+            return true
+        end
+        return false
+    end
+
+    local function deleteConfig(name)
+        if name == "Default" then return false end
+        
+        local filePath = configFolder .. name .. ".json"
+        local success, err = pcall(function()
+            delfile(filePath)
+        end)
+        
+        if success then
+            configList = getConfigList()
+            configDropdown:SetValues(configList)
+            return true
+        end
+        return false
+    end
+
+    local function renameConfig(oldName, newName)
+        if oldName == "Default" then return false end
+        
+        local oldPath = configFolder .. oldName .. ".json"
+        local newPath = configFolder .. newName .. ".json"
+        
+        local success, err = pcall(function()
+            local content = readfile(oldPath)
+            writefile(newPath, content)
+            delfile(oldPath)
+        end)
+        
+        if success then
+            configList = getConfigList()
+            configDropdown:SetValues(configList)
+            configDropdown:SetValue(newName)
+            currentConfigName = newName
+            return true
+        end
+        return false
+    end
+
+    local function resetToDefault()
+        superStrengthActive = false
+        superStrengthValue = 500
+        throwKeybind = Enum.KeyCode.E
+        selectedTarget = nil
+        holdHeight = 17
+        kickActive = false
+        ownershipRagdollActive = false
+        antiGrabEnabled = false
+        isAntiKickActive = false
+        antiExplosionActive = false
+        infiniteRagdoll = false
+        antiLagActive = false
+        antiInputActive = false
+        antiInputSpeed = 0.1
+        antiKickItemActive = false
+        antiBanActive = false
+        blobmanKickActive = false
+        blobmanTarget = nil
+        blobmanGrabInterval = 0.02
+        blobmanHoldHeight = 15
+        circleKickActive = false
+        circleTarget = nil
+        circleSpinSpeed = 13.576
+        circleHoldHeight = 20
+        autoSitBlodmanActive = false
+        fovEnabled = false
+        SetFOV(false)
+        SetThirdPerson(false)
+        pclespEnabled = false
+        cornerRadiusValue = 0
+        applyCornerRadius(Window.Parent, 0)
+        
+        if kickTask then task.cancel(kickTask) kickTask = nil end
+        if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
+        if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+        if antiKickTask then task.cancel(antiKickTask) antiKickTask = nil end
+        StopAntiKick()
+        if antiExplosionConn then antiExplosionConn:Disconnect() antiExplosionConn = nil end
+        if infiniteRagdollTask then task.cancel(infiniteRagdollTask) infiniteRagdollTask = nil end
+        if antiLagActive then DisableAntiLag() antiLagActive = false end
+        StopAntiInput()
+        if antiKickItemActive then StopAntiKickItem() end
+        if antiBanCon then antiBanCon:Disconnect() antiBanCon = nil end
+        if blobmanKickTask then task.cancel(blobmanKickTask) blobmanKickTask = nil end
+        if circleKickTask then task.cancel(circleKickTask) circleKickTask = nil end
+        if autoSitBlodmanTask then task.cancel(autoSitBlodmanTask) autoSitBlodmanTask = nil end
+        cleanupBodies()
+        
+        superStrengthToggle:SetValue(false)
+        strengthSlider:SetValue(500)
+        holdHeightSlider:SetValue(17)
+        ownershipKickToggle:SetValue(false)
+        palletRagdollToggle:SetValue(false)
+        antiGrabToggle:SetValue(false)
+        antiKickToggle:SetValue(false)
+        antiExplosionToggle:SetValue(false)
+        infiniteRagdollToggle:SetValue(false)
+        antiLagToggle:SetValue(false)
+        antiInputToggle:SetValue(false)
+        antiKickItemToggle:SetValue(false)
+        antiBanToggle:SetValue(false)
+        blobmanKickToggle:SetValue(false)
+        circleKickToggle:SetValue(false)
+        autoSitBlodmanToggle:SetValue(false)
+        fovToggle:SetValue(false)
+        thirdPersonToggle:SetValue(false)
+        pcldEspToggle:SetValue(false)
+        cornerRadiusSlider:SetValue(0)
+    end
+
+    configList = getConfigList()
+    local configDropdown = SettingsConfigBlock:AddDropdown("Select Config", {
+        Text = "Select Config",
+        Values = configList,
+        Default = "Default",
+        Callback = function(Value)
+            currentConfigName = Value
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "Save Config",
+        Func = function()
+            local name = currentConfigName
+            if name == "Default" then
+                local newName = "Config_" .. os.date("%Y%m%d_%H%M%S")
+                if saveConfig(newName) then
+                    currentConfigName = newName
+                    configDropdown:SetValue(newName)
+                end
+            else
+                saveConfig(name)
+            end
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "Load Config",
+        Func = function()
+            if currentConfigName then
+                loadConfig(currentConfigName)
+            end
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "Delete Config",
+        Func = function()
+            if currentConfigName and currentConfigName ~= "Default" then
+                if deleteConfig(currentConfigName) then
+                    configDropdown:SetValue("Default")
+                    currentConfigName = "Default"
+                end
+            end
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "Rename Config",
+        Func = function()
+            if currentConfigName and currentConfigName ~= "Default" then
+                local newName = game:GetService("GuiService"):PromptUserInput("Enter new config name:", currentConfigName)
+                if newName and newName ~= "" and newName ~= currentConfigName then
+                    renameConfig(currentConfigName, newName)
+                end
+            end
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "New Config",
+        Func = function()
+            local name = game:GetService("GuiService"):PromptUserInput("Enter config name:", "Config_" .. os.date("%Y%m%d_%H%M%S"))
+            if name and name ~= "" then
+                if saveConfig(name) then
+                    configDropdown:SetValue(name)
+                    currentConfigName = name
+                end
+            end
+        end
+    })
+
+    SettingsConfigBlock:AddButton({
+        Text = "Reset All",
+        Func = function()
+            resetToDefault()
+            currentConfigName = "Default"
+            configDropdown:SetValue("Default")
+        end
+    })
+
+    local autoLoadToggle = SettingsConfigBlock:AddToggle("Auto Load", {
+        Text = "Auto Load Config on Start",
+        Default = false,
+        Callback = function(Value)
+            autoLoadEnabled = Value
+        end
+    })
+
+    local cornerRadiusValue = 0
+    local function applyCornerRadius(parent, radius)
+        for _, child in pairs(parent:GetDescendants()) do
+            if child:IsA("Frame") or child:IsA("ScrollingFrame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                local corner = child:FindFirstChild("UICorner")
+                if not corner then
+                    corner = Instance.new("UICorner")
+                    corner.Parent = child
+                end
+                corner.CornerRadius = UDim.new(0, radius)
+            end
+        end
+    end
+
+    local cornerRadiusSlider = SettingsUIBlock:AddSlider("Corner Radius", {
+        Text = "Corner Radius",
+        Min = 0,
+        Max = 20,
+        Default = 0,
+        Suffix = "px",
+        Callback = function(Value)
+            cornerRadiusValue = Value
+            applyCornerRadius(Window.Parent, Value)
+        end
+    })
+
+    task.spawn(function()
+        wait(0.5)
+        applyCornerRadius(Window.Parent, 0)
+        if autoLoadEnabled then
+            local configs = getConfigList()
+            if #configs > 0 and configs[1] ~= "Default" then
+                loadConfig(configs[1])
+            end
+        end
+    end)
+
+    if autoLoadEnabled then
+        task.spawn(function()
+            wait(1)
+            local configs = getConfigList()
+            for _, name in pairs(configs) do
+                if name ~= "Default" then
+                    loadConfig(name)
+                    break
+                end
+            end
+        end)
+    end
 end
 
 StartMainScript("Absolute")
