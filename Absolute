@@ -272,7 +272,10 @@ function StartMainScript(titleText)
         Min = 100,
         Max = 10000,
         Default = 500,
+        Rounding = 0,
         Callback = function(Value)
+            if Value < 100 then Value = 100 end
+            if Value > 10000 then Value = 10000 end
             superStrengthValue = Value
         end
     })
@@ -639,7 +642,10 @@ function StartMainScript(titleText)
         Max = 0.5,
         Default = 0.1,
         Suffix = "sec",
+        Rounding = 2,
         Callback = function(Value)
+            if Value < 0.02 then Value = 0.02 end
+            if Value > 0.5 then Value = 0.5 end
             antiInputSpeed = Value
         end
     })
@@ -1151,7 +1157,10 @@ function StartMainScript(titleText)
         Min = 0.01,
         Max = 0.1,
         Default = 0.02,
+        Rounding = 2,
         Callback = function(Value)
+            if Value < 0.01 then Value = 0.01 end
+            if Value > 0.1 then Value = 0.1 end
             blobmanGrabInterval = Value
         end
     })
@@ -1161,7 +1170,10 @@ function StartMainScript(titleText)
         Min = 5,
         Max = 40,
         Default = 15,
+        Rounding = 0,
         Callback = function(Value)
+            if Value < 5 then Value = 5 end
+            if Value > 40 then Value = 40 end
             blobmanHoldHeight = Value
         end
     })
@@ -1188,7 +1200,10 @@ function StartMainScript(titleText)
         Min = 13,
         Max = 20,
         Default = 13.576,
+        Rounding = 3,
         Callback = function(Value)
+            if Value < 13 then Value = 13 end
+            if Value > 20 then Value = 20 end
             circleSpinSpeed = Value
         end
     })
@@ -1198,7 +1213,10 @@ function StartMainScript(titleText)
         Min = 5,
         Max = 40,
         Default = 20,
+        Rounding = 0,
         Callback = function(Value)
+            if Value < 5 then Value = 5 end
+            if Value > 40 then Value = 40 end
             circleHoldHeight = Value
         end
     })
@@ -1817,7 +1835,12 @@ function StartMainScript(titleText)
         Min = 5,
         Max = 40,
         Default = 17,
-        Callback = function(Value) holdHeight = Value end
+        Rounding = 0,
+        Callback = function(Value)
+            if Value < 5 then Value = 5 end
+            if Value > 40 then Value = 40 end
+            holdHeight = Value
+        end
     })
 
     AntiGrabBlock:AddToggle("Anti-Grab", {
