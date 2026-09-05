@@ -251,14 +251,6 @@ function StartMainScript(titleText)
     SaveManager:BuildConfigSection(Settings)
     ThemeManager:ApplyToTab(Settings)
 
-    MenuGroup:AddToggle("KeybindMenuOpen", {
-        Default = Library.KeybindFrame.Visible,
-        Text = "Binds Menu",
-        Callback = function(value)
-            Library.KeybindFrame.Visible = value
-        end,
-    })
-
     local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength")
     
     local superStrengthActive = false
@@ -773,8 +765,134 @@ function StartMainScript(titleText)
     local antiKickTask = nil
     local infiniteRagdoll = false
     local infiniteRagdollTask = nil
+
+    -- НОВЫЙ ANTI-GRAB
     local antiGrabEnabled = false
     local antiGrabTask = nil
+    local savedCFrame = nil
+    local bodyPosition = nil
+    local bodyGyro = nil
+    local ragdollActive = false
+
+    local function createBodyPositions(hrp)
+        if bodyPosition then bodyPosition:Destroy() bodyPosition = nil end
+        if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+        bodyPosition = Instance.new("BodyPosition")
+        bodyPosition.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyPosition.D = 1000
+        bodyPosition.P = 10000
+        bodyPosition.Position = savedCFrame.Position
+        bodyPosition.Parent = hrp
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro.D = 1000
+        bodyGyro.P = 10000
+        bodyGyro.CFrame = savedCFrame
+        bodyGyro.Parent = hrp
+    end
+
+    local function removeBodyPositions()
+        if bodyPosition then bodyPosition:Destroy() bodyPosition = nil end
+        if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+    end
+
+    local function AntiGrabLoop()
+        while antiGrabEnabled do
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp and hum then
+                    if not isHeld.Value then
+                        savedCFrame = hrp.CFrame
+                        removeBodyPositions()
+                        if ragdollActive then
+                            ragdollActive = false
+                            hum.PlatformStand = false
+                            hum:ChangeState(Enum.HumanoidStateType.Running)
+                        end
+                    else
+                        if savedCFrame then
+                            hrp.CFrame = savedCFrame
+                        end
+                        if savedCFrame then
+                            if not bodyPosition or not bodyPosition.Parent then
+                                createBodyPositions(hrp)
+                            else
+                                bodyPosition.Position = savedCFrame.Position
+                                bodyGyro.CFrame = savedCFrame
+                            end
+                        end
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                        pcall(function() struggleEvent:FireServer(LocalPlayer) end)
+                        if not ragdollActive then
+                            ragdollActive = true
+                            pcall(function() ragdollRemote:FireServer(hrp, 0.01) end)
+                            task.delay(0.01, function()
+                                if ragdollActive then
+                                    ragdollActive = false
+                                    if hum then
+                                        hum.PlatformStand = false
+                                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                                    end
+                                end
+                            end)
+                        end
+                        if hum then
+                            hum.Sit = false
+                            hum.PlatformStand = false
+                            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                            hum:ChangeState(Enum.HumanoidStateType.Running)
+                            hum.AutoRotate = true
+                        end
+                        local head = char:FindFirstChild("Head")
+                        if head then
+                            local partOwner = head:FindFirstChild("PartOwner")
+                            if partOwner then partOwner:Destroy() end
+                        end
+                        for _, v in pairs(hrp:GetChildren()) do
+                            if v:IsA("BodyVelocity") and v ~= bodyPosition and v ~= bodyGyro then
+                                v:Destroy()
+                            end
+                        end
+                    end
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    local function ToggleAntiGrab(Value)
+        antiGrabEnabled = Value
+        if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+        if Value then
+            local char = LocalPlayer.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then savedCFrame = hrp.CFrame end
+            end
+            antiGrabTask = task.spawn(AntiGrabLoop)
+        else
+            removeBodyPositions()
+            ragdollActive = false
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then
+                    hum.PlatformStand = false
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
+                end
+            end
+        end
+    end
+
+    local function CleanupAntiGrab()
+        antiGrabEnabled = false
+        if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+        removeBodyPositions()
+        ragdollActive = false
+    end
 
     local blobmanKickActive = false
     local blobmanKickTask = nil
@@ -793,7 +911,7 @@ function StartMainScript(titleText)
     local ownershipRagdollTask = nil
 
     local bodyPos = nil
-    local bodyGyro = nil
+    local bodyGyro2 = nil
 
     local antiLagActive = false
 
@@ -1089,41 +1207,8 @@ function StartMainScript(titleText)
     local function cleanupBodies()
         pcall(function()
             if bodyPos then bodyPos:Destroy() bodyPos = nil end
-            if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+            if bodyGyro2 then bodyGyro2:Destroy() bodyGyro2 = nil end
         end)
-    end
-
-    local function AntiGrabLoop()
-        while antiGrabEnabled do
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if isHeld.Value then
-                    pcall(function() struggleEvent:FireServer(LocalPlayer) end)
-                    if hrp then
-                        hrp.Anchored = true
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                    end
-                    if hum then
-                        hum.Sit = false
-                        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                    end
-                    local head = char:FindFirstChild("Head")
-                    if head then
-                        local partOwner = head:FindFirstChild("PartOwner")
-                        if partOwner then partOwner:Destroy() end
-                    end
-                    pcall(function()
-                        ragdollRemote:FireServer(hrp, 0)
-                    end)
-                else
-                    if hrp and hrp.Anchored then hrp.Anchored = false end
-                end
-            end
-            RunService.Heartbeat:Wait()
-        end
     end
 
     local function BlodmanKickLoop()
@@ -1719,7 +1804,11 @@ function StartMainScript(titleText)
 
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if antiGrabEnabled then antiGrabTask = task.spawn(AntiGrabLoop) end
+        if antiGrabEnabled then 
+            savedCFrame = nil
+            if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+            antiGrabTask = task.spawn(AntiGrabLoop)
+        end
         if fovEnabled then SetFOV(true) end
         if infiniteRagdoll then infiniteRagdollTask = task.spawn(InfiniteRagdollLoop) end
     end)
@@ -1732,21 +1821,12 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
+    -- НОВЫЙ ANTI-GRAB TOGGLE
     AntiGrabBlock:AddToggle("Anti-Grab", {
         Text = "Anti-Grab",
         Default = false,
         Callback = function(Value)
-            antiGrabEnabled = Value
-            if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
-            if Value then
-                antiGrabTask = task.spawn(AntiGrabLoop)
-            else
-                local char = LocalPlayer.Character
-                if char then
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    if hrp then hrp.Anchored = false end
-                end
-            end
+            ToggleAntiGrab(Value)
         end
     })
 
@@ -1792,7 +1872,8 @@ function StartMainScript(titleText)
         })
     end
 
-    local antiBanActive = false    local antiBanCon = nil
+    local antiBanActive = false
+    local antiBanCon = nil
     local warnTimestamps = {}
 
     local function startAntiBan()
@@ -1930,11 +2011,11 @@ function StartMainScript(titleText)
             bodyPos.D = 100
             bodyPos.Position = pos
             bodyPos.Parent = targetRoot
-            bodyGyro = Instance.new("BodyGyro")
-            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bodyGyro.D = 100
-            bodyGyro.CFrame = CFrame.new(pos)
-            bodyGyro.Parent = targetRoot
+            bodyGyro2 = Instance.new("BodyGyro")
+            bodyGyro2.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro2.D = 100
+            bodyGyro2.CFrame = CFrame.new(pos)
+            bodyGyro2.Parent = targetRoot
         end
 
         while kickActive do
@@ -1980,7 +2061,7 @@ function StartMainScript(titleText)
                     
                     if bodyPos and bodyPos.Parent then
                         bodyPos.Position = lockPos.Position
-                        if bodyGyro then bodyGyro.CFrame = lockPos end
+                        if bodyGyro2 then bodyGyro2.CFrame = lockPos end
                     else
                         createBodies(tRoot, lockPos.Position)
                     end
@@ -2237,8 +2318,10 @@ function StartMainScript(titleText)
         cleanupBodies()
         ownershipRagdollActive = false
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
-        antiGrabEnabled = false
-        if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
+        
+        -- Чистим новый антиграб
+        CleanupAntiGrab()
+        
         if fovEnabled then SetFOV(false) fovEnabled = false end
         if isAntiKickActive then
             isAntiKickActive = false
