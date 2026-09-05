@@ -766,7 +766,6 @@ function StartMainScript(titleText)
     local infiniteRagdoll = false
     local infiniteRagdollTask = nil
 
-    -- НОВЫЙ ANTI-GRAB
     local antiGrabEnabled = false
     local antiGrabTask = nil
     local savedCFrame = nil
@@ -1821,7 +1820,6 @@ function StartMainScript(titleText)
         Callback = function(Value) holdHeight = Value end
     })
 
-    -- НОВЫЙ ANTI-GRAB TOGGLE
     AntiGrabBlock:AddToggle("Anti-Grab", {
         Text = "Anti-Grab",
         Default = false,
@@ -2319,7 +2317,6 @@ function StartMainScript(titleText)
         ownershipRagdollActive = false
         if ownershipRagdollTask then task.cancel(ownershipRagdollTask) end
         
-        -- Чистим новый антиграб
         CleanupAntiGrab()
         
         if fovEnabled then SetFOV(false) fovEnabled = false end
