@@ -216,7 +216,6 @@ function StartMainScript(titleText)
     local DefenseTab = Window:AddTab("Defense", "shield")
     local VisualTab = Window:AddTab("Visual", "eye")
     local BlodmanTab = Window:AddTab("Blobman", "venetian-mask")
-    local ServerTab = Window:AddTab("Server", "server")
     local Settings = Window:AddTab("Settings", "settings")
 
     local MenuGroup = Settings:AddLeftGroupbox("Menu", "wrench")
@@ -585,8 +584,6 @@ function StartMainScript(titleText)
     local BlodmanCircleBlock = BlodmanTab:AddLeftGroupbox("Blob Kick (CIRCLE)", "venetian-mask")
     local BlodmanCircleSettingsBlock = BlodmanTab:AddRightGroupbox("Settings Circle", "settings")
     local BlodmanAutoSitBlock = BlodmanTab:AddLeftGroupbox("Auto Sit Blodman", "robot-arm")
-    
-    local MonsterLagBlock = ServerTab:AddLeftGroupbox("Monster Lag", "zap")
 
     local InputToyList = {
         ["White Mug"] = "CupMugWhite",
@@ -1041,44 +1038,6 @@ function StartMainScript(titleText)
             end
         end
     })
-
-    do
-        _G.MonsterLagEnabled = false
-
-        MonsterLagBlock:AddToggle("Monster Lag", {
-            Text = "Monster Lag",
-            Default = false,
-            Callback = function(Value)
-                _G.MonsterLagEnabled = Value
-                
-                if Value then
-                    task.spawn(function()
-                        local RepS = game:GetService("ReplicatedStorage")
-                        local WS = game:GetService("Workspace")
-                        local LP = game:GetService("Players").LocalPlayer
-                        local GrabEvents = RepS:FindFirstChild("GrabEvents")
-                        local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
-
-                        while _G.MonsterLagEnabled and CreateLine do
-                            local spawnLocation = WS:FindFirstChild("SpawnLocation") 
-                                or WS:FindFirstChild("Spawn") 
-                                or (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart"))
-
-                            if spawnLocation then
-                                local randomX = math.random(-9e9, 9e9)
-                                local randomZ = math.random(-9e9, 9e9)
-                                CreateLine:FireServer(spawnLocation, CFrame.new(randomX, 0, randomZ))
-                            end
-                            task.wait(0.01)
-                        end
-                    end)
-                    Library:Notify("Monster Lag", "Enabled", 2)
-                else
-                    Library:Notify("Monster Lag", "Disabled", 2)
-                end
-            end
-        })
-    end
 
     local function AutoSitBlodmanLoop()
         while autoSitBlodmanActive do
@@ -2676,7 +2635,8 @@ function StartMainScript(titleText)
         task.spawn(function()
             local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
             local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
-            if inv and destroyToy then                for _,v in pairs(inv:GetChildren()) do 
+            if inv and destroyToy then
+                for _,v in pairs(inv:GetChildren()) do 
                     if v.Name == "AntiKickItem" then 
                         pcall(function() destroyToy:FireServer(v) end)
                     end
