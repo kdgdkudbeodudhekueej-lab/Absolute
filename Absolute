@@ -5,7 +5,6 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
-local UserInputService = game:GetService("UserInputService")
 
 local SCRIPT_NAME = "Absolute"
 local SCRIPT_VERSION = "v???"
@@ -121,6 +120,7 @@ task.spawn(function()
         end
     end
 end)
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "Absolute_Startup"
 screenGui.ResetOnSpawn = false
@@ -129,9 +129,9 @@ screenGui.Parent = playerGui
 local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"))()
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
+
 function StartMainScript(titleText)
     local Players = game:GetService("Players")
-
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local RunService = game:GetService("RunService")
     local Workspace = game:GetService("Workspace")
@@ -144,18 +144,20 @@ function StartMainScript(titleText)
         Theme = "Night",
         ToggleKey = Enum.KeyCode.RightShift,
         EnableCompacting = true,
-	SidebarCompacted = true,
-	CornerRadius = 20
+        SidebarCompacted = true,
+        CornerRadius = 20
     })
-ThemeManager:SetLibrary(Library)
-ThemeManager:SetDefaultTheme({
-	BackgroundColor = Color3.fromRGB(10, 10, 10), -- Р§РµСЂРЅС‹Р№ С„РѕРЅ
-	MainColor = Color3.fromRGB(18, 18, 18),        -- РўРµРјРЅРѕ-СЃРµСЂС‹Рµ РїР°РЅРµР»Рё
-	AccentColor = Color3.fromRGB(255, 215, 0),     -- РЇСЂРєРѕ-Р¶РµР»С‚С‹Рµ РёРєРѕРЅРєРё Рё Р°РєС‚РёРІРЅС‹Рµ СЌР»РµРјРµРЅС‚С‹
-	OutlineColor = Color3.fromRGB(10, 10, 10),    -- Р–РµР»С‚С‹Рµ РєРѕРЅС‚СѓСЂС‹ Рё Р»РёРЅРёРё
-	FontColor = Color3.fromRGB(255, 255, 255),      -- Р‘РµР»С‹Р№ С‚РµРєСЃС‚
-	FontFace = "Code"
-})
+
+    ThemeManager:SetLibrary(Library)
+    ThemeManager:SetDefaultTheme({
+        BackgroundColor = Color3.fromRGB(10, 10, 10),
+        MainColor = Color3.fromRGB(18, 18, 18),
+        AccentColor = Color3.fromRGB(255, 215, 0),
+        OutlineColor = Color3.fromRGB(10, 10, 10),
+        FontColor = Color3.fromRGB(255, 255, 255),
+        FontFace = "Code"
+    })
+
     Library.ToggleKeybind = Enum.KeyCode.RightShift
 
     local mainGui = Window.Parent
@@ -215,45 +217,47 @@ ThemeManager:SetDefaultTheme({
     local VisualTab = Window:AddTab("Visual", "eye")
     local BlodmanTab = Window:AddTab("Blobman", "venetian-mask")
     local Settings = Window:AddTab("Settings", "settings")
+
     local MenuGroup = Settings:AddLeftGroupbox("Menu", "wrench")
-MenuGroup:AddToggle("KeybindMenuOpen", {
-    Default = Library.KeybindFrame.Visible,
-    Text = "Binds Menu",
-    Callback = function(value)
-        Library.KeybindFrame.Visible = value
-    end,
-})
---
-MenuGroup:AddToggle("ShowCustomCursor", {
-    Text = "Custom Cursor",
-    Default = true,
-    Callback = function(Value)
-        Library.ShowCustomCursor = Value
-    end,
-})
---
-MenuGroup:AddButton("Unload", function()
-    Library:Unload()
-end)
---
-MenuGroup:AddDivider()
-MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", { Default = "Tab", NoUI = true, Text = "Keybind Menu" })
---
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-ThemeManager:SetFolder("Absolute")
-SaveManager:SetFolder("Absolute/Configs")
-SaveManager:BuildConfigSection(Settings)
-ThemeManager:ApplyToTab(Settings)
-MenuGroup:AddToggle("KeybindMenuOpen", {
-    Default = Library.KeybindFrame.Visible,
-    Text = "Binds Menu",
-    Callback = function(value)
-        Library.KeybindFrame.Visible = value
-    end,
-})
+    MenuGroup:AddToggle("KeybindMenuOpen", {
+        Default = Library.KeybindFrame.Visible,
+        Text = "Binds Menu",
+        Callback = function(value)
+            Library.KeybindFrame.Visible = value
+        end,
+    })
+
+    MenuGroup:AddToggle("ShowCustomCursor", {
+        Text = "Custom Cursor",
+        Default = true,
+        Callback = function(Value)
+            Library.ShowCustomCursor = Value
+        end,
+    })
+
+    MenuGroup:AddButton("Unload", function()
+        Library:Unload()
+    end)
+
+    MenuGroup:AddDivider()
+    MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", { Default = "Tab", NoUI = true, Text = "Keybind Menu" })
+
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+    ThemeManager:SetFolder("Absolute")
+    SaveManager:SetFolder("Absolute/Configs")
+    SaveManager:BuildConfigSection(Settings)
+    ThemeManager:ApplyToTab(Settings)
+
+    MenuGroup:AddToggle("KeybindMenuOpen", {
+        Default = Library.KeybindFrame.Visible,
+        Text = "Binds Menu",
+        Callback = function(value)
+            Library.KeybindFrame.Visible = value
+        end,
+    })
 
     local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength")
     
@@ -350,6 +354,218 @@ MenuGroup:AddToggle("KeybindMenuOpen", {
             end
         end
     end)
+
+    local TeleportSection = MainTab:AddLeftGroupbox("Teleport", "rocket")
+    
+    local isLocked = false
+    local isButtonVisible = false
+    local tpButton = nil
+    local tpGui = nil
+    
+    local function CreateTeleportButton()
+        tpGui = Instance.new("ScreenGui")
+        tpGui.Name = "TeleportButton"
+        tpGui.ResetOnSpawn = false
+        tpGui.Enabled = false
+        tpGui.Parent = LocalPlayer.PlayerGui
+        
+        local btn = Instance.new("ImageButton")
+        btn.Size = UDim2.new(0, 65, 0, 65)
+        btn.Position = UDim2.new(1, -145, 1, -90)
+        btn.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+        btn.BackgroundTransparency = 0.1
+        btn.BorderSizePixel = 0
+        btn.Image = "rbxassetid://97166444"
+        btn.ImageTransparency = 1
+        btn.Parent = tpGui
+        tpButton = btn
+        
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(1, 0)
+        UICorner.Parent = btn
+        
+        local glow = Instance.new("ImageLabel")
+        glow.Size = UDim2.new(1.6, 0, 1.6, 0)
+        glow.Position = UDim2.new(-0.3, 0, -0.3, 0)
+        glow.Image = "rbxassetid://6023423762"
+        glow.BackgroundTransparency = 1
+        glow.ImageColor3 = Color3.fromRGB(80, 0, 120)
+        glow.ImageTransparency = 0.6
+        glow.Parent = btn
+        
+        local ring = Instance.new("ImageLabel")
+        ring.Size = UDim2.new(1.3, 0, 1.3, 0)
+        ring.Position = UDim2.new(-0.15, 0, -0.15, 0)
+        ring.Image = "rbxassetid://6023420564"
+        ring.BackgroundTransparency = 1
+        ring.ImageColor3 = Color3.fromRGB(255, 100, 0)
+        ring.ImageTransparency = 0.5
+        ring.Parent = btn
+        
+        local singularity = Instance.new("ImageLabel")
+        singularity.Size = UDim2.new(0.4, 0, 0.4, 0)
+        singularity.Position = UDim2.new(0.3, 0, 0.3, 0)
+        singularity.Image = "rbxassetid://6023423762"
+        singularity.BackgroundTransparency = 1
+        singularity.ImageColor3 = Color3.fromRGB(255, 200, 50)
+        singularity.ImageTransparency = 0.3
+        singularity.Parent = btn
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0.4, 0)
+        label.Position = UDim2.new(0, 0, 0.3, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "TP"
+        label.TextColor3 = Color3.fromRGB(255, 200, 100)
+        label.TextSize = 14
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.Parent = btn
+        
+        local angle = 0
+        local ringConnection = RunService.Heartbeat:Connect(function(dt)
+            if not btn.Parent then ringConnection:Disconnect() return end
+            angle = angle + dt * 1.5
+            ring.Rotation = angle * 57.3
+        end)
+        
+        local pulse = 1
+        local pulseDir = 1
+        local pulseConnection = RunService.Heartbeat:Connect(function(dt)
+            if not btn.Parent then pulseConnection:Disconnect() return end
+            pulse = pulse + pulseDir * dt * 0.5
+            if pulse > 1.3 then pulseDir = -1 end
+            if pulse < 0.7 then pulseDir = 1 end
+            singularity.Size = UDim2.new(0.3 * pulse, 0, 0.3 * pulse, 0)
+            singularity.ImageTransparency = 0.2 * (2 - pulse)
+        end)
+        
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.3), {Size = UDim2.new(0, 75, 0, 75), BackgroundTransparency = 0}):Play()
+            TweenService:Create(glow, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(150, 0, 200), ImageTransparency = 0.3}):Play()
+            TweenService:Create(ring, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 150, 0), ImageTransparency = 0.2}):Play()
+            TweenService:Create(singularity, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 255, 255), ImageTransparency = 0.1}):Play()
+            TweenService:Create(label, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end)
+        
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.3), {Size = UDim2.new(0, 65, 0, 65), BackgroundTransparency = 0.1}):Play()
+            TweenService:Create(glow, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(80, 0, 120), ImageTransparency = 0.6}):Play()
+            TweenService:Create(ring, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 100, 0), ImageTransparency = 0.5}):Play()
+            TweenService:Create(singularity, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 200, 50), ImageTransparency = 0.3}):Play()
+            TweenService:Create(label, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(255, 200, 100)}):Play()
+        end)
+        
+        local isDragging = false
+        local dragStart = nil
+        local startPos = nil
+        
+        btn.InputBegan:Connect(function(input)
+            if isLocked then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = true
+                dragStart = input.Position
+                startPos = btn.Position
+            end
+        end)
+        
+        btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = false
+            end
+        end)
+        
+        UserInputService.InputChanged:Connect(function(input)
+            if isLocked then return end
+            if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                btn.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+        
+        local cooldown = false
+        
+        local function teleport()
+            if cooldown then return end
+            cooldown = true
+            
+            TweenService:Create(singularity, TweenInfo.new(0.1), {ImageColor3 = Color3.fromRGB(255, 255, 255), ImageTransparency = 0}):Play()
+            TweenService:Create(ring, TweenInfo.new(0.1), {ImageColor3 = Color3.fromRGB(255, 255, 255), ImageTransparency = 0}):Play()
+            
+            task.delay(0.15, function()
+                TweenService:Create(singularity, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 200, 50), ImageTransparency = 0.3}):Play()
+                TweenService:Create(ring, TweenInfo.new(0.3), {ImageColor3 = Color3.fromRGB(255, 100, 0), ImageTransparency = 0.5}):Play()
+            end)
+            
+            local char = LocalPlayer.Character
+            if char then
+                local camPart = char:FindFirstChild("CamPart")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if camPart and hrp then
+                    local ray = Ray.new(camPart.Position, camPart.CFrame.lookVector * 5000)
+                    local hit, pos = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
+                    if hit and pos then
+                        hrp.CFrame = CFrame.new(pos.X, pos.Y + 5, pos.Z)
+                    end
+                end
+            end
+            
+            task.delay(0.25, function()
+                cooldown = false
+            end)
+        end
+        
+        btn.MouseButton1Click:Connect(function()
+            if isDragging then return end
+            teleport()
+        end)
+        
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch and not isDragging then
+                teleport()
+            end
+        end)
+        
+        UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.KeyCode == Enum.KeyCode.Z then
+                teleport()
+            end
+        end)
+        
+        btn.AncestryChanged:Connect(function()
+            if not btn.Parent then
+                ringConnection:Disconnect()
+                pulseConnection:Disconnect()
+            end
+        end)
+    end
+    
+    TeleportSection:AddToggle("TP Button", {
+        Text = "🌀 TP Button",
+        Default = false,
+        Callback = function(Value)
+            isButtonVisible = Value
+            if tpGui then
+                tpGui.Enabled = Value
+            end
+        end
+    })
+    
+    TeleportSection:AddToggle("Lock Button", {
+        Text = "🔒 Lock Button",
+        Default = false,
+        Callback = function(Value)
+            isLocked = Value
+        end
+    })
+    
+    TeleportSection:AddLabel("Hotkey: Z")
+    
+    task.spawn(CreateTeleportButton)
 
     local KickBlock = TargetTab:AddLeftGroupbox("Ownership Kick", "swords")
     local PalletBlock = TargetTab:AddRightGroupbox("Pallet Ragdoll", "sword")
@@ -1576,8 +1792,7 @@ MenuGroup:AddToggle("KeybindMenuOpen", {
         })
     end
 
-    local antiBanActive = false
-    local antiBanCon = nil
+    local antiBanActive = false    local antiBanCon = nil
     local warnTimestamps = {}
 
     local function startAntiBan()
@@ -1685,129 +1900,129 @@ MenuGroup:AddToggle("KeybindMenuOpen", {
         end
     })
 
-local function OwnershipKickFunction(targetName)
-	local target = Players:FindFirstChild(targetName)
-	if not target then return end
-	
-	local myChar = LocalPlayer.Character
-	local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-	if not myRoot then return end
+    local function OwnershipKickFunction(targetName)
+        local target = Players:FindFirstChild(targetName)
+        if not target then return end
+        
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
 
-	local savedPos = myRoot.CFrame 
-	local dragging = false
-	local grabStartTime = 0
-	local checkStartTime = 0
-	
-	local currentFPS = 60
-	local fpsConnection = RunService.RenderStepped:Connect(function(dt)
-		currentFPS = 1 / dt
-	end)
+        local savedPos = myRoot.CFrame 
+        local dragging = false
+        local grabStartTime = 0
+        local checkStartTime = 0
+        
+        local currentFPS = 60
+        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
+            currentFPS = 1 / dt
+        end)
 
-	local function createBodies(targetRoot, pos)
-		cleanupBodies()
-		for _, v in pairs(targetRoot:GetChildren()) do
-			if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-				v:Destroy()
-			end
-		end
-		bodyPos = Instance.new("BodyPosition")
-		bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-		bodyPos.D = 100
-		bodyPos.Position = pos
-		bodyPos.Parent = targetRoot
-		bodyGyro = Instance.new("BodyGyro")
-		bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-		bodyGyro.D = 100
-		bodyGyro.CFrame = CFrame.new(pos)
-		bodyGyro.Parent = targetRoot
-	end
+        local function createBodies(targetRoot, pos)
+            cleanupBodies()
+            for _, v in pairs(targetRoot:GetChildren()) do
+                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
+            bodyPos = Instance.new("BodyPosition")
+            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyPos.D = 100
+            bodyPos.Position = pos
+            bodyPos.Parent = targetRoot
+            bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro.D = 100
+            bodyGyro.CFrame = CFrame.new(pos)
+            bodyGyro.Parent = targetRoot
+        end
 
-	while kickActive do
-		local currentTarget = Players:FindFirstChild(target.Name)
-		if not currentTarget or not currentTarget.Parent then 
-			cleanupBodies()
-			break 
-		end
-		
-		myChar = LocalPlayer.Character
-		myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-		local tChar = currentTarget.Character
-		local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-		local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
-		
-		if tRoot and tHum and tHum.Health > 0 and myRoot then
-			local lockPos = savedPos * CFrame.new(0, holdHeight or 0, 0)
+        while kickActive do
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then 
+                cleanupBodies()
+                break 
+            end
+            
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local tChar = currentTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+            
+            if tRoot and tHum and tHum.Health > 0 and myRoot then
+                local lockPos = savedPos * CFrame.new(0, holdHeight or 0, 0)
 
-			if not dragging then
-				myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-				cleanupBodies()
-				checkStartTime = 0
-				pcall(function()
-					tHum.PlatformStand = true
-					tHum.Sit = true
-					SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-					DestroyGrabLine:FireServer(tRoot)
-				end)
-				myRoot.AssemblyLinearVelocity = Vector3.zero
-				myRoot.AssemblyAngularVelocity = Vector3.zero
-				
-				if grabStartTime == 0 then grabStartTime = tick() end
-				if tick() - grabStartTime > 0.35 then
-					dragging = true
-					grabStartTime = 0
-					checkStartTime = tick()
-					createBodies(tRoot, lockPos.Position)
-				end
-			else
-				myRoot.CFrame = savedPos
-				myRoot.AssemblyLinearVelocity = Vector3.zero
-				myRoot.AssemblyAngularVelocity = Vector3.zero
-				
-				if bodyPos and bodyPos.Parent then
-					bodyPos.Position = lockPos.Position
-					if bodyGyro then bodyGyro.CFrame = lockPos end
-				else
-					createBodies(tRoot, lockPos.Position)
-				end
-				
-				tHum.PlatformStand = true
-				pcall(function()
-					SetNetworkOwner:FireServer(tRoot, lockPos)
-					DestroyGrabLine:FireServer(tRoot)
-				end)
-			end
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    cleanupBodies()
+                    checkStartTime = 0
+                    pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.35 then
+                        dragging = true
+                        grabStartTime = 0
+                        checkStartTime = tick()
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                else
+                    myRoot.CFrame = savedPos
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    if bodyPos and bodyPos.Parent then
+                        bodyPos.Position = lockPos.Position
+                        if bodyGyro then bodyGyro.CFrame = lockPos end
+                    else
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                    
+                    tHum.PlatformStand = true
+                    pcall(function()
+                        SetNetworkOwner:FireServer(tRoot, lockPos)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                end
 
-			if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
-				local currentDist = (tRoot.Position - lockPos.Position).Magnitude
-				if currentDist > 10 then
-					dragging = false
-					grabStartTime = 0
-					checkStartTime = 0
-					cleanupBodies()
-					myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-				else
-					checkStartTime = tick()
-				end
-			end
-		else
-			dragging = false
-			grabStartTime = 0
-			checkStartTime = 0
-			cleanupBodies()
-		end
-		RunService.Heartbeat:Wait()
-	end
-	
-	fpsConnection:Disconnect()
-	cleanupBodies()
-	if myRoot then myRoot.CFrame = savedPos end
-	if target and target.Character then
-		local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
-		if tRoot then
-			pcall(function() DestroyGrabLine:FireServer(tRoot) end)
-		end
-	end
-end
+                if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+                    local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                    if currentDist > 10 then
+                        dragging = false
+                        grabStartTime = 0
+                        checkStartTime = 0
+                        cleanupBodies()
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    else
+                        checkStartTime = tick()
+                    end
+                end
+            else
+                dragging = false
+                grabStartTime = 0
+                checkStartTime = 0
+                cleanupBodies()
+            end
+            RunService.Heartbeat:Wait()
+        end
+        
+        fpsConnection:Disconnect()
+        cleanupBodies()
+        if myRoot then myRoot.CFrame = savedPos end
+        if target and target.Character then
+            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+            end
+        end
+    end
 
     KickBlock:AddToggle("Enable Ownership Kick", {
         Text = "Enable Ownership Kick",
@@ -1847,168 +2062,158 @@ end
         Segments = 8,
         ImpactPower = 10
     }
-PalletBlock:AddToggle("PalletRagdoll", {
-    Text = "Pallet Ragdoll",
-    Default = false,
-    Callback = function(Value)
-        SetToggleState("Ragdoll Target", Value)
-        local RS = game:GetService("ReplicatedStorage")
-        local RunService = game:GetService("RunService")
-        local DestroyToy = RS:WaitForChild("MenuToys"):WaitForChild("DestroyToy")
-        local SetNetOwner = RS:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner")
-        local DestroyLine = RS:WaitForChild("GrabEvents"):WaitForChild("DestroyGrabLine")
-        local toysFolder = workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
-        local lpName = LocalPlayer.Name
 
-        -- Clean up existing frame connections
-        local function clearAttackLoop()
-            if getgenv().ragdollSteppedConn then
-                getgenv().ragdollSteppedConn:Disconnect()
-                getgenv().ragdollSteppedConn = nil
-            end
-        end
+    PalletBlock:AddToggle("PalletRagdoll", {
+        Text = "Pallet Ragdoll",
+        Default = false,
+        Callback = function(Value)
+            SetToggleState("Ragdoll Target", Value)
+            local RS = game:GetService("ReplicatedStorage")
+            local RunService = game:GetService("RunService")
+            local DestroyToy = RS:WaitForChild("MenuToys"):WaitForChild("DestroyToy")
+            local SetNetOwner = RS:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner")
+            local DestroyLine = RS:WaitForChild("GrabEvents"):WaitForChild("DestroyGrabLine")
+            local toysFolder = workspace:WaitForChild(LocalPlayer.Name .. "SpawnedInToys")
+            local lpName = LocalPlayer.Name
 
-        if Value then
-            if not selectedKickPlayer then
-                notify("Warning", "Select Target first", 3)
-                return
+            local function clearAttackLoop()
+                if getgenv().ragdollSteppedConn then
+                    getgenv().ragdollSteppedConn:Disconnect()
+                    getgenv().ragdollSteppedConn = nil
+                end
             end
 
-            getgenv().palletRagdollActive = true
-            getgenv().PalletForRagdoll = nil
-            
-            if getgenv().palletCacheConn then
-                getgenv().palletCacheConn:Disconnect()
-            end
-            clearAttackLoop()
+            if Value then
+                if not selectedKickPlayer then
+                    notify("Warning", "Select Target first", 3)
+                    return
+                end
 
-            -- 1. Cache and Setup Pallet
-            getgenv().palletCacheConn = toysFolder.ChildAdded:Connect(function(child)
-                if not getgenv().palletRagdollActive then return end
-                if child.Name ~= "PalletLightBrown" and child.Name ~= "PalletForRagdoll" then return end
+                getgenv().palletRagdollActive = true
+                getgenv().PalletForRagdoll = nil
+                
+                if getgenv().palletCacheConn then
+                    getgenv().palletCacheConn:Disconnect()
+                end
+                clearAttackLoop()
 
-                local soundPart = child:WaitForChild("SoundPart", 3)
-                if not soundPart then return end
+                getgenv().palletCacheConn = toysFolder.ChildAdded:Connect(function(child)
+                    if not getgenv().palletRagdollActive then return end
+                    if child.Name ~= "PalletLightBrown" and child.Name ~= "PalletForRagdoll" then return end
 
-                -- Claim network ownership instantly
-                pcall(function()
-                    SetNetOwner:FireServer(soundPart, soundPart.CFrame)
-                    DestroyLine:FireServer(soundPart)
-                end)
+                    local soundPart = child:WaitForChild("SoundPart", 3)
+                    if not soundPart then return end
 
-                local partOwner = soundPart:WaitForChild("PartOwner", 1)
-                if partOwner and partOwner.Value == lpName then
-                    -- Make fully invisible and non-collidable for local player
-                    for _, v in pairs(child:GetChildren()) do
-                        if v:IsA("BasePart") then
-                            v.CanCollide = false
-                            v.CanQuery = false
-                            v.Transparency = 1 
-                        end
-                    end
+                    pcall(function()
+                        SetNetOwner:FireServer(soundPart, soundPart.CFrame)
+                        DestroyLine:FireServer(soundPart)
+                    end)
 
-                    child.Name = "PalletForRagdoll"
-                    getgenv().PalletForRagdoll = child
-
-                    -- Toggle flag for the alternating strike directions
-                    local strikePhase = false
-
-                    -- 2. Engine-Synced Attack Loop (Stepped runs right before physics simulation)
-                    getgenv().ragdollSteppedConn = RunService.Stepped:Connect(function()
-                        if not getgenv().palletRagdollActive or not child.Parent then 
-                            clearAttackLoop()
-                            return 
+                    local partOwner = soundPart:WaitForChild("PartOwner", 1)
+                    if partOwner and partOwner.Value == lpName then
+                        for _, v in pairs(child:GetChildren()) do
+                            if v:IsA("BasePart") then
+                                v.CanCollide = false
+                                v.CanQuery = false
+                                v.Transparency = 1 
+                            end
                         end
 
-                        local tChar = selectedKickPlayer and selectedKickPlayer.Character
-                        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-                        local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                        child.Name = "PalletForRagdoll"
+                        getgenv().PalletForRagdoll = child
 
-                        if tRoot and tHum and soundPart.Parent and tHum.Health > 0 then
-                            local ragdolledVal = tHum:FindFirstChild("Ragdolled")
-                            local isRagdolled = ragdolledVal and ragdolledVal.Value or false
+                        local strikePhase = false
 
-                            if not isRagdolled then
-                                -- Alternating hyper-velocity strikes every single frame
-                                strikePhase = not strikePhase
-                                if strikePhase then
-                                    soundPart.CFrame = tRoot.CFrame * CFrame.new(0, 2, 0)
-                                    soundPart.AssemblyLinearVelocity = Vector3.new(0, -9e5, 0)
+                        getgenv().ragdollSteppedConn = RunService.Stepped:Connect(function()
+                            if not getgenv().palletRagdollActive or not child.Parent then 
+                                clearAttackLoop()
+                                return 
+                            end
+
+                            local tChar = selectedKickPlayer and selectedKickPlayer.Character
+                            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                            local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+
+                            if tRoot and tHum and soundPart.Parent and tHum.Health > 0 then
+                                local ragdolledVal = tHum:FindFirstChild("Ragdolled")
+                                local isRagdolled = ragdolledVal and ragdolledVal.Value or false
+
+                                if not isRagdolled then
+                                    strikePhase = not strikePhase
+                                    if strikePhase then
+                                        soundPart.CFrame = tRoot.CFrame * CFrame.new(0, 2, 0)
+                                        soundPart.AssemblyLinearVelocity = Vector3.new(0, -9e5, 0)
+                                    else
+                                        soundPart.CFrame = tRoot.CFrame * CFrame.new(0, -1, 0)
+                                        soundPart.AssemblyLinearVelocity = Vector3.new(0, 9e5, 0)
+                                    end
                                 else
-                                    soundPart.CFrame = tRoot.CFrame * CFrame.new(0, -1, 0)
-                                    soundPart.AssemblyLinearVelocity = Vector3.new(0, 9e5, 0)
+                                    soundPart.CFrame = CFrame.new(0, 9e9, 0)
+                                    soundPart.AssemblyLinearVelocity = Vector3.zero
                                 end
                             else
-                                -- Instantly pull away to reduce lag once ragdolled
                                 soundPart.CFrame = CFrame.new(0, 9e9, 0)
                                 soundPart.AssemblyLinearVelocity = Vector3.zero
                             end
-                        else
-                            soundPart.CFrame = CFrame.new(0, 9e9, 0)
-                            soundPart.AssemblyLinearVelocity = Vector3.zero
-                        end
-                    end)
+                        end)
 
-                    -- Handle respawn/destruction
-                    child.AncestryChanged:Connect(function()
-                        if not child.Parent then
-                            clearAttackLoop()
-                            getgenv().PalletForRagdoll = nil
-                            if getgenv().palletRagdollActive then
-                                task.wait(0.03)
-                                if getgenv().spawnNewPallet then getgenv().spawnNewPallet() end
+                        child.AncestryChanged:Connect(function()
+                            if not child.Parent then
+                                clearAttackLoop()
+                                getgenv().PalletForRagdoll = nil
+                                if getgenv().palletRagdollActive then
+                                    task.wait(0.03)
+                                    if getgenv().spawnNewPallet then getgenv().spawnNewPallet() end
+                                end
                             end
-                        end
-                    end)
-                else
-                    pcall(function() DestroyToy:FireServer(child) end)
-                end
-            end)
-
-            -- 3. Toy Spawner Function
-            getgenv().spawnNewPallet = function()
-                if not getgenv().palletRagdollActive then return end
-                if getgenv().PalletForRagdoll and getgenv().PalletForRagdoll.Parent then return end
-                
-                local c = LocalPlayer.Character
-                local h = c and c:FindFirstChild("HumanoidRootPart")
-                if not h then return end
-
-                task.spawn(function()
-                    pcall(function()
-                        RS.MenuToys.SpawnToyRemoteFunction:InvokeServer(
-                            "PalletLightBrown",
-                            h.CFrame * CFrame.new(0, 10, 20),
-                            Vector3.zero
-                        )
-                    end)
+                        end)
+                    else
+                        pcall(function() DestroyToy:FireServer(child) end)
+                    end
                 end)
+
+                getgenv().spawnNewPallet = function()
+                    if not getgenv().palletRagdollActive then return end
+                    if getgenv().PalletForRagdoll and getgenv().PalletForRagdoll.Parent then return end
+                    
+                    local c = LocalPlayer.Character
+                    local h = c and c:FindFirstChild("HumanoidRootPart")
+                    if not h then return end
+
+                    task.spawn(function()
+                        pcall(function()
+                            RS.MenuToys.SpawnToyRemoteFunction:InvokeServer(
+                                "PalletLightBrown",
+                                h.CFrame * CFrame.new(0, 10, 20),
+                                Vector3.zero
+                            )
+                        end)
+                    end)
+                end
+
+                getgenv().spawnNewPallet()
+            else
+                getgenv().palletRagdollActive = false
+                clearAttackLoop()
+
+                if getgenv().palletCacheConn then
+                    getgenv().palletCacheConn:Disconnect()
+                    getgenv().palletCacheConn = nil
+                end
+
+                local pallet = getgenv().PalletForRagdoll
+                if pallet and pallet.Parent then
+                    pcall(function() DestroyToy:FireServer(pallet) end)
+                end
+
+                getgenv().PalletForRagdoll = nil
+
+                if toysFolder:FindFirstChild("PalletForRagdoll") then
+                    pcall(function() DestroyToy:FireServer(toysFolder.PalletForRagdoll) end)
+                end
             end
-
-            getgenv().spawnNewPallet()
-        else
-            -- Clean up everything completely
-            getgenv().palletRagdollActive = false
-            clearAttackLoop()
-
-            if getgenv().palletCacheConn then
-                getgenv().palletCacheConn:Disconnect()
-                getgenv().palletCacheConn = nil
-            end
-
-            local pallet = getgenv().PalletForRagdoll
-            if pallet and pallet.Parent then
-                pcall(function() DestroyToy:FireServer(pallet) end)
-            end
-
-            getgenv().PalletForRagdoll = nil
-
-            if toysFolder:FindFirstChild("PalletForRagdoll") then
-                pcall(function() DestroyToy:FireServer(toysFolder.PalletForRagdoll) end)
-            end
-        end
-    end,
-})
+        end,
+    })
 
     task.spawn(function()
         while true do
@@ -2118,7 +2323,9 @@ PalletBlock:AddToggle("PalletRagdoll", {
             end
         end
         return nil
-    end    local function SpawnToyItem(ToyName)
+    end
+
+    local function SpawnToyItem(ToyName)
         local InPlot = LocalPlayer:FindFirstChild("InPlot")
         local InOwnedPlot = LocalPlayer:FindFirstChild("InOwnedPlot")
         local CanSpawnToy = LocalPlayer:FindFirstChild("CanSpawnToy")
