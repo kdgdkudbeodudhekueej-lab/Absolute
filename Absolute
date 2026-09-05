@@ -251,44 +251,7 @@ function StartMainScript(titleText)
     SaveManager:BuildConfigSection(Settings)
     ThemeManager:ApplyToTab(Settings)
 
-    local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength", "hand")
-    LineLagGroup = MainTab:AddRightGroupbox("Line Lag", "spline")
-_G.MonsterLagEnabled = false
-
-    LineLagGroup:AddToggle("Lag",{
-        Text = "Line Lag",
-        Default = false,
-        Callback = function(Value)
-            _G.MonsterLagEnabled = Value
-            
-            if Value then
-                -- Start the lag loop
-                task.spawn(function()
-                    local RepS = game:GetService("ReplicatedStorage")
-                    local WS = game:GetService("Workspace")
-                    local LP = game:GetService("Players").LocalPlayer
-                    local GrabEvents = RepS:FindFirstChild("GrabEvents")
-                    local CreateLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
-
-                    while _G.MonsterLagEnabled and CreateLine do
-                        local spawnLocation = WS:FindFirstChild("SpawnLocation") 
-                            or WS:FindFirstChild("Spawn") 
-                            or (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart"))
-
-                        if spawnLocation then
-                            local randomX = math.random(-9e9, 9e9)
-                            local randomZ = math.random(-9e9, 9e9)
-                            CreateLine:FireServer(spawnLocation, CFrame.new(randomX, 0, randomZ))
-                        end
-                        task.wait() -- Adjust this to task.wait(0.01) if you want it faster
-                    end
-                end)
-                Library:Notify({ Title = "Monster Lag", Description = "Enabled", Duration = 2 })
-            else
-                Library:Notify({ Title = "Monster Lag", Description = "Disabled", Duration = 2 })
-            end
-        end
-    })
+    local SuperStrengthBlock = MainTab:AddLeftGroupbox("Super Strength")
     
     local superStrengthActive = false
     local superStrengthValue = 500
@@ -577,7 +540,7 @@ _G.MonsterLagEnabled = false
     end
     
     TeleportSection:AddToggle("TP Button", {
-        Text = "рџЊЂ TP Button",
+        Text = "🌀 TP Button",
         Default = false,
         Callback = function(Value)
             isButtonVisible = Value
@@ -588,7 +551,7 @@ _G.MonsterLagEnabled = false
     })
     
     TeleportSection:AddToggle("Lock Button", {
-        Text = "рџ”’ Lock Button",
+        Text = "🔒 Lock Button",
         Default = false,
         Callback = function(Value)
             isLocked = Value
@@ -2065,185 +2028,157 @@ _G.MonsterLagEnabled = false
         end
     })
 
-TargetGroup:AddToggle("SpamGrabKick", {
-        Text = "Spam Grab Kick",
+    local function OwnershipKickFunction(targetName)
+        local target = Players:FindFirstChild(targetName)
+        if not target then return end
+        
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+
+        local savedPos = myRoot.CFrame 
+        local dragging = false
+        local grabStartTime = 0
+        local checkStartTime = 0
+        
+        local currentFPS = 60
+        local fpsConnection = RunService.RenderStepped:Connect(function(dt)
+            currentFPS = 1 / dt
+        end)
+
+        local function createBodies(targetRoot, pos)
+            cleanupBodies()
+            for _, v in pairs(targetRoot:GetChildren()) do
+                if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
+            bodyPos = Instance.new("BodyPosition")
+            bodyPos.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyPos.D = 100
+            bodyPos.Position = pos
+            bodyPos.Parent = targetRoot
+            bodyGyro2 = Instance.new("BodyGyro")
+            bodyGyro2.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro2.D = 100
+            bodyGyro2.CFrame = CFrame.new(pos)
+            bodyGyro2.Parent = targetRoot
+        end
+
+        while kickActive do
+            local currentTarget = Players:FindFirstChild(target.Name)
+            if not currentTarget or not currentTarget.Parent then 
+                cleanupBodies()
+                break 
+            end
+            
+            myChar = LocalPlayer.Character
+            myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local tChar = currentTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+            
+            if tRoot and tHum and tHum.Health > 0 and myRoot then
+                local lockPos = savedPos * CFrame.new(0, holdHeight or 0, 0)
+
+                if not dragging then
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    cleanupBodies()
+                    checkStartTime = 0
+                    pcall(function()
+                        tHum.PlatformStand = true
+                        tHum.Sit = true
+                        SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    if grabStartTime == 0 then grabStartTime = tick() end
+                    if tick() - grabStartTime > 0.35 then
+                        dragging = true
+                        grabStartTime = 0
+                        checkStartTime = tick()
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                else
+                    myRoot.CFrame = savedPos
+                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+                    
+                    if bodyPos and bodyPos.Parent then
+                        bodyPos.Position = lockPos.Position
+                        if bodyGyro2 then bodyGyro2.CFrame = lockPos end
+                    else
+                        createBodies(tRoot, lockPos.Position)
+                    end
+                    
+                    tHum.PlatformStand = true
+                    pcall(function()
+                        SetNetworkOwner:FireServer(tRoot, lockPos)
+                        DestroyGrabLine:FireServer(tRoot)
+                    end)
+                end
+
+                if checkStartTime > 0 and tick() - checkStartTime > 0.30 then
+                    local currentDist = (tRoot.Position - lockPos.Position).Magnitude
+                    if currentDist > 10 then
+                        dragging = false
+                        grabStartTime = 0
+                        checkStartTime = 0
+                        cleanupBodies()
+                        myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+                    else
+                        checkStartTime = tick()
+                    end
+                end
+            else
+                dragging = false
+                grabStartTime = 0
+                checkStartTime = 0
+                cleanupBodies()
+            end
+            RunService.Heartbeat:Wait()
+        end
+        
+        fpsConnection:Disconnect()
+        cleanupBodies()
+        if myRoot then myRoot.CFrame = savedPos end
+        if target and target.Character then
+            local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                pcall(function() DestroyGrabLine:FireServer(tRoot) end)
+            end
+        end
+    end
+
+    KickBlock:AddToggle("Enable Ownership Kick", {
+        Text = "Enable Ownership Kick",
         Default = false,
         Callback = function(Value)
-            if SetToggleState then SetToggleState("SpamGrabKick", Value) end
-            applymethod = Value
-
             if Value then
                 if not selectedTarget then
-                    if Library and Library.Notify then
-                    notify("Error", "Select a target first!", 3)
-                    end
-                    applymethod = false
-                    -- Depending on your UI library, you might need to force the toggle back to false here.
                     return
                 end
-
-                spamGrabKickTask = task.spawn(function()
-                    local kickbp, kickbg
-                    
-                    while applymethod and RunService.RenderStepped:Wait() do
-                        local char = plr.Character
-                        local HRP = char and char:FindFirstChild("HumanoidRootPart")
-                        local hum = char and char:FindFirstChild("Humanoid")
-                        local inv = workspace:FindFirstChild(plr.Name.."SpawnedInToys")
-                        
-                        local tt = selectedKickPlayer
-                        if not tt or not tt.Character or not tt.Character:FindFirstChild("HumanoidRootPart") or not HRP or not inv then
-                            break
-                        end
-                        
-                        local Sets = {
-                            Char = tt.Character,
-                            HRP = tt.Character.HumanoidRootPart,
-                            Name = tt.Name
-                        }
-                        
-                        local pos = HRP.CFrame
-
-                        -- Process out-of-workspace character Logic
-                        if Sets.Char.Parent ~= workspace then
-                            local blob = gblob(hum) or inv:FindFirstChild("CreatureBlobman") or spawntoy("CreatureBlobman", HRP.CFrame * CFrame.new(5, 5, 20))
-                            if blob then
-                                repeat task.wait() until (blob:FindFirstChild("RightDetector") and blob:FindFirstChild("VehicleSeat")) or not applymethod
-                                if not applymethod then break end
-                                
-                                blob.Name = "cringe"
-                                
-                                repeat task.wait() pcall(function() blob.VehicleSeat:Sit(hum) end) until hum.SeatPart == blob.VehicleSeat or not applymethod
-                                if not applymethod then break end
-
-                                local rFolder = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-                                local CG = rFolder and rFolder:FindFirstChild("CreatureGrab")
-                                local CD = rFolder and rFolder:FindFirstChild("CreatureRelease")
-                                
-                                if CG and CD and blob:FindFirstChild("HumanoidRootPart") then
-                                    blob.HumanoidRootPart.CFrame = Sets.HRP.CFrame
-                                    task.wait(0.2)
-                                    
-                                    local isNetOwner = false
-                                    repeat
-                                        task.wait()
-                                        pcall(function()
-                                            local rightWeld = blob.RightDetector:FindFirstChild("RightWeld") or blob.RightDetector:FindFirstChild("RigidConstraint")
-                                            CG:FireServer(blob.RightDetector, Sets.HRP, rightWeld)
-                                            CD:FireServer(rightWeld)
-                                            if type(isnetworkowner) == "function" then
-                                                isNetOwner = isnetworkowner(Sets.HRP)
-                                            else
-                                                isNetOwner = true -- Fallback if executor lacks isnetworkowner
-                                            end
-                                        end)
-                                    until isNetOwner or not applymethod
-                                    
-                                    task.wait(0.2)
-                                    Sets.HRP.CFrame = pos * offset
-                                    HRP.CFrame = pos
-                                    pcall(function() DestroyToy:FireServer(inv:FindFirstChild("cringe")) end)
-                                    task.wait(0.5)
-                                end
-                            end
-                        end
-                        
-                        -- Process standard grab/tp logic
-                        if Sets.HRP and hum and HRP then
-                            pcall(function() DestroyLine:FireServer(Sets.HRP) end)
-                            RunService.RenderStepped:Wait()
-                            RunService.RenderStepped:Wait()
-                            pcall(function() SetNetOwner:FireServer(Sets.HRP, Sets.HRP.CFrame) end)
-                            
-                            -- TP Failsafe Distance Check
-                            if (Sets.HRP.Position - HRP.Position).Magnitude >= 20 and Sets.Char.Parent == workspace then
-                                task.wait(0.1)
-                                tp(HRP, Sets.HRP)
-                                task.wait(0.2)
-                                sno(Sets.HRP)
-                                task.wait()
-                                HRP.CFrame = pos
-                                task.wait(0.2)
-                                for i,v in pairs(Sets.Char:GetChildren()) do
-                                    if v:IsA("Part") and v.Name ~= "Humanoid" then
-                                        v.CFrame = pos * offset
-                                    end
-                                end
-                            end
-                            
-                            -- Y-Level Drop Check
-                            if Sets.HRP.Position.Y < HRP.Position.Y + 4 and Sets.Char.Parent == workspace then
-                                local targetHead = Sets.Char:FindFirstChild("Head")
-                                if targetHead then
-                                    repeat task.wait() sno(Sets.HRP) until targetHead:FindFirstChild("PartOwner") or not applymethod
-                                end
-                                HRP.CFrame = pos
-                                Sets.HRP.CFrame = HRP.CFrame * offset
-                            end
-                            
-                            -- BodyPosition & BodyGyro Locking
-                            if not kickbp or kickbp.Parent ~= Sets.HRP then
-                                if Sets.HRP:FindFirstChild("XOCU_BlobBP") then Sets.HRP.XOCU_BlobBP:Destroy() end
-                                kickbp = Instance.new("BodyPosition")
-                                kickbp.Name = "XOCU_BlobBP"
-                                kickbp.Parent = Sets.HRP
-                                kickbp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                kickbp.D = 200
-                                kickbp.Position = HRP.Position + Vector3.new(0,7,0)
-                            end
-                            if not kickbg or kickbg.Parent ~= Sets.HRP then
-                                if Sets.HRP:FindFirstChild("XOCU_BlobBG") then Sets.HRP.XOCU_BlobBG:Destroy() end
-                                kickbg = Instance.new("BodyGyro")
-                                kickbg.Name = "XOCU_BlobBG"
-                                kickbg.Parent = Sets.HRP
-                                kickbg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                                kickbg.D = 100
-                                kickbg.CFrame = CFrame.new(0, 0, 0)
-                            end
-                            
-                            task.spawn(function()
-                                for i,v in pairs(Sets.Char:GetChildren()) do
-                                    if v:IsA("BasePart") then
-                                        stvel(v)
-                                        v.Velocity = Vector3.zero
-                                    end
-                                end
-                            end)
-                            
-                            kickbp.Position = HRP.Position + Vector3.new(offset.X, offset.Y, offset.Z)
-                        end
-                    end
-
-                    -- Loop Cleanup
-                    local tt = selectedTarget
-                    if tt and tt.Character then
-                        local tHRP = tt.Character:FindFirstChild("HumanoidRootPart")
-                        if tHRP then
-                            local oldBp = tHRP:FindFirstChild("XOCU_BlobBP")
-                            local oldBg = tHRP:FindFirstChild("XOCU_BlobBG")
-                            if oldBp then oldBp:Destroy() end
-                            if oldBg then oldBg:Destroy() end
-                        end
-                    end
-                    if kickbp then kickbp:Destroy() end
-                    if kickbg then kickbg:Destroy() end
-                end)
+                kickActive = true
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                kickTask = task.spawn(function() OwnershipKickFunction(selectedTarget.Name) end)
             else
-                -- Toggled Off Cleanup
-                applymethod = false
-                if spamGrabKickTask then
-                    task.cancel(spamGrabKickTask)
-                    spamGrabKickTask = nil
-                end
-                
-                local tt = selectedTarget
-                if tt and tt.Character then
-                    local tHRP = tt.Character:FindFirstChild("HumanoidRootPart")
-                    if tHRP then
-                        local oldBp = tHRP:FindFirstChild("XOCU_BlobBP")
-                        local oldBg = tHRP:FindFirstChild("XOCU_BlobBG")
-                        if oldBp then oldBp:Destroy() end
-                        if oldBg then oldBg:Destroy() end
+                kickActive = false
+                if kickTask then task.cancel(kickTask) kickTask = nil end
+                cleanupBodies()
+                if selectedTarget and selectedTarget.Character then
+                    local tRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        for _, v in pairs(tRoot:GetChildren()) do
+                            if v:IsA("BodyPosition") or v:IsA("BodyGyro") then
+                                pcall(function() v:Destroy() end)
+                            end
+                        end
+                        pcall(function()
+                            tRoot.AssemblyLinearVelocity = Vector3.zero
+                            tRoot.AssemblyAngularVelocity = Vector3.zero
+                        end)
                     end
                 end
             end
@@ -2277,7 +2212,7 @@ TargetGroup:AddToggle("SpamGrabKick", {
             end
 
             if Value then
-                if not selectedTarget then
+                if not selectedKickPlayer then
                     notify("Warning", "Select Target first", 3)
                     return
                 end
@@ -2323,7 +2258,7 @@ TargetGroup:AddToggle("SpamGrabKick", {
                                 return 
                             end
 
-                            local tChar = selectedTarget and selectedTarget.Character
+                            local tChar = selectedKickPlayer and selectedKickPlayer.Character
                             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
                             local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
 
@@ -2583,142 +2518,154 @@ TargetGroup:AddToggle("SpamGrabKick", {
         end)
     end
 
-local SelectedToy = "JapaneseLantern"
+    local function StartAntiKickItem()
+        if antiKickItemTask then task.cancel(antiKickItemTask) end
+        
+        antiKickItemTask = task.spawn(function()
+            local Item, SoundPart
+            while antiKickItemActive and task.wait() do 
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChild("Humanoid")
+                local inPlot = LocalPlayer:FindFirstChild("InPlot")
+                local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+                local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+                
+                if not hrp or not hum or hum.Health <= 0 or not inv then continue end  
+                if inPlot and inPlot.Value then continue end 
+                
+                if not MyPCLD and not pcldConn then
+                    FindPCLD(hrp)
+                end
 
-local function StartAntiKickItem()
-    if antiKickItemTask then task.cancel(antiKickItemTask) end
-    
-    antiKickItemTask = task.spawn(function()
-        local Item, SoundPart
-        while antiKickItemActive and task.wait() do 
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChild("Humanoid")
-            local inPlot = LocalPlayer:FindFirstChild("InPlot")
-            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-            local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
-            
-            if not hrp or not hum or hum.Health <= 0 or not inv then continue end  
-            if inPlot and inPlot.Value then continue end 
-            
-            if not MyPCLD and not pcldConn then
-                FindPCLD(hrp)
-            end
-
-            Item = inv:FindFirstChild("AntiKickItem") 
-            SoundPart = Item and Item:FindFirstChild("Hitbox")
-            
-            local needsRespawn = false
-            if Item then
-                for _, v in pairs(Item:GetChildren()) do
-                    if v:IsA("BasePart") then
-                        local partOwner = v:FindFirstChild("PartOwner")
-                        if partOwner and partOwner.Value ~= LocalPlayer.Name then
-                            needsRespawn = true
-                            break
+                Item = inv:FindFirstChild("AntiKickItem") 
+                SoundPart = Item and Item:FindFirstChild("Hitbox")
+                
+                local needsRespawn = false
+                if Item then
+                    for _, v in pairs(Item:GetChildren()) do
+                        if v:IsA("BasePart") then
+                            local partOwner = v:FindFirstChild("PartOwner")
+                            if partOwner and partOwner.Value ~= LocalPlayer.Name then
+                                needsRespawn = true
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if needsRespawn and Item then
+                    pcall(function() destroyToy:FireServer(Item) end)
+                    task.wait(0.1)
+                    Item = nil
+                    SoundPart = nil
+                end
+                
+                if not Item or not SoundPart then
+                    for _,v in pairs(inv:GetChildren()) do 
+                        if v.Name == "AntiKickItem" then 
+                            pcall(function() destroyToy:FireServer(v) end)
+                        end
+                    end
+                    
+                    Item = SpawnToyItem(SelectedToy)
+                    if not Item then continue end 
+                    
+                    SoundPart = Item and FWD(Item, "Hitbox", 0.5)
+                    if SoundPart then sno(SoundPart) end
+                    
+                    for _,v in pairs(Item:GetChildren()) do 
+                        if v:IsA("BasePart") then 
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
+                        end
+                    end
+                    
+                    Item.Name = "AntiKickItem"
+                end
+                
+                if SoundPart and not CheckNetworkOwnerOnPart(SoundPart) then 
+                    sno(SoundPart)
+                end
+                
+                local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
+                if SoundPart and targetPart then
+                    local targetCF = targetPart.CFrame
+                    if SelectedToy == "JapaneseLantern" then
+                        targetCF = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                    end
+                    
+                    local currentCF = SoundPart.CFrame
+                    local lerpFactor = 0.3
+                    local newCF = currentCF:Lerp(targetCF, lerpFactor)
+                    
+                    SoundPart.CFrame = newCF
+                    SoundPart.AssemblyLinearVelocity = Vector3.zero
+                    SoundPart.AssemblyAngularVelocity = Vector3.zero
+                    
+                    for _,v in pairs(Item:GetChildren()) do 
+                        if v:IsA("BasePart") then 
+                            v.CanCollide = false
+                            v.CanTouch = false
+                            v.CanQuery = false
+                            v.Transparency = 0.70
+                            v.Massless = true
                         end
                     end
                 end
             end
-            
-            if needsRespawn and Item then
-                pcall(function() destroyToy:FireServer(Item) end)
-                task.wait(0.1)
-                Item = nil
-                SoundPart = nil
-            end
-            
-            if not Item or not SoundPart then
+        end)
+    end
+
+    local function StopAntiKickItem()
+        antiKickItemActive = false
+        if antiKickItemTask then 
+            task.cancel(antiKickItemTask) 
+            antiKickItemTask = nil 
+        end
+        if pcldConn then 
+            pcldConn:Disconnect() 
+            pcldConn = nil 
+        end
+        MyPCLD = nil
+        
+        task.spawn(function()
+            local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
+            local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+            if inv and destroyToy then
                 for _,v in pairs(inv:GetChildren()) do 
                     if v.Name == "AntiKickItem" then 
                         pcall(function() destroyToy:FireServer(v) end)
                     end
                 end
-                
-                Item = SpawnToyItem(SelectedToy)
-                if not Item then continue end 
-                
-                SoundPart = Item and FWD(Item, "Hitbox", 0.5)
-                if SoundPart then sno(SoundPart) end
-                
-                for _,v in pairs(Item:GetChildren()) do 
-                    if v:IsA("BasePart") then 
-                        v.CanCollide = false
-                        v.CanTouch = false
-                        v.CanQuery = false
-                        v.Transparency = 0.70
-                        v.Massless = true
-                    end
-                end
-                
-                Item.Name = "AntiKickItem"
             end
-            
-            if SoundPart and not CheckNetworkOwnerOnPart(SoundPart) then 
-                sno(SoundPart)
-            end
-            
-            local targetPart = MyPCLD or hrp:FindFirstChild("FirePlayerPart") or hrp
-            if SoundPart and targetPart then
-                local targetCF = targetPart.CFrame * CFrame.new(0, 1.5, 0)
-                local currentCF = SoundPart.CFrame
-                local newCF = currentCF:Lerp(targetCF, 0.3)
-                
-                SoundPart.CFrame = newCF
-                SoundPart.AssemblyLinearVelocity = Vector3.zero
-                SoundPart.AssemblyAngularVelocity = Vector3.zero
-                
-                for _,v in pairs(Item:GetChildren()) do 
-                    if v:IsA("BasePart") then 
-                        v.CanCollide = false
-                        v.CanTouch = false
-                        v.CanQuery = false
-                        v.Transparency = 0.70
-                        v.Massless = true
-                    end
-                end
-            end
-        end
-    end)
-end
+        end)
+    end
 
-local function StopAntiKickItem()
-    antiKickItemActive = false
-    if antiKickItemTask then 
-        task.cancel(antiKickItemTask) 
-        antiKickItemTask = nil 
-    end
-    if pcldConn then 
-        pcldConn:Disconnect() 
-        pcldConn = nil 
-    end
-    MyPCLD = nil
-    
-    task.spawn(function()
-        local inv = Workspace:FindFirstChild(LocalPlayer.Name.."SpawnedInToys")
-        local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
-        if inv and destroyToy then
-            for _,v in pairs(inv:GetChildren()) do 
-                if v.Name == "AntiKickItem" then 
-                    pcall(function() destroyToy:FireServer(v) end)
-                end
+    AntiKickItemBlock:AddDropdown("Anti Kick Item", {
+        Text = "Anti Kick Item",
+        Values = {"Japanese Lantern"},
+        Default = "Japanese Lantern",
+        Callback = function(Value)
+            SelectedToy = "JapaneseLantern"
+        end
+    })
+
+    AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
+        Text = "Anti-Kick [ITEM]",
+        Default = false,
+        Callback = function(Value)
+            antiKickItemActive = Value
+            if Value then 
+                StartAntiKickItem() 
+            else 
+                StopAntiKickItem() 
             end
         end
-    end)
-end
-
-AntiKickItemBlock:AddToggle("Anti-Kick [ITEM]", {
-    Text = "Anti-Kick [ITEM]",
-    Default = false,
-    Callback = function(Value)
-        antiKickItemActive = Value
-        if Value then 
-            StartAntiKickItem() 
-        else 
-            StopAntiKickItem() 
-        end
-    end
-})
+    })
 
     do
         local PCLD_Auto_Active = false
