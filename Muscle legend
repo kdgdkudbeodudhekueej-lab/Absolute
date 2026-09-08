@@ -13,8 +13,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 370)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -185)
+mainFrame.Size = UDim2.new(0, 250, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -260)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 2
 mainFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -57,7 +57,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         contentFrame.Visible = false
         minimizeBtn.Text = "□"
     else
-        mainFrame.Size = UDim2.new(0, 250, 0, 370)
+        mainFrame.Size = UDim2.new(0, 250, 0, 520)
         contentFrame.Visible = true
         minimizeBtn.Text = "_"
     end
@@ -152,6 +152,38 @@ local function createDropdown(y, text, options, callback)
     return dropdown
 end
 
+local function createTextBox(y, text, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, 0, 0, 28)
+    label.Position = UDim2.new(0.05, 0, 0, y)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextScaled = true
+    label.Font = Enum.Font.Gotham
+    label.Parent = contentFrame
+    
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.45, 0, 0, 28)
+    box.Position = UDim2.new(0.5, 0, 0, y)
+    box.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.TextScaled = true
+    box.Font = Enum.Font.Gotham
+    box.PlaceholderText = "3"
+    box.Text = "3"
+    box.Parent = contentFrame
+    
+    box.FocusLost:Connect(function()
+        local val = tonumber(box.Text)
+        if val and val > 0 then
+            callback(val)
+        end
+    end)
+    
+    return box
+end
+
 local y = 5
 
 createLabel(y, "STATS", Color3.fromRGB(138, 43, 226))
@@ -193,7 +225,7 @@ end)
 strengthStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
 durabilityStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
 
-local function managePets(petName)
+local function equipFarmSet()
     for _, folder in pairs(player.petsFolder:GetChildren()) do
         if folder:IsA("Folder") then
             for _, pet in pairs(folder:GetChildren()) do
@@ -202,24 +234,78 @@ local function managePets(petName)
         end
     end
     task.wait(0.1)
-    for _, pet in pairs(player.petsFolder.Unique:GetChildren()) do
-        if pet.Name == petName then
-            ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+    
+    local equipped = 0
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Swift Samurai" and equipped < 6 then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                    equipped = equipped + 1
+                    task.wait(0.05)
+                end
+            end
+        end
+    end
+    
+    local bossEquipped = 0
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Rare Boss Pet" and bossEquipped < 2 then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                    bossEquipped = bossEquipped + 1
+                    task.wait(0.05)
+                end
+            end
         end
     end
 end
 
-createButton(y, "Equip Swift Samurai", function()
-    managePets("Swift Samurai")
+local function equipOverlord()
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
+            end
+        end
+    end
+    task.wait(0.1)
+    
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Tribal Overlord" then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                end
+            end
+        end
+    end
+end
+
+createButton(y, "Equip Farm Set (6 Samurai + 2 Boss)", function()
+    equipFarmSet()
+end)
+y = y + 33
+
+createButton(y, "Equip Tribal Overlord", function()
+    equipOverlord()
 end)
 y = y + 33
 
 local isRebirthing = false
 local fastRepRunning = false
 local currentMode = "Normal"
+local customReps = 3
+local customDelay = 0.01
+local customPause = 0.05
+local customInstances = 1
 
 local function doRebirth()
     local target = 5000 + (rebirthsStat.Value * 2550)
+    
+    equipFarmSet()
+    task.wait(0.2)
     
     while isRebirthing and strengthStat.Value < target do
         local reps = player.MembershipType == Enum.MembershipType.Premium and 8 or 14
@@ -231,8 +317,9 @@ local function doRebirth()
     end
     
     if isRebirthing and strengthStat.Value >= target then
-        managePets("Tribal Overlord")
+        equipOverlord()
         task.wait(0.25)
+        
         local before = rebirthsStat.Value
         repeat
             ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
@@ -243,7 +330,6 @@ end
 
 local function rebirthLoop()
     while isRebirthing do
-        managePets("Swift Samurai")
         doRebirth()
         task.wait(0.5)
     end
@@ -259,9 +345,35 @@ createToggle(y, "Fast Rebirth", function(state)
 end)
 y = y + 33
 
+createLabel(y, "FAST REP SETTINGS", Color3.fromRGB(138, 43, 226))
+y = y + 25
+
+createTextBox(y, "Reps per batch:", function(val)
+    customReps = val
+end)
+y = y + 33
+
+createTextBox(y, "Delay (sec):", function(val)
+    customDelay = val
+end)
+y = y + 33
+
+createTextBox(y, "Micro pause:", function(val)
+    customPause = val
+end)
+y = y + 33
+
+createTextBox(y, "Instances (1-10):", function(val)
+    if val >= 1 and val <= 10 then
+        customInstances = val
+    end
+end)
+y = y + 33
+
 local repsPerBatch = 3
 local batchDelay = 0.01
 local microPause = 0.05
+local fasterInstances = 1
 
 local function setMode(mode)
     currentMode = mode
@@ -269,25 +381,34 @@ local function setMode(mode)
         repsPerBatch = 1
         batchDelay = 0.08
         microPause = 0.3
+        fasterInstances = 1
     elseif mode == "Normal" then
         repsPerBatch = 3
         batchDelay = 0.01
         microPause = 0.05
+        fasterInstances = 1
     elseif mode == "Faster" then
-        repsPerBatch = 15
-        batchDelay = 0.002
-        microPause = 0.01
+        repsPerBatch = 3
+        batchDelay = 0.01
+        microPause = 0.05
+        fasterInstances = 4
+    elseif mode == "Custom" then
+        repsPerBatch = customReps
+        batchDelay = customDelay
+        microPause = customPause
+        fasterInstances = customInstances
     end
 end
 
-createDropdown(y, "Speed:", {"Slower", "Normal", "Faster"}, function(selected)
+createDropdown(y, "Speed Mode:", {"Slower", "Normal", "Faster", "Custom"}, function(selected)
     setMode(selected)
 end)
 y = y + 33
 
 local repCount = 0
+local fastThreads = {}
 
-local function fastRepLoop()
+local function fastRepWorker()
     while fastRepRunning do
         for i = 1, repsPerBatch do
             muscleEvent:FireServer("rep")
@@ -302,10 +423,27 @@ local function fastRepLoop()
     end
 end
 
+local function fastRepLoop()
+    for _, thread in ipairs(fastThreads) do
+        task.cancel(thread)
+    end
+    fastThreads = {}
+    
+    for i = 1, fasterInstances do
+        local thread = task.spawn(fastRepWorker)
+        table.insert(fastThreads, thread)
+    end
+end
+
 createToggle(y, "Fast Rep", function(state)
     fastRepRunning = state
     repCount = 0
     if state then 
-        task.spawn(fastRepLoop)
+        fastRepLoop()
+    else
+        for _, thread in ipairs(fastThreads) do
+            task.cancel(thread)
+        end
+        fastThreads = {}
     end
 end)
