@@ -1,6 +1,15 @@
+-- AUTO EXECUTE ПОСЛЕ TELEPORT
+if queue_on_teleport then
+    queue_on_teleport([[
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/kdgdkudbeodudhekueej-lab/Absolute/refs/heads/main/Tp-punch"))()
+    ]])
+end
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
 -- GUI
@@ -10,8 +19,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 200)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
+mainFrame.Size = UDim2.new(0, 250, 0, 280)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -140)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 2
 mainFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -54,13 +63,13 @@ minimizeBtn.MouseButton1Click:Connect(function()
         contentFrame.Visible = false
         minimizeBtn.Text = "□"
     else
-        mainFrame.Size = UDim2.new(0, 250, 0, 200)
+        mainFrame.Size = UDim2.new(0, 250, 0, 280)
         contentFrame.Visible = true
         minimizeBtn.Text = "_"
     end
 end)
 
--- Ищем punch event и tool
+-- Ищем punch event
 local punchEvent
 for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
     if string.find(event.Name:lower(), "punch") then
@@ -69,15 +78,16 @@ for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
     end
 end
 
-local isRunning = false
-local fastPunchEnabled = false
+-- ВСЁ ВКЛЮЧЕНО
+local isRunning = true
+local fastPunchEnabled = true
+local autoHopEnabled = true
 
 -- Функция взять punch в руку
 local function equipPunch()
     local char = player.Character
     if not char then return end
-    
-    -- Ищем Punch tool в Backpack
+
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         for _, tool in pairs(backpack:GetChildren()) do
@@ -87,65 +97,53 @@ local function equipPunch()
             end
         end
     end
-    
-    -- Проверяем если уже в руках
+
     for _, tool in pairs(char:GetChildren()) do
         if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
             return true
         end
     end
-    
+
     return false
 end
 
--- Функция телепорта за спину
+-- Телепорт вплотную за спину
 local function teleportBehind(targetPlayer)
     local myChar = player.Character
     local targetChar = targetPlayer.Character
-    
+
     if not myChar or not targetChar then return false end
-    
+
     local myHRP = myChar:FindFirstChild("HumanoidRootPart")
     local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-    
+
     if not myHRP or not targetHRP then return false end
-    
-    -- Позиция сзади цели со случайным смещением
+
     local randomOffset = CFrame.new(
-        math.random(-2, 2),
+        math.random(-0.5, 0.5),
         0,
-        math.random(2, 4) -- сзади
+        1.5
     )
-    
+
     myHRP.CFrame = targetHRP.CFrame * randomOffset
     return true
 end
 
--- Основной цикл
+-- Основной цикл TP Punch
 local function farmLoop()
     while isRunning do
         for _, targetPlayer in pairs(Players:GetPlayers()) do
             if targetPlayer ~= player and targetPlayer.Character then
                 pcall(function()
-                    -- Берем punch в руку
                     equipPunch()
-                    
-                    -- Телепортируемся за спину
                     if teleportBehind(targetPlayer) then
                         task.wait(0.05)
-                        
-                        -- Бьём
                         local char = player.Character
                         local tool = char and char:FindFirstChildOfClass("Tool")
-                        if tool then
-                            tool:Activate()
-                        end
-                        
+                        if tool then tool:Activate() end
                         if punchEvent then
                             punchEvent:FireServer(targetPlayer, targetPlayer.Character)
                         end
-                        
-                        -- Задержка как ты просил (0.5 сек)
                         task.wait(0.5)
                     end
                 end)
@@ -161,29 +159,50 @@ local function fastPunchLoop()
         pcall(function()
             local char = player.Character
             if not char then return end
-            
             equipPunch()
-            
             local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                tool:Activate()
-            end
-            
-            if punchEvent then
-                punchEvent:FireServer()
-            end
+            if tool then tool:Activate() end
+            if punchEvent then punchEvent:FireServer() end
         end)
         task.wait(0.05)
+    end
+end
+
+-- Server Hop функция
+local function serverHop()
+    local servers = {}
+    
+    local success, result = pcall(function()
+        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local response = HttpService:JSONDecode(game:HttpGet(url))
+        return response
+    end)
+    
+    if success and result and result.data then
+        for _, server in pairs(result.data) do
+            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                table.insert(servers, server.id)
+            end
+        end
+    end
+    
+    if #servers > 0 then
+        local randomServer = servers[math.random(1, #servers)]
+        print("[Auto Hop] Переход на сервер: " .. randomServer)
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, player)
+    else
+        print("[Auto Hop] Нет серверов, реконнект...")
+        TeleportService:Teleport(game.PlaceId, player)
     end
 end
 
 -- Статус
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
-statusLabel.Position = UDim2.new(0.05, 0, 0, 10)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 5)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: OFF"
-statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+statusLabel.Text = "Status: ON | Hop: 20s"
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
 statusLabel.TextScaled = true
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.Parent = contentFrame
@@ -191,9 +210,9 @@ statusLabel.Parent = contentFrame
 -- Кнопка TP Punch
 local tpBtn = Instance.new("TextButton")
 tpBtn.Size = UDim2.new(0.9, 0, 0, 30)
-tpBtn.Position = UDim2.new(0.05, 0, 0, 40)
-tpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-tpBtn.Text = "TP Punch [OFF]"
+tpBtn.Position = UDim2.new(0.05, 0, 0, 30)
+tpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+tpBtn.Text = "TP Punch [ON]"
 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpBtn.TextScaled = true
 tpBtn.Font = Enum.Font.GothamBold
@@ -201,27 +220,22 @@ tpBtn.Parent = contentFrame
 
 tpBtn.MouseButton1Click:Connect(function()
     isRunning = not isRunning
-    
     if isRunning then
         tpBtn.Text = "TP Punch [ON]"
         tpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        statusLabel.Text = "Status: ON"
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         task.spawn(farmLoop)
     else
         tpBtn.Text = "TP Punch [OFF]"
         tpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-        statusLabel.Text = "Status: OFF"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
 
 -- Кнопка Fast Punch
 local fastBtn = Instance.new("TextButton")
 fastBtn.Size = UDim2.new(0.9, 0, 0, 30)
-fastBtn.Position = UDim2.new(0.05, 0, 0, 80)
-fastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-fastBtn.Text = "Fast Punch [OFF]"
+fastBtn.Position = UDim2.new(0.05, 0, 0, 65)
+fastBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+fastBtn.Text = "Fast Punch [ON]"
 fastBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 fastBtn.TextScaled = true
 fastBtn.Font = Enum.Font.GothamBold
@@ -229,7 +243,6 @@ fastBtn.Parent = contentFrame
 
 fastBtn.MouseButton1Click:Connect(function()
     fastPunchEnabled = not fastPunchEnabled
-    
     if fastPunchEnabled then
         fastBtn.Text = "Fast Punch [ON]"
         fastBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
@@ -239,3 +252,59 @@ fastBtn.MouseButton1Click:Connect(function()
         fastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     end
 end)
+
+-- Кнопка Auto Hop
+local hopBtn = Instance.new("TextButton")
+hopBtn.Size = UDim2.new(0.9, 0, 0, 30)
+hopBtn.Position = UDim2.new(0.05, 0, 0, 100)
+hopBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+hopBtn.Text = "Auto Hop 20s [ON]"
+hopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+hopBtn.TextScaled = true
+hopBtn.Font = Enum.Font.GothamBold
+hopBtn.Parent = contentFrame
+
+hopBtn.MouseButton1Click:Connect(function()
+    autoHopEnabled = not autoHopEnabled
+    if autoHopEnabled then
+        hopBtn.Text = "Auto Hop 20s [ON]"
+        hopBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        hopBtn.Text = "Auto Hop 20s [OFF]"
+        hopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    end
+end)
+
+-- Кнопка ручного Server Hop
+local manualHopBtn = Instance.new("TextButton")
+manualHopBtn.Size = UDim2.new(0.9, 0, 0, 30)
+manualHopBtn.Position = UDim2.new(0.05, 0, 0, 135)
+manualHopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+manualHopBtn.Text = "Server Hop (Manual)"
+manualHopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+manualHopBtn.TextScaled = true
+manualHopBtn.Font = Enum.Font.GothamBold
+manualHopBtn.Parent = contentFrame
+
+manualHopBtn.MouseButton1Click:Connect(function()
+    serverHop()
+end)
+
+-- Запускаем всё сразу
+task.spawn(farmLoop)
+task.spawn(fastPunchLoop)
+
+-- AUTO SERVER HOP КАЖДЫЕ 20 СЕКУНД
+task.spawn(function()
+    task.wait(20) -- ждём 20 секунд после запуска
+    while true do
+        if autoHopEnabled then
+            print("[Auto Hop] 20 секунд прошло, меняю сервер...")
+            serverHop()
+            break -- после телепорта скрипт перезапустится через queue_on_teleport
+        end
+        task.wait(1)
+    end
+end)
+
+print("[TP Punch] Загружено! Auto Hop: 20s")
