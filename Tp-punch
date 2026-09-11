@@ -1,0 +1,241 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TPPunchMenu"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 250, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 25)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+title.Text = "TP Punch"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+minimizeBtn.Position = UDim2.new(1, -25, 0, 0)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.TextScaled = true
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Parent = mainFrame
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 1, -25)
+contentFrame.Position = UDim2.new(0, 0, 0, 25)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+local isMinimized = false
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        mainFrame.Size = UDim2.new(0, 250, 0, 25)
+        contentFrame.Visible = false
+        minimizeBtn.Text = "□"
+    else
+        mainFrame.Size = UDim2.new(0, 250, 0, 200)
+        contentFrame.Visible = true
+        minimizeBtn.Text = "_"
+    end
+end)
+
+-- Ищем punch event и tool
+local punchEvent
+for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
+    if string.find(event.Name:lower(), "punch") then
+        punchEvent = event
+        break
+    end
+end
+
+local isRunning = false
+local fastPunchEnabled = false
+
+-- Функция взять punch в руку
+local function equipPunch()
+    local char = player.Character
+    if not char then return end
+    
+    -- Ищем Punch tool в Backpack
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, tool in pairs(backpack:GetChildren()) do
+            if string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist") then
+                tool.Parent = char
+                return true
+            end
+        end
+    end
+    
+    -- Проверяем если уже в руках
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Функция телепорта за спину
+local function teleportBehind(targetPlayer)
+    local myChar = player.Character
+    local targetChar = targetPlayer.Character
+    
+    if not myChar or not targetChar then return false end
+    
+    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    
+    if not myHRP or not targetHRP then return false end
+    
+    -- Позиция сзади цели со случайным смещением
+    local randomOffset = CFrame.new(
+        math.random(-2, 2),
+        0,
+        math.random(2, 4) -- сзади
+    )
+    
+    myHRP.CFrame = targetHRP.CFrame * randomOffset
+    return true
+end
+
+-- Основной цикл
+local function farmLoop()
+    while isRunning do
+        for _, targetPlayer in pairs(Players:GetPlayers()) do
+            if targetPlayer ~= player and targetPlayer.Character then
+                pcall(function()
+                    -- Берем punch в руку
+                    equipPunch()
+                    
+                    -- Телепортируемся за спину
+                    if teleportBehind(targetPlayer) then
+                        task.wait(0.05)
+                        
+                        -- Бьём
+                        local char = player.Character
+                        local tool = char and char:FindFirstChildOfClass("Tool")
+                        if tool then
+                            tool:Activate()
+                        end
+                        
+                        if punchEvent then
+                            punchEvent:FireServer(targetPlayer, targetPlayer.Character)
+                        end
+                        
+                        -- Задержка как ты просил (0.5 сек)
+                        task.wait(0.5)
+                    end
+                end)
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Fast punch loop
+local function fastPunchLoop()
+    while fastPunchEnabled do
+        pcall(function()
+            local char = player.Character
+            if not char then return end
+            
+            equipPunch()
+            
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                tool:Activate()
+            end
+            
+            if punchEvent then
+                punchEvent:FireServer()
+            end
+        end)
+        task.wait(0.05)
+    end
+end
+
+-- Статус
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 10)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: OFF"
+statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = contentFrame
+
+-- Кнопка TP Punch
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.9, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.05, 0, 0, 40)
+tpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+tpBtn.Text = "TP Punch [OFF]"
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.TextScaled = true
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.Parent = contentFrame
+
+tpBtn.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    
+    if isRunning then
+        tpBtn.Text = "TP Punch [ON]"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        statusLabel.Text = "Status: ON"
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        task.spawn(farmLoop)
+    else
+        tpBtn.Text = "TP Punch [OFF]"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        statusLabel.Text = "Status: OFF"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+-- Кнопка Fast Punch
+local fastBtn = Instance.new("TextButton")
+fastBtn.Size = UDim2.new(0.9, 0, 0, 30)
+fastBtn.Position = UDim2.new(0.05, 0, 0, 80)
+fastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+fastBtn.Text = "Fast Punch [OFF]"
+fastBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fastBtn.TextScaled = true
+fastBtn.Font = Enum.Font.GothamBold
+fastBtn.Parent = contentFrame
+
+fastBtn.MouseButton1Click:Connect(function()
+    fastPunchEnabled = not fastPunchEnabled
+    
+    if fastPunchEnabled then
+        fastBtn.Text = "Fast Punch [ON]"
+        fastBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        task.spawn(fastPunchLoop)
+    else
+        fastBtn.Text = "Fast Punch [OFF]"
+        fastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    end
+end)
