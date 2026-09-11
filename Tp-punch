@@ -1,10 +1,3 @@
--- AUTO EXECUTE ПОСЛЕ TELEPORT
-if queue_on_teleport then
-    queue_on_teleport([[
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/kdgdkudbeodudhekueej-lab/Absolute/refs/heads/main/Tp-punch"))()
-    ]])
-end
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,11 +7,13 @@ local player = Players.LocalPlayer
 
 -- ===== CONFIG СИСТЕМА =====
 local CONFIG_FILE = "tppunch_config.json"
+local SCRIPT_URL = "https://raw.githubusercontent.com/kdgdkudbeodudhekueej-lab/Absolute/refs/heads/main/Tp-punch"
 
 local defaultConfig = {
     tpPunch = false,
     fastPunch = false,
     autoHop = false,
+    autoExecute = false,
     hopTime = 10,
     minPlayers = 6
 }
@@ -37,7 +32,7 @@ local function loadConfig()
             for k, v in pairs(data) do
                 config[k] = v
             end
-            print("[Config] Загружен: " .. CONFIG_FILE)
+            print("[Config] Загружен")
             return true
         end
     end
@@ -69,6 +64,13 @@ end
 
 loadConfig()
 
+-- ===== AUTO EXECUTE (если включен в конфиге) =====
+if config.autoExecute and queue_on_teleport then
+    queue_on_teleport([[
+        loadstring(game:HttpGet("]] .. SCRIPT_URL .. [["))()
+    ]])
+end
+
 -- ===== GUI =====
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TPPunchMenu"
@@ -76,8 +78,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 380)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -190)
+mainFrame.Size = UDim2.new(0, 250, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -210)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 2
 mainFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -119,7 +121,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         contentFrame.Visible = false
         minimizeBtn.Text = "□"
     else
-        mainFrame.Size = UDim2.new(0, 250, 0, 380)
+        mainFrame.Size = UDim2.new(0, 250, 0, 420)
         contentFrame.Visible = true
         minimizeBtn.Text = "_"
     end
@@ -138,6 +140,7 @@ end
 local isRunning = config.tpPunch
 local fastPunchEnabled = config.fastPunch
 local autoHopEnabled = config.autoHop
+local autoExecuteEnabled = config.autoExecute
 local currentTarget = nil
 local currentWeld = nil
 
@@ -162,7 +165,6 @@ local function equipPunch()
     return false
 end
 
--- Открепить от текущей цели
 local function unweld()
     if currentWeld then
         pcall(function()
@@ -173,7 +175,6 @@ local function unweld()
     currentTarget = nil
 end
 
--- Прикрепиться намертво сзади цели
 local function weldBehind(targetPlayer)
     local myChar = player.Character
     local targetChar = targetPlayer.Character
@@ -183,23 +184,15 @@ local function weldBehind(targetPlayer)
     local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
     if not myHRP or not targetHRP then return false end
     
-    -- Если уже прикреплён к этой цели - не трогаем
     if currentTarget == targetPlayer and currentWeld and currentWeld.Parent then
         return true
     end
     
-    -- Открепляемся от старой цели
     unweld()
     
-    -- Телепортируемся вплотную сзади
-    local randomOffset = CFrame.new(
-        math.random(-0.3, 0.3),
-        0,
-        1.2 -- прям впритык, но не внутри
-    )
+    local randomOffset = CFrame.new(math.random(-0.3, 0.3), 0, 1.2)
     myHRP.CFrame = targetHRP.CFrame * randomOffset
     
-    -- Создаём WELD (намертво прикрепляем)
     local weld = Instance.new("WeldConstraint")
     weld.Part0 = myHRP
     weld.Part1 = targetHRP
@@ -210,7 +203,6 @@ local function weldBehind(targetPlayer)
     return true
 end
 
--- Основной цикл TP Punch
 local function farmLoop()
     while isRunning do
         for _, targetPlayer in pairs(Players:GetPlayers()) do
@@ -304,11 +296,7 @@ end
 makeButton(30, "TP Punch", isRunning, function(state)
     isRunning = state
     config.tpPunch = state
-    if state then
-        task.spawn(farmLoop)
-    else
-        unweld()
-    end
+    if state then task.spawn(farmLoop) else unweld() end
 end)
 
 makeButton(65, "Fast Punch", fastPunchEnabled, function(state)
@@ -322,10 +310,32 @@ makeButton(100, "Auto Hop", autoHopEnabled, function(state)
     config.autoHop = state
 end)
 
+-- AUTO EXECUTE КНОПКА
+makeButton(135, "Auto Execute", autoExecuteEnabled, function(state)
+    autoExecuteEnabled = state
+    config.autoExecute = state
+    if state then
+        if queue_on_teleport then
+            queue_on_teleport([[
+                loadstring(game:HttpGet("]] .. SCRIPT_URL .. [["))()
+            ]])
+            statusLabel.Text = "✅ Auto Execute включён!"
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            statusLabel.Text = "❌ queue_on_teleport не поддерживается"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    else
+        statusLabel.Text = "Auto Execute выключен"
+        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+    saveConfig()
+end)
+
 -- ===== DROPDOWN =====
 local configDropdownBtn = Instance.new("TextButton")
 configDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
-configDropdownBtn.Position = UDim2.new(0.05, 0, 0, 135)
+configDropdownBtn.Position = UDim2.new(0.05, 0, 0, 170)
 configDropdownBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
 configDropdownBtn.Text = "⚙️ Config Menu  ▼"
 configDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -335,7 +345,7 @@ configDropdownBtn.Parent = contentFrame
 
 local dropdownOptions = Instance.new("Frame")
 dropdownOptions.Size = UDim2.new(0.9, 0, 0, 105)
-dropdownOptions.Position = UDim2.new(0.05, 0, 0, 165)
+dropdownOptions.Position = UDim2.new(0.05, 0, 0, 200)
 dropdownOptions.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 dropdownOptions.BorderSizePixel = 1
 dropdownOptions.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -382,6 +392,7 @@ makeDropdownOption("🔄 Auto Load Config", function()
     isRunning = config.tpPunch
     fastPunchEnabled = config.fastPunch
     autoHopEnabled = config.autoHop
+    autoExecuteEnabled = config.autoExecute
     statusLabel.Text = "✅ Config загружен!"
     statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
     task.wait(2)
@@ -412,7 +423,7 @@ end)
 -- Кнопка ручного Server Hop
 local manualHopBtn = Instance.new("TextButton")
 manualHopBtn.Size = UDim2.new(0.9, 0, 0, 30)
-manualHopBtn.Position = UDim2.new(0.05, 0, 0, 280)
+manualHopBtn.Position = UDim2.new(0.05, 0, 0, 315)
 manualHopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
 manualHopBtn.Text = "Server Hop (Manual)"
 manualHopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
