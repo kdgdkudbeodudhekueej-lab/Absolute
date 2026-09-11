@@ -1,11 +1,10 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
--- ===== CONFIG СИСТЕМА =====
+-- ===== CONFIG =====
 local CONFIG_FILE = "tppunch_config.json"
 local SCRIPT_URL = "https://raw.githubusercontent.com/kdgdkudbeodudhekueej-lab/Absolute/refs/heads/main/Tp-punch"
 
@@ -19,56 +18,31 @@ local defaultConfig = {
 }
 
 local config = {}
-for k, v in pairs(defaultConfig) do
-    config[k] = v
-end
+for k, v in pairs(defaultConfig) do config[k] = v end
 
 local function loadConfig()
     if isfile and isfile(CONFIG_FILE) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(CONFIG_FILE))
-        end)
-        if success and data then
-            for k, v in pairs(data) do
-                config[k] = v
-            end
-            print("[Config] Загружен")
-            return true
-        end
+        local s, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
+        if s and data then for k, v in pairs(data) do config[k] = v end end
     end
-    print("[Config] Файл не найден")
-    return false
 end
 
 local function saveConfig()
     if writefile then
-        pcall(function()
-            writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-            print("[Config] Сохранён")
-        end)
-        return true
+        pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(config)) end)
     end
-    return false
 end
 
 local function deleteConfig()
     if delfile and isfile and isfile(CONFIG_FILE) then
-        pcall(function()
-            delfile(CONFIG_FILE)
-            print("[Config] Удалён")
-        end)
-        return true
+        pcall(function() delfile(CONFIG_FILE) end)
     end
-    return false
 end
 
 loadConfig()
 
--- ===== AUTO EXECUTE (если включен в конфиге) =====
 if config.autoExecute and queue_on_teleport then
-    queue_on_teleport([[
-        loadstring(game:HttpGet("]] .. SCRIPT_URL .. [["))()
-    ]])
+    queue_on_teleport('loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()')
 end
 
 -- ===== GUI =====
@@ -112,11 +86,8 @@ contentFrame.Position = UDim2.new(0, 0, 0, 25)
 contentFrame.BackgroundTransparency = 1
 contentFrame.Parent = mainFrame
 
-local isMinimized = false
-
 minimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    if isMinimized then
+    if mainFrame.Size.Y.Offset == 420 then
         mainFrame.Size = UDim2.new(0, 250, 0, 25)
         contentFrame.Visible = false
         minimizeBtn.Text = "□"
@@ -127,11 +98,11 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Ищем punch event
+-- Ищем punch events
 local punchEvent
-for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
-    if string.find(event.Name:lower(), "punch") then
-        punchEvent = event
+for _, e in pairs(ReplicatedStorage.rEvents:GetChildren()) do
+    if string.find(e.Name:lower(), "punch") then
+        punchEvent = e
         break
     end
 end
@@ -141,35 +112,43 @@ local isRunning = config.tpPunch
 local fastPunchEnabled = config.fastPunch
 local autoHopEnabled = config.autoHop
 local autoExecuteEnabled = config.autoExecute
-local currentTarget = nil
 local currentWeld = nil
+local currentTarget = nil
+local cachedTool = nil
 
--- Функция взять punch в руку
-local function equipPunch()
+-- Получить punch tool
+local function getPunchTool()
     local char = player.Character
-    if not char then return end
+    if not char then return nil end
+    
+    if cachedTool and cachedTool.Parent == char then
+        return cachedTool
+    end
+    
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
+            cachedTool = tool
+            return tool
+        end
+    end
+    
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         for _, tool in pairs(backpack:GetChildren()) do
             if string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist") then
                 tool.Parent = char
-                return true
+                cachedTool = tool
+                return tool
             end
         end
     end
-    for _, tool in pairs(char:GetChildren()) do
-        if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
-            return true
-        end
-    end
-    return false
+    
+    return nil
 end
 
 local function unweld()
     if currentWeld then
-        pcall(function()
-            currentWeld:Destroy()
-        end)
+        pcall(function() currentWeld:Destroy() end)
         currentWeld = nil
     end
     currentTarget = nil
@@ -190,8 +169,7 @@ local function weldBehind(targetPlayer)
     
     unweld()
     
-    local randomOffset = CFrame.new(math.random(-0.3, 0.3), 0, 1.2)
-    myHRP.CFrame = targetHRP.CFrame * randomOffset
+    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1.2)
     
     local weld = Instance.new("WeldConstraint")
     weld.Part0 = myHRP
@@ -203,21 +181,52 @@ local function weldBehind(targetPlayer)
     return true
 end
 
+-- НАСТОЯЩИЙ быстрый удар — вызываем все методы сразу
+local function realPunch(targetPlayer)
+    local char = player.Character
+    if not char then return end
+    
+    local tool = getPunchTool()
+    if not tool then return end
+    
+    -- 1. Активируем tool (встроенный удар)
+    pcall(function() tool:Activate() end)
+    
+    -- 2. Отправляем все возможные события с tool
+    if punchEvent then
+        pcall(function()
+            punchEvent:FireServer(tool, targetPlayer, targetPlayer.Character)
+        end)
+        pcall(function()
+            punchEvent:FireServer("punch", tool, targetPlayer)
+        end)
+        pcall(function()
+            punchEvent:FireServer(tool)
+        end)
+    end
+    
+    -- 3. Пробуем ударить через Tool.Activated
+    pcall(function()
+        tool:Activate()
+    end)
+end
+
+-- Farm loop - быстро бьёт по всем
 local function farmLoop()
     while isRunning do
-        for _, targetPlayer in pairs(Players:GetPlayers()) do
+        local players = Players:GetPlayers()
+        for _, targetPlayer in pairs(players) do
+            if not isRunning then break end
             if targetPlayer ~= player and targetPlayer.Character then
                 pcall(function()
-                    equipPunch()
                     if weldBehind(targetPlayer) then
-                        task.wait(0.1)
-                        local char = player.Character
-                        local tool = char and char:FindFirstChildOfClass("Tool")
-                        if tool then tool:Activate() end
-                        if punchEvent then
-                            punchEvent:FireServer(targetPlayer, targetPlayer.Character)
-                        end
-                        task.wait(0.4)
+                        -- Бьём 3 раза подряд для верности
+                        realPunch(targetPlayer)
+                        task.wait(0.05)
+                        realPunch(targetPlayer)
+                        task.wait(0.05)
+                        realPunch(targetPlayer)
+                        task.wait(0.3)
                     end
                 end)
             end
@@ -226,41 +235,45 @@ local function farmLoop()
     end
 end
 
+-- Fast Punch - быстрый спам настоящих ударов
 local function fastPunchLoop()
     while fastPunchEnabled do
         pcall(function()
             local char = player.Character
             if not char then return end
-            equipPunch()
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then tool:Activate() end
-            if punchEvent then punchEvent:FireServer() end
+            
+            local tool = getPunchTool()
+            if tool then
+                tool:Activate()
+            end
+            
+            if punchEvent then
+                punchEvent:FireServer()
+            end
         end)
-        task.wait(0.05)
+        task.wait(0.1) -- Быстро но не слишком
     end
 end
 
 local function serverHop()
-    local servers = {}
-    local success, result = pcall(function()
-        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        return HttpService:JSONDecode(game:HttpGet(url))
-    end)
-    if success and result and result.data then
-        for _, server in pairs(result.data) do
-            if server.playing >= config.minPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
-                table.insert(servers, server.id)
+    task.spawn(function()
+        local servers = {}
+        local s, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=50"))
+        end)
+        if s and result and result.data then
+            for _, server in pairs(result.data) do
+                if server.playing >= config.minPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    table.insert(servers, server.id)
+                end
             end
         end
-    end
-    if #servers > 0 then
-        local randomServer = servers[math.random(1, #servers)]
-        print("[Auto Hop] Переход на сервер: " .. randomServer)
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, player)
-    else
-        print("[Auto Hop] Реконнект...")
-        TeleportService:Teleport(game.PlaceId, player)
-    end
+        if #servers > 0 then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
+        else
+            TeleportService:Teleport(game.PlaceId, player)
+        end
+    end)
 end
 
 -- ===== UI =====
@@ -310,29 +323,16 @@ makeButton(100, "Auto Hop", autoHopEnabled, function(state)
     config.autoHop = state
 end)
 
--- AUTO EXECUTE КНОПКА
 makeButton(135, "Auto Execute", autoExecuteEnabled, function(state)
     autoExecuteEnabled = state
     config.autoExecute = state
-    if state then
-        if queue_on_teleport then
-            queue_on_teleport([[
-                loadstring(game:HttpGet("]] .. SCRIPT_URL .. [["))()
-            ]])
-            statusLabel.Text = "✅ Auto Execute включён!"
-            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        else
-            statusLabel.Text = "❌ queue_on_teleport не поддерживается"
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
-    else
-        statusLabel.Text = "Auto Execute выключен"
-        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    if state and queue_on_teleport then
+        queue_on_teleport('loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()')
     end
     saveConfig()
 end)
 
--- ===== DROPDOWN =====
+-- Dropdown
 local configDropdownBtn = Instance.new("TextButton")
 configDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
 configDropdownBtn.Position = UDim2.new(0.05, 0, 0, 170)
@@ -382,9 +382,6 @@ makeDropdownOption("💾 Save Config", function()
     saveConfig()
     statusLabel.Text = "✅ Config сохранён!"
     statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    task.wait(2)
-    statusLabel.Text = "Config загружен"
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 end, Color3.fromRGB(50, 150, 50))
 
 makeDropdownOption("🔄 Auto Load Config", function()
@@ -395,22 +392,12 @@ makeDropdownOption("🔄 Auto Load Config", function()
     autoExecuteEnabled = config.autoExecute
     statusLabel.Text = "✅ Config загружен!"
     statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    task.wait(2)
-    statusLabel.Text = "Config загружен"
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 end, Color3.fromRGB(50, 100, 200))
 
 makeDropdownOption("🗑️ Delete Config", function()
-    if deleteConfig() then
-        statusLabel.Text = "❌ Config удалён!"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    else
-        statusLabel.Text = "❌ Нет файла конфига"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    end
-    task.wait(2)
-    statusLabel.Text = "Config загружен"
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    deleteConfig()
+    statusLabel.Text = "❌ Config удалён!"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 end, Color3.fromRGB(150, 50, 50))
 
 local dropdownOpen = false
@@ -420,7 +407,6 @@ configDropdownBtn.MouseButton1Click:Connect(function()
     configDropdownBtn.Text = dropdownOpen and "⚙️ Config Menu  ▲" or "⚙️ Config Menu  ▼"
 end)
 
--- Кнопка ручного Server Hop
 local manualHopBtn = Instance.new("TextButton")
 manualHopBtn.Size = UDim2.new(0.9, 0, 0, 30)
 manualHopBtn.Position = UDim2.new(0.05, 0, 0, 315)
@@ -431,25 +417,14 @@ manualHopBtn.TextScaled = true
 manualHopBtn.Font = Enum.Font.GothamBold
 manualHopBtn.Parent = contentFrame
 
-manualHopBtn.MouseButton1Click:Connect(function()
-    serverHop()
-end)
+manualHopBtn.MouseButton1Click:Connect(serverHop)
 
--- Запуск если в конфиге было ON
 if isRunning then task.spawn(farmLoop) end
 if fastPunchEnabled then task.spawn(fastPunchLoop) end
 
--- AUTO HOP цикл
 task.spawn(function()
     task.wait(config.hopTime)
-    while true do
-        if autoHopEnabled then
-            print("[Auto Hop] " .. config.hopTime .. " секунд прошло...")
-            serverHop()
-            break
-        end
-        task.wait(1)
-    end
+    if autoHopEnabled then serverHop() end
 end)
 
-print("[TP Punch] Загружено! Config: " .. CONFIG_FILE)
+print("[TP Punch] Загружено!")
