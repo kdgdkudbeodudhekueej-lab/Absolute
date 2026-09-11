@@ -23,9 +23,11 @@ local defaultConfig = {
     minPlayers = 6
 }
 
-local config = defaultConfig
+local config = {}
+for k, v in pairs(defaultConfig) do
+    config[k] = v
+end
 
--- Загрузка конфига
 local function loadConfig()
     if isfile and isfile(CONFIG_FILE) then
         local success, data = pcall(function()
@@ -36,21 +38,33 @@ local function loadConfig()
                 config[k] = v
             end
             print("[Config] Загружен: " .. CONFIG_FILE)
+            return true
         end
-    else
-        print("[Config] Файл не найден, создаю новый...")
-        saveConfig()
     end
+    print("[Config] Файл не найден")
+    return false
 end
 
--- Сохранение конфига
-function saveConfig()
+local function saveConfig()
     if writefile then
         pcall(function()
             writefile(CONFIG_FILE, HttpService:JSONEncode(config))
             print("[Config] Сохранён")
         end)
+        return true
     end
+    return false
+end
+
+local function deleteConfig()
+    if delfile and isfile and isfile(CONFIG_FILE) then
+        pcall(function()
+            delfile(CONFIG_FILE)
+            print("[Config] Удалён")
+        end)
+        return true
+    end
+    return false
 end
 
 loadConfig()
@@ -120,16 +134,17 @@ for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
     end
 end
 
--- Переменные состояния (из конфига)
+-- Переменные
 local isRunning = config.tpPunch
 local fastPunchEnabled = config.fastPunch
 local autoHopEnabled = config.autoHop
+local currentTarget = nil
+local currentWeld = nil
 
 -- Функция взять punch в руку
 local function equipPunch()
     local char = player.Character
     if not char then return end
-
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         for _, tool in pairs(backpack:GetChildren()) do
@@ -139,35 +154,59 @@ local function equipPunch()
             end
         end
     end
-
     for _, tool in pairs(char:GetChildren()) do
         if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
             return true
         end
     end
-
     return false
 end
 
--- Телепорт за спину
-local function teleportBehind(targetPlayer)
+-- Открепить от текущей цели
+local function unweld()
+    if currentWeld then
+        pcall(function()
+            currentWeld:Destroy()
+        end)
+        currentWeld = nil
+    end
+    currentTarget = nil
+end
+
+-- Прикрепиться намертво сзади цели
+local function weldBehind(targetPlayer)
     local myChar = player.Character
     local targetChar = targetPlayer.Character
-
     if not myChar or not targetChar then return false end
-
+    
     local myHRP = myChar:FindFirstChild("HumanoidRootPart")
     local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-
     if not myHRP or not targetHRP then return false end
-
+    
+    -- Если уже прикреплён к этой цели - не трогаем
+    if currentTarget == targetPlayer and currentWeld and currentWeld.Parent then
+        return true
+    end
+    
+    -- Открепляемся от старой цели
+    unweld()
+    
+    -- Телепортируемся вплотную сзади
     local randomOffset = CFrame.new(
-        math.random(-0.5, 0.5),
+        math.random(-0.3, 0.3),
         0,
-        1.5
+        1.2 -- прям впритык, но не внутри
     )
-
     myHRP.CFrame = targetHRP.CFrame * randomOffset
+    
+    -- Создаём WELD (намертво прикрепляем)
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = myHRP
+    weld.Part1 = targetHRP
+    weld.Parent = myHRP
+    
+    currentWeld = weld
+    currentTarget = targetPlayer
     return true
 end
 
@@ -178,15 +217,15 @@ local function farmLoop()
             if targetPlayer ~= player and targetPlayer.Character then
                 pcall(function()
                     equipPunch()
-                    if teleportBehind(targetPlayer) then
-                        task.wait(0.05)
+                    if weldBehind(targetPlayer) then
+                        task.wait(0.1)
                         local char = player.Character
                         local tool = char and char:FindFirstChildOfClass("Tool")
                         if tool then tool:Activate() end
                         if punchEvent then
                             punchEvent:FireServer(targetPlayer, targetPlayer.Character)
                         end
-                        task.wait(0.5)
+                        task.wait(0.4)
                     end
                 end)
             end
@@ -195,7 +234,6 @@ local function farmLoop()
     end
 end
 
--- Fast punch loop
 local function fastPunchLoop()
     while fastPunchEnabled do
         pcall(function()
@@ -210,16 +248,12 @@ local function fastPunchLoop()
     end
 end
 
--- Server Hop функция (с фильтром по игрокам из конфига)
 local function serverHop()
     local servers = {}
-    
     local success, result = pcall(function()
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        local response = HttpService:JSONDecode(game:HttpGet(url))
-        return response
+        return HttpService:JSONDecode(game:HttpGet(url))
     end)
-    
     if success and result and result.data then
         for _, server in pairs(result.data) do
             if server.playing >= config.minPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
@@ -227,18 +261,17 @@ local function serverHop()
             end
         end
     end
-    
     if #servers > 0 then
         local randomServer = servers[math.random(1, #servers)]
-        print("[Auto Hop] Переход на сервер: " .. randomServer .. " (" .. config.minPlayers .. "+ игроков)")
+        print("[Auto Hop] Переход на сервер: " .. randomServer)
         TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, player)
     else
-        print("[Auto Hop] Нет серверов с " .. config.minPlayers .. "+ игроками, обычный реконнект...")
+        print("[Auto Hop] Реконнект...")
         TeleportService:Teleport(game.PlaceId, player)
     end
 end
 
--- Статус
+-- ===== UI =====
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
 statusLabel.Position = UDim2.new(0.05, 0, 0, 5)
@@ -249,7 +282,6 @@ statusLabel.TextScaled = true
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.Parent = contentFrame
 
--- Создание кнопки
 local function makeButton(y, text, state, onToggle)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -260,7 +292,6 @@ local function makeButton(y, text, state, onToggle)
     btn.TextScaled = true
     btn.Font = Enum.Font.GothamBold
     btn.Parent = contentFrame
-    
     btn.MouseButton1Click:Connect(function()
         state = not state
         btn.Text = text .. (state and " [ON]" or " [OFF]")
@@ -270,33 +301,118 @@ local function makeButton(y, text, state, onToggle)
     return btn
 end
 
--- TP Punch
 makeButton(30, "TP Punch", isRunning, function(state)
     isRunning = state
     config.tpPunch = state
-    saveConfig()
-    if state then task.spawn(farmLoop) end
+    if state then
+        task.spawn(farmLoop)
+    else
+        unweld()
+    end
 end)
 
--- Fast Punch
 makeButton(65, "Fast Punch", fastPunchEnabled, function(state)
     fastPunchEnabled = state
     config.fastPunch = state
-    saveConfig()
     if state then task.spawn(fastPunchLoop) end
 end)
 
--- Auto Hop
 makeButton(100, "Auto Hop", autoHopEnabled, function(state)
     autoHopEnabled = state
     config.autoHop = state
+end)
+
+-- ===== DROPDOWN =====
+local configDropdownBtn = Instance.new("TextButton")
+configDropdownBtn.Size = UDim2.new(0.9, 0, 0, 30)
+configDropdownBtn.Position = UDim2.new(0.05, 0, 0, 135)
+configDropdownBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+configDropdownBtn.Text = "⚙️ Config Menu  ▼"
+configDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+configDropdownBtn.TextScaled = true
+configDropdownBtn.Font = Enum.Font.GothamBold
+configDropdownBtn.Parent = contentFrame
+
+local dropdownOptions = Instance.new("Frame")
+dropdownOptions.Size = UDim2.new(0.9, 0, 0, 105)
+dropdownOptions.Position = UDim2.new(0.05, 0, 0, 165)
+dropdownOptions.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+dropdownOptions.BorderSizePixel = 1
+dropdownOptions.BorderColor3 = Color3.fromRGB(138, 43, 226)
+dropdownOptions.Visible = false
+dropdownOptions.Parent = contentFrame
+
+local dropdownLayout = Instance.new("UIListLayout")
+dropdownLayout.Padding = UDim.new(0, 3)
+dropdownLayout.Parent = dropdownOptions
+
+local dropdownPadding = Instance.new("UIPadding")
+dropdownPadding.PaddingTop = UDim.new(0, 5)
+dropdownPadding.PaddingLeft = UDim.new(0, 5)
+dropdownPadding.PaddingRight = UDim.new(0, 5)
+dropdownPadding.Parent = dropdownOptions
+
+local function makeDropdownOption(text, callback, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 28)
+    btn.BackgroundColor3 = color or Color3.fromRGB(60, 60, 80)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = dropdownOptions
+    btn.MouseButton1Click:Connect(function()
+        callback()
+        dropdownOptions.Visible = false
+        configDropdownBtn.Text = "⚙️ Config Menu  ▼"
+    end)
+end
+
+makeDropdownOption("💾 Save Config", function()
     saveConfig()
+    statusLabel.Text = "✅ Config сохранён!"
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    task.wait(2)
+    statusLabel.Text = "Config загружен"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+end, Color3.fromRGB(50, 150, 50))
+
+makeDropdownOption("🔄 Auto Load Config", function()
+    loadConfig()
+    isRunning = config.tpPunch
+    fastPunchEnabled = config.fastPunch
+    autoHopEnabled = config.autoHop
+    statusLabel.Text = "✅ Config загружен!"
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    task.wait(2)
+    statusLabel.Text = "Config загружен"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+end, Color3.fromRGB(50, 100, 200))
+
+makeDropdownOption("🗑️ Delete Config", function()
+    if deleteConfig() then
+        statusLabel.Text = "❌ Config удалён!"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    else
+        statusLabel.Text = "❌ Нет файла конфига"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+    task.wait(2)
+    statusLabel.Text = "Config загружен"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+end, Color3.fromRGB(150, 50, 50))
+
+local dropdownOpen = false
+configDropdownBtn.MouseButton1Click:Connect(function()
+    dropdownOpen = not dropdownOpen
+    dropdownOptions.Visible = dropdownOpen
+    configDropdownBtn.Text = dropdownOpen and "⚙️ Config Menu  ▲" or "⚙️ Config Menu  ▼"
 end)
 
 -- Кнопка ручного Server Hop
 local manualHopBtn = Instance.new("TextButton")
 manualHopBtn.Size = UDim2.new(0.9, 0, 0, 30)
-manualHopBtn.Position = UDim2.new(0.05, 0, 0, 135)
+manualHopBtn.Position = UDim2.new(0.05, 0, 0, 280)
 manualHopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
 manualHopBtn.Text = "Server Hop (Manual)"
 manualHopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -306,26 +422,6 @@ manualHopBtn.Parent = contentFrame
 
 manualHopBtn.MouseButton1Click:Connect(function()
     serverHop()
-end)
-
--- Кнопка сохранения конфига
-local saveBtn = Instance.new("TextButton")
-saveBtn.Size = UDim2.new(0.9, 0, 0, 30)
-saveBtn.Position = UDim2.new(0.05, 0, 0, 170)
-saveBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-saveBtn.Text = "💾 Save Config"
-saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveBtn.TextScaled = true
-saveBtn.Font = Enum.Font.GothamBold
-saveBtn.Parent = contentFrame
-
-saveBtn.MouseButton1Click:Connect(function()
-    saveConfig()
-    statusLabel.Text = "Config сохранён!"
-    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    task.wait(2)
-    statusLabel.Text = "Config загружен"
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 end)
 
 -- Запуск если в конфиге было ON
