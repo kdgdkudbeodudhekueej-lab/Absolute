@@ -13,7 +13,7 @@ local defaultConfig = {
     fastPunch = false,
     autoHop = false,
     autoExecute = false,
-    hopTime = 10,
+    hopTime = 30,
     minPlayers = 6
 }
 
