@@ -98,63 +98,51 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Ищем punch events
-local punchEvent
-for _, e in pairs(ReplicatedStorage.rEvents:GetChildren()) do
-    if string.find(e.Name:lower(), "punch") then
-        punchEvent = e
-        break
-    end
-end
+-- ===== ПРАВИЛЬНЫЙ МЕТОД УДАРА =====
+local muscleEvent = player:WaitForChild("muscleEvent")
 
--- Переменные
-local isRunning = config.tpPunch
-local fastPunchEnabled = config.fastPunch
-local autoHopEnabled = config.autoHop
-local autoExecuteEnabled = config.autoExecute
-local currentWeld = nil
-local currentTarget = nil
-local cachedTool = nil
-
--- Получить punch tool
-local function getPunchTool()
+-- Взять punch в руку
+local function equipPunch()
     local char = player.Character
-    if not char then return nil end
+    if not char then return end
     
-    if cachedTool and cachedTool.Parent == char then
-        return cachedTool
+    local punch = char:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
+    if punch and punch.Parent ~= char then
+        char.Humanoid:EquipTool(punch)
     end
-    
-    for _, tool in pairs(char:GetChildren()) do
-        if tool:IsA("Tool") and (string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist")) then
-            cachedTool = tool
-            return tool
-        end
-    end
-    
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, tool in pairs(backpack:GetChildren()) do
-            if string.find(tool.Name:lower(), "punch") or string.find(tool.Name:lower(), "fist") then
-                tool.Parent = char
-                cachedTool = tool
-                return tool
-            end
-        end
-    end
-    
-    return nil
 end
 
-local function unweld()
-    if currentWeld then
-        pcall(function() currentWeld:Destroy() end)
-        currentWeld = nil
-    end
-    currentTarget = nil
+-- НАСТОЯЩИЙ удар через muscleEvent + firetouchinterest (как в Silence)
+local function realPunch(targetPlayer)
+    local char = player.Character
+    if not char then return end
+    
+    local targetChar = targetPlayer.Character
+    if not targetChar then return end
+    
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    local leftHand = char:FindFirstChild("LeftHand")
+    local rightHand = char:FindFirstChild("RightHand")
+    
+    if not targetHRP or not leftHand or not rightHand then return end
+    
+    equipPunch()
+    
+    pcall(function()
+        -- firetouchinterest — трогаем цель руками (это и есть удар)
+        firetouchinterest(targetHRP, leftHand, 0)
+        firetouchinterest(targetHRP, leftHand, 1)
+        firetouchinterest(targetHRP, rightHand, 0)
+        firetouchinterest(targetHRP, rightHand, 1)
+        
+        -- muscleEvent punch (как в Silence)
+        muscleEvent:FireServer("punch", "leftHand")
+        muscleEvent:FireServer("punch", "rightHand")
+    end)
 end
 
-local function weldBehind(targetPlayer)
+-- Телепорт ВНУТРЬ игрока
+local function teleportInside(targetPlayer)
     local myChar = player.Character
     local targetChar = targetPlayer.Character
     if not myChar or not targetChar then return false end
@@ -163,55 +151,18 @@ local function weldBehind(targetPlayer)
     local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
     if not myHRP or not targetHRP then return false end
     
-    if currentTarget == targetPlayer and currentWeld and currentWeld.Parent then
-        return true
-    end
-    
-    unweld()
-    
-    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1.2)
-    
-    local weld = Instance.new("WeldConstraint")
-    weld.Part0 = myHRP
-    weld.Part1 = targetHRP
-    weld.Parent = myHRP
-    
-    currentWeld = weld
-    currentTarget = targetPlayer
+    -- ТП прямо ВНУТРЬ (0, 0, 0 = центр игрока)
+    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 0)
     return true
 end
 
--- НАСТОЯЩИЙ быстрый удар — вызываем все методы сразу
-local function realPunch(targetPlayer)
-    local char = player.Character
-    if not char then return end
-    
-    local tool = getPunchTool()
-    if not tool then return end
-    
-    -- 1. Активируем tool (встроенный удар)
-    pcall(function() tool:Activate() end)
-    
-    -- 2. Отправляем все возможные события с tool
-    if punchEvent then
-        pcall(function()
-            punchEvent:FireServer(tool, targetPlayer, targetPlayer.Character)
-        end)
-        pcall(function()
-            punchEvent:FireServer("punch", tool, targetPlayer)
-        end)
-        pcall(function()
-            punchEvent:FireServer(tool)
-        end)
-    end
-    
-    -- 3. Пробуем ударить через Tool.Activated
-    pcall(function()
-        tool:Activate()
-    end)
-end
+-- ===== ПЕРЕМЕННЫЕ =====
+local isRunning = config.tpPunch
+local fastPunchEnabled = config.fastPunch
+local autoHopEnabled = config.autoHop
+local autoExecuteEnabled = config.autoExecute
 
--- Farm loop - быстро бьёт по всем
+-- Farm loop — ТП внутрь + настоящий удар
 local function farmLoop()
     while isRunning do
         local players = Players:GetPlayers()
@@ -219,42 +170,48 @@ local function farmLoop()
             if not isRunning then break end
             if targetPlayer ~= player and targetPlayer.Character then
                 pcall(function()
-                    if weldBehind(targetPlayer) then
-                        -- Бьём 3 раза подряд для верности
-                        realPunch(targetPlayer)
+                    -- ТП ВНУТРЬ
+                    if teleportInside(targetPlayer) then
                         task.wait(0.05)
+                        -- Бьём 3 раза
                         realPunch(targetPlayer)
-                        task.wait(0.05)
+                        task.wait(0.03)
                         realPunch(targetPlayer)
-                        task.wait(0.3)
+                        task.wait(0.03)
+                        realPunch(targetPlayer)
+                        task.wait(0.2)
                     end
                 end)
             end
         end
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end
 
--- Fast Punch - быстрый спам настоящих ударов
+-- FAST PUNCH — максимально быстро, только удары
 local function fastPunchLoop()
     while fastPunchEnabled do
         pcall(function()
             local char = player.Character
             if not char then return end
             
-            local tool = getPunchTool()
+            equipPunch()
+            
+            -- Быстрые удары через muscleEvent
+            muscleEvent:FireServer("punch", "leftHand")
+            muscleEvent:FireServer("punch", "rightHand")
+            
+            -- Tool activate для анимации
+            local tool = char:FindFirstChild("Punch")
             if tool then
                 tool:Activate()
             end
-            
-            if punchEvent then
-                punchEvent:FireServer()
-            end
         end)
-        task.wait(0.1) -- Быстро но не слишком
+        task.wait(0.01) -- ОЧЕНЬ быстро (100 раз в секунду)
     end
 end
 
+-- Server Hop
 local function serverHop()
     task.spawn(function()
         local servers = {}
@@ -309,7 +266,7 @@ end
 makeButton(30, "TP Punch", isRunning, function(state)
     isRunning = state
     config.tpPunch = state
-    if state then task.spawn(farmLoop) else unweld() end
+    if state then task.spawn(farmLoop) end
 end)
 
 makeButton(65, "Fast Punch", fastPunchEnabled, function(state)
