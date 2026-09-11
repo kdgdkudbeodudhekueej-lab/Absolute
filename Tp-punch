@@ -12,15 +12,58 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
--- GUI
+-- ===== CONFIG СИСТЕМА =====
+local CONFIG_FILE = "tppunch_config.json"
+
+local defaultConfig = {
+    tpPunch = false,
+    fastPunch = false,
+    autoHop = false,
+    hopTime = 10,
+    minPlayers = 6
+}
+
+local config = defaultConfig
+
+-- Загрузка конфига
+local function loadConfig()
+    if isfile and isfile(CONFIG_FILE) then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(CONFIG_FILE))
+        end)
+        if success and data then
+            for k, v in pairs(data) do
+                config[k] = v
+            end
+            print("[Config] Загружен: " .. CONFIG_FILE)
+        end
+    else
+        print("[Config] Файл не найден, создаю новый...")
+        saveConfig()
+    end
+end
+
+-- Сохранение конфига
+function saveConfig()
+    if writefile then
+        pcall(function()
+            writefile(CONFIG_FILE, HttpService:JSONEncode(config))
+            print("[Config] Сохранён")
+        end)
+    end
+end
+
+loadConfig()
+
+-- ===== GUI =====
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TPPunchMenu"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 280)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -140)
+mainFrame.Size = UDim2.new(0, 250, 0, 380)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -190)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 2
 mainFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -30,7 +73,6 @@ mainFrame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 25)
-title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
 title.Text = "TP Punch"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -63,7 +105,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
         contentFrame.Visible = false
         minimizeBtn.Text = "□"
     else
-        mainFrame.Size = UDim2.new(0, 250, 0, 280)
+        mainFrame.Size = UDim2.new(0, 250, 0, 380)
         contentFrame.Visible = true
         minimizeBtn.Text = "_"
     end
@@ -78,10 +120,10 @@ for _, event in pairs(ReplicatedStorage.rEvents:GetChildren()) do
     end
 end
 
--- ВСЁ ВКЛЮЧЕНО
-local isRunning = true
-local fastPunchEnabled = true
-local autoHopEnabled = true
+-- Переменные состояния (из конфига)
+local isRunning = config.tpPunch
+local fastPunchEnabled = config.fastPunch
+local autoHopEnabled = config.autoHop
 
 -- Функция взять punch в руку
 local function equipPunch()
@@ -107,7 +149,7 @@ local function equipPunch()
     return false
 end
 
--- Телепорт вплотную за спину
+-- Телепорт за спину
 local function teleportBehind(targetPlayer)
     local myChar = player.Character
     local targetChar = targetPlayer.Character
@@ -168,7 +210,7 @@ local function fastPunchLoop()
     end
 end
 
--- Server Hop функция
+-- Server Hop функция (с фильтром по игрокам из конфига)
 local function serverHop()
     local servers = {}
     
@@ -180,7 +222,7 @@ local function serverHop()
     
     if success and result and result.data then
         for _, server in pairs(result.data) do
-            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+            if server.playing >= config.minPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
                 table.insert(servers, server.id)
             end
         end
@@ -188,10 +230,10 @@ local function serverHop()
     
     if #servers > 0 then
         local randomServer = servers[math.random(1, #servers)]
-        print("[Auto Hop] Переход на сервер: " .. randomServer)
+        print("[Auto Hop] Переход на сервер: " .. randomServer .. " (" .. config.minPlayers .. "+ игроков)")
         TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, player)
     else
-        print("[Auto Hop] Нет серверов, реконнект...")
+        print("[Auto Hop] Нет серверов с " .. config.minPlayers .. "+ игроками, обычный реконнект...")
         TeleportService:Teleport(game.PlaceId, player)
     end
 end
@@ -201,78 +243,54 @@ local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
 statusLabel.Position = UDim2.new(0.05, 0, 0, 5)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: ON | Hop: 20s"
-statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.Text = "Config загружен"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statusLabel.TextScaled = true
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.Parent = contentFrame
 
--- Кнопка TP Punch
-local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0.9, 0, 0, 30)
-tpBtn.Position = UDim2.new(0.05, 0, 0, 30)
-tpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-tpBtn.Text = "TP Punch [ON]"
-tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpBtn.TextScaled = true
-tpBtn.Font = Enum.Font.GothamBold
-tpBtn.Parent = contentFrame
+-- Создание кнопки
+local function makeButton(y, text, state, onToggle)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
+    btn.Text = text .. (state and " [ON]" or " [OFF]")
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = contentFrame
+    
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = text .. (state and " [ON]" or " [OFF]")
+        btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
+        onToggle(state)
+    end)
+    return btn
+end
 
-tpBtn.MouseButton1Click:Connect(function()
-    isRunning = not isRunning
-    if isRunning then
-        tpBtn.Text = "TP Punch [ON]"
-        tpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        task.spawn(farmLoop)
-    else
-        tpBtn.Text = "TP Punch [OFF]"
-        tpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    end
+-- TP Punch
+makeButton(30, "TP Punch", isRunning, function(state)
+    isRunning = state
+    config.tpPunch = state
+    saveConfig()
+    if state then task.spawn(farmLoop) end
 end)
 
--- Кнопка Fast Punch
-local fastBtn = Instance.new("TextButton")
-fastBtn.Size = UDim2.new(0.9, 0, 0, 30)
-fastBtn.Position = UDim2.new(0.05, 0, 0, 65)
-fastBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-fastBtn.Text = "Fast Punch [ON]"
-fastBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-fastBtn.TextScaled = true
-fastBtn.Font = Enum.Font.GothamBold
-fastBtn.Parent = contentFrame
-
-fastBtn.MouseButton1Click:Connect(function()
-    fastPunchEnabled = not fastPunchEnabled
-    if fastPunchEnabled then
-        fastBtn.Text = "Fast Punch [ON]"
-        fastBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        task.spawn(fastPunchLoop)
-    else
-        fastBtn.Text = "Fast Punch [OFF]"
-        fastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    end
+-- Fast Punch
+makeButton(65, "Fast Punch", fastPunchEnabled, function(state)
+    fastPunchEnabled = state
+    config.fastPunch = state
+    saveConfig()
+    if state then task.spawn(fastPunchLoop) end
 end)
 
--- Кнопка Auto Hop
-local hopBtn = Instance.new("TextButton")
-hopBtn.Size = UDim2.new(0.9, 0, 0, 30)
-hopBtn.Position = UDim2.new(0.05, 0, 0, 100)
-hopBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-hopBtn.Text = "Auto Hop 20s [ON]"
-hopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-hopBtn.TextScaled = true
-hopBtn.Font = Enum.Font.GothamBold
-hopBtn.Parent = contentFrame
-
-hopBtn.MouseButton1Click:Connect(function()
-    autoHopEnabled = not autoHopEnabled
-    if autoHopEnabled then
-        hopBtn.Text = "Auto Hop 20s [ON]"
-        hopBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    else
-        hopBtn.Text = "Auto Hop 20s [OFF]"
-        hopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    end
+-- Auto Hop
+makeButton(100, "Auto Hop", autoHopEnabled, function(state)
+    autoHopEnabled = state
+    config.autoHop = state
+    saveConfig()
 end)
 
 -- Кнопка ручного Server Hop
@@ -290,21 +308,41 @@ manualHopBtn.MouseButton1Click:Connect(function()
     serverHop()
 end)
 
--- Запускаем всё сразу
-task.spawn(farmLoop)
-task.spawn(fastPunchLoop)
+-- Кнопка сохранения конфига
+local saveBtn = Instance.new("TextButton")
+saveBtn.Size = UDim2.new(0.9, 0, 0, 30)
+saveBtn.Position = UDim2.new(0.05, 0, 0, 170)
+saveBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+saveBtn.Text = "💾 Save Config"
+saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveBtn.TextScaled = true
+saveBtn.Font = Enum.Font.GothamBold
+saveBtn.Parent = contentFrame
 
--- AUTO SERVER HOP КАЖДЫЕ 20 СЕКУНД
+saveBtn.MouseButton1Click:Connect(function()
+    saveConfig()
+    statusLabel.Text = "Config сохранён!"
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    task.wait(2)
+    statusLabel.Text = "Config загружен"
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+end)
+
+-- Запуск если в конфиге было ON
+if isRunning then task.spawn(farmLoop) end
+if fastPunchEnabled then task.spawn(fastPunchLoop) end
+
+-- AUTO HOP цикл
 task.spawn(function()
-    task.wait(20) -- ждём 20 секунд после запуска
+    task.wait(config.hopTime)
     while true do
         if autoHopEnabled then
-            print("[Auto Hop] 20 секунд прошло, меняю сервер...")
+            print("[Auto Hop] " .. config.hopTime .. " секунд прошло...")
             serverHop()
-            break -- после телепорта скрипт перезапустится через queue_on_teleport
+            break
         end
         task.wait(1)
     end
 end)
 
-print("[TP Punch] Загружено! Auto Hop: 20s")
+print("[TP Punch] Загружено! Config: " .. CONFIG_FILE)
