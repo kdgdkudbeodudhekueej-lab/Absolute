@@ -17,8 +17,8 @@ rbGui.ResetOnSpawn = false
 rbGui.Parent = player.PlayerGui
 
 local rbFrame = Instance.new("Frame")
-rbFrame.Size = UDim2.new(0, 250, 0, 590)
-rbFrame.Position = UDim2.new(0, 10, 0.5, -295)
+rbFrame.Size = UDim2.new(0, 250, 0, 640)
+rbFrame.Position = UDim2.new(0, 10, 0.5, -320)
 rbFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 rbFrame.BorderSizePixel = 2
 rbFrame.BorderColor3 = Color3.fromRGB(50, 200, 50)
@@ -60,7 +60,7 @@ rbMinBtn.MouseButton1Click:Connect(function()
         rbContent.Visible = false
         rbMinBtn.Text = "□"
     else
-        rbFrame.Size = UDim2.new(0, 250, 0, 590)
+        rbFrame.Size = UDim2.new(0, 250, 0, 640)
         rbContent.Visible = true
         rbMinBtn.Text = "_"
     end
@@ -164,12 +164,25 @@ y = y + 25
 local strengthLabel = createLabel(rbContent, y, "Strength: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
 y = y + 25
 local durabilityLabel = createLabel(rbContent, y, "Durability: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
-y = y + 35
+y = y + 25
+local rebirthProgressLabel = createLabel(rbContent, y, "До ребита: считаю...", Color3.fromRGB(255, 200, 100))
+y = y + 30
 
 local function updateStats()
     rebirthLabel.Text = string.format("Rebirths: %s | Gained: %s", formatNumber(rebirthsStat.Value), formatNumber(rebirthsStat.Value - rebirthGained))
     strengthLabel.Text = string.format("Strength: %s | Gained: %s", formatNumber(strengthStat.Value), formatNumber(strengthStat.Value - strengthGained))
     durabilityLabel.Text = string.format("Durability: %s | Gained: %s", formatNumber(durabilityStat.Value), formatNumber(durabilityStat.Value - durabilityGained))
+    
+    local target = 5000 + (rebirthsStat.Value * 2550)
+    local needed = target - strengthStat.Value
+    
+    if needed <= 0 then
+        rebirthProgressLabel.Text = "До ребита: ГОТОВ!"
+        rebirthProgressLabel.TextColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        rebirthProgressLabel.Text = string.format("До ребита: %s (%s / %s)", formatNumber(needed), formatNumber(strengthStat.Value), formatNumber(target))
+        rebirthProgressLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    end
 end
 
 local function resetStats()
@@ -185,6 +198,8 @@ end)
 
 strengthStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
 durabilityStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
+
+updateStats()
 
 local function equipFarmSet()
     for _, folder in pairs(player.petsFolder:GetChildren()) do
@@ -453,9 +468,6 @@ noBtn.MouseButton1Click:Connect(function()
     currentConfirmAction = nil
 end)
 
-fastRebirthToggle.MouseButton1Click:Connect(function()
-end)
-
 local function resetFastRebirthBtn()
     fastRebirthToggle.Text = "Fast Rebirth [OFF]"
     fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
@@ -463,7 +475,6 @@ local function resetFastRebirthBtn()
     fastRepRunning = false
 end
 
-local origFastRebirthClick = fastRebirthToggle.MouseButton1Click
 fastRebirthToggle.MouseButton1Click:Connect(function()
     if fastRebirthToggle.Text:find("%[ON%]") then
         resetFastRebirthBtn()
@@ -503,11 +514,11 @@ autoRebirthToggle.MouseButton1Click:Connect(function()
                     pcall(function()
                         ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
                     end)
-                    task.wait(0.5)
+                    task.wait(0.05)
                     if rebirthsStat.Value > before then
-                        task.wait(1)
+                        task.wait(0.3)
                     else
-                        task.wait(2)
+                        task.wait(0.5)
                     end
                 end
             end)
@@ -792,8 +803,8 @@ killGui.ResetOnSpawn = false
 killGui.Parent = player.PlayerGui
 
 local killFrame = Instance.new("Frame")
-killFrame.Size = UDim2.new(0, 250, 0, 385)
-killFrame.Position = UDim2.new(1, -260, 0.5, -192)
+killFrame.Size = UDim2.new(0, 250, 0, 440)
+killFrame.Position = UDim2.new(1, -260, 0.5, -220)
 killFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 killFrame.BorderSizePixel = 2
 killFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -835,7 +846,7 @@ killMinBtn.MouseButton1Click:Connect(function()
         killContent.Visible = false
         killMinBtn.Text = "□"
     else
-        killFrame.Size = UDim2.new(0, 250, 0, 385)
+        killFrame.Size = UDim2.new(0, 250, 0, 440)
         killContent.Visible = true
         killMinBtn.Text = "_"
     end
@@ -853,6 +864,7 @@ local dropdownOpen = false
 local killAllEnabled = false
 local cameraLockEnabled = false
 local cameraAnchorPart = nil
+local distanceOffset = 0.5
 
 local function savePosition()
     local myChar = player.Character
@@ -920,7 +932,12 @@ local function attackPlayer(targetPlayer)
     local leftHand = myChar:FindFirstChild("LeftHand")
     local rightHand = myChar:FindFirstChild("RightHand")
     if not targetHRP or not myHRP or not leftHand or not rightHand or not targetHumanoid then return end
-    myHRP.CFrame = targetHRP.CFrame
+    
+    local targetCFrame = targetHRP.CFrame
+    local backOffset = CFrame.new(0, 0, distanceOffset)
+    local behindPos = targetCFrame * backOffset
+    myHRP.CFrame = CFrame.new(behindPos.Position, targetHRP.Position)
+    
     equipPunch()
     resetAttackTime()
     pcall(function()
@@ -1013,7 +1030,10 @@ local function killAllLoop()
                         if not killAllEnabled then break end
                         local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
                         if not targetHRP then break end
-                        myHRP.CFrame = targetHRP.CFrame
+                        local targetCFrame = targetHRP.CFrame
+                        local backOffset = CFrame.new(0, 0, distanceOffset)
+                        local behindPos = targetCFrame * backOffset
+                        myHRP.CFrame = CFrame.new(behindPos.Position, targetHRP.Position)
                         resetAttackTime()
                         local tool = myChar:FindFirstChild("Punch")
                         if tool then pcall(function() tool:Activate() end) end
@@ -1337,13 +1357,95 @@ killButton(335, "Fast Attack", false, function(state)
     if state then task.spawn(fastAttackLoop) end
 end)
 
+local distLabel = Instance.new("TextLabel")
+distLabel.Size = UDim2.new(0.9, 0, 0, 20)
+distLabel.Position = UDim2.new(0.05, 0, 0, 370)
+distLabel.BackgroundTransparency = 1
+distLabel.Text = "Distance: 0.50"
+distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+distLabel.TextScaled = true
+distLabel.Font = Enum.Font.Gotham
+distLabel.Parent = killContent
+
+local distSliderBg = Instance.new("Frame")
+distSliderBg.Size = UDim2.new(0.9, 0, 0, 12)
+distSliderBg.Position = UDim2.new(0.05, 0, 0, 395)
+distSliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+distSliderBg.BorderSizePixel = 0
+distSliderBg.Parent = killContent
+
+local distSliderFill = Instance.new("Frame")
+distSliderFill.Size = UDim2.new(0.5 / 3, 0, 1, 0)
+distSliderFill.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+distSliderFill.BorderSizePixel = 0
+distSliderFill.Parent = distSliderBg
+
+local distSliderKnob = Instance.new("TextButton")
+distSliderKnob.Size = UDim2.new(0, 14, 0, 14)
+distSliderKnob.Position = UDim2.new(0.5 / 3, -7, 0.5, -7)
+distSliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+distSliderKnob.Text = ""
+distSliderKnob.AutoButtonColor = false
+distSliderKnob.BorderSizePixel = 0
+distSliderKnob.Parent = distSliderBg
+
+local distCornerBg = Instance.new("UICorner")
+distCornerBg.CornerRadius = UDim.new(1, 0)
+distCornerBg.Parent = distSliderBg
+
+local distCornerFill = Instance.new("UICorner")
+distCornerFill.CornerRadius = UDim.new(1, 0)
+distCornerFill.Parent = distSliderFill
+
+local distCornerKnob = Instance.new("UICorner")
+distCornerKnob.CornerRadius = UDim.new(1, 0)
+distCornerKnob.Parent = distSliderKnob
+
+local distDragging = false
+
+local function updateDistSlider(input)
+    local relX = math.clamp((input.Position.X - distSliderBg.AbsolutePosition.X) / distSliderBg.AbsoluteSize.X, 0, 1)
+    local newVal = math.floor(relX * 300) / 100
+    distanceOffset = newVal
+    distSliderFill.Size = UDim2.new(relX, 0, 1, 0)
+    distSliderKnob.Position = UDim2.new(relX, -7, 0.5, -7)
+    distLabel.Text = "Distance: " .. string.format("%.2f", distanceOffset)
+end
+
+distSliderKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        distDragging = true
+    end
+end)
+
+distSliderKnob.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        distDragging = false
+    end
+end)
+
+distSliderBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        distDragging = true
+        updateDistSlider(input)
+    end
+end)
+
+distSliderBg.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        distDragging = false
+    end
+end)
+
 game:GetService("UserInputService").InputChanged:Connect(function(input)
     if bossDragging then updateBossSlider(input) end
+    if distDragging then updateDistSlider(input) end
 end)
 
 game:GetService("UserInputService").InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         bossDragging = false
+        distDragging = false
     end
 end)
 
