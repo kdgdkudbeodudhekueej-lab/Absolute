@@ -17,8 +17,8 @@ rbGui.ResetOnSpawn = false
 rbGui.Parent = player.PlayerGui
 
 local rbFrame = Instance.new("Frame")
-rbFrame.Size = UDim2.new(0, 250, 0, 520)
-rbFrame.Position = UDim2.new(0, 10, 0.5, -260)
+rbFrame.Size = UDim2.new(0, 250, 0, 590)
+rbFrame.Position = UDim2.new(0, 10, 0.5, -295)
 rbFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 rbFrame.BorderSizePixel = 2
 rbFrame.BorderColor3 = Color3.fromRGB(50, 200, 50)
@@ -60,7 +60,7 @@ rbMinBtn.MouseButton1Click:Connect(function()
         rbContent.Visible = false
         rbMinBtn.Text = "□"
     else
-        rbFrame.Size = UDim2.new(0, 250, 0, 520)
+        rbFrame.Size = UDim2.new(0, 250, 0, 590)
         rbContent.Visible = true
         rbMinBtn.Text = "_"
     end
@@ -285,98 +285,12 @@ local function rebirthLoop()
 end
 
 local fastRebirthToggle = createToggle(rbContent, y, "Fast Rebirth", function(state)
-    isRebirthing = state
-    fastRepRunning = state
-    if state then
-        task.spawn(rebirthLoop)
-        task.spawn(fastRepLoop)
-    end
 end)
 y = y + 33
 
-local confirmGui = Instance.new("ScreenGui")
-confirmGui.Name = "ConfirmDialog"
-confirmGui.ResetOnSpawn = false
-confirmGui.Parent = player.PlayerGui
-
-local confirmFrame = Instance.new("Frame")
-confirmFrame.Size = UDim2.new(0, 300, 0, 150)
-confirmFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-confirmFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-confirmFrame.BorderSizePixel = 2
-confirmFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
-confirmFrame.Visible = false
-confirmFrame.ZIndex = 10
-confirmFrame.Parent = confirmGui
-
-local confirmTitle = Instance.new("TextLabel")
-confirmTitle.Size = UDim2.new(1, 0, 0, 25)
-confirmTitle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-confirmTitle.Text = "WARNING"
-confirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmTitle.TextScaled = true
-confirmTitle.Font = Enum.Font.GothamBold
-confirmTitle.ZIndex = 11
-confirmTitle.Parent = confirmFrame
-
-local confirmText = Instance.new("TextLabel")
-confirmText.Size = UDim2.new(0.9, 0, 0, 60)
-confirmText.Position = UDim2.new(0.05, 0, 0, 35)
-confirmText.BackgroundTransparency = 1
-confirmText.Text = "Вы точно хотите включить Fast Rebirth? Он только для 8 паков!"
-confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmText.TextScaled = true
-confirmText.TextWrapped = true
-confirmText.Font = Enum.Font.Gotham
-confirmText.ZIndex = 11
-confirmText.Parent = confirmFrame
-
-local yesBtn = Instance.new("TextButton")
-yesBtn.Size = UDim2.new(0.4, 0, 0, 30)
-yesBtn.Position = UDim2.new(0.05, 0, 0, 105)
-yesBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-yesBtn.Text = "Да"
-yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-yesBtn.TextScaled = true
-yesBtn.Font = Enum.Font.GothamBold
-yesBtn.ZIndex = 11
-yesBtn.Parent = confirmFrame
-
-local noBtn = Instance.new("TextButton")
-noBtn.Size = UDim2.new(0.4, 0, 0, 30)
-noBtn.Position = UDim2.new(0.55, 0, 0, 105)
-noBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-noBtn.Text = "Нет"
-noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-noBtn.TextScaled = true
-noBtn.Font = Enum.Font.GothamBold
-noBtn.ZIndex = 11
-noBtn.Parent = confirmFrame
-
-local fastRebirthState = false
-
-fastRebirthToggle.MouseButton1Click:Connect(function()
+local autoRebirthToggle = createToggle(rbContent, y, "Auto Rebirth", function(state)
 end)
-
-yesBtn.MouseButton1Click:Connect(function()
-    confirmFrame.Visible = false
-    fastRebirthState = true
-    isRebirthing = true
-    fastRepRunning = true
-    fastRebirthToggle.Text = "Fast Rebirth [ON]"
-    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    task.spawn(rebirthLoop)
-    task.spawn(fastRepLoop)
-end)
-
-noBtn.MouseButton1Click:Connect(function()
-    confirmFrame.Visible = false
-    fastRebirthState = false
-    isRebirthing = false
-    fastRepRunning = false
-    fastRebirthToggle.Text = "Fast Rebirth [OFF]"
-    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-end)
+y = y + 33
 
 createLabel(rbContent, y, "FAST REP SETTINGS", Color3.fromRGB(50, 200, 50))
 y = y + 25
@@ -453,6 +367,153 @@ createToggle(rbContent, y, "Fast Rep", function(state)
             pcall(function() task.cancel(thread) end)
         end
         fastThreads = {}
+    end
+end)
+
+local confirmGui = Instance.new("ScreenGui")
+confirmGui.Name = "ConfirmDialog"
+confirmGui.ResetOnSpawn = false
+confirmGui.Parent = player.PlayerGui
+
+local confirmFrame = Instance.new("Frame")
+confirmFrame.Size = UDim2.new(0, 320, 0, 160)
+confirmFrame.Position = UDim2.new(0.5, -160, 0.5, -80)
+confirmFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+confirmFrame.BorderSizePixel = 2
+confirmFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 10
+confirmFrame.Parent = confirmGui
+
+local confirmTitle = Instance.new("TextLabel")
+confirmTitle.Size = UDim2.new(1, 0, 0, 25)
+confirmTitle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+confirmTitle.Text = "WARNING"
+confirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+confirmTitle.TextScaled = true
+confirmTitle.Font = Enum.Font.GothamBold
+confirmTitle.ZIndex = 11
+confirmTitle.Parent = confirmFrame
+
+local confirmText = Instance.new("TextLabel")
+confirmText.Size = UDim2.new(0.9, 0, 0, 70)
+confirmText.Position = UDim2.new(0.05, 0, 0, 35)
+confirmText.BackgroundTransparency = 1
+confirmText.Text = ""
+confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+confirmText.TextScaled = true
+confirmText.TextWrapped = true
+confirmText.Font = Enum.Font.Gotham
+confirmText.ZIndex = 11
+confirmText.Parent = confirmFrame
+
+local yesBtn = Instance.new("TextButton")
+yesBtn.Size = UDim2.new(0.4, 0, 0, 30)
+yesBtn.Position = UDim2.new(0.05, 0, 0, 115)
+yesBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+yesBtn.Text = "Да"
+yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+yesBtn.TextScaled = true
+yesBtn.Font = Enum.Font.GothamBold
+yesBtn.ZIndex = 11
+yesBtn.Parent = confirmFrame
+
+local noBtn = Instance.new("TextButton")
+noBtn.Size = UDim2.new(0.4, 0, 0, 30)
+noBtn.Position = UDim2.new(0.55, 0, 0, 115)
+noBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+noBtn.Text = "Нет"
+noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noBtn.TextScaled = true
+noBtn.Font = Enum.Font.GothamBold
+noBtn.ZIndex = 11
+noBtn.Parent = confirmFrame
+
+local currentConfirmAction = nil
+
+local function showConfirm(text, onYes, onNo)
+    confirmText.Text = text
+    confirmFrame.Visible = true
+    currentConfirmAction = {yes = onYes, no = onNo}
+end
+
+yesBtn.MouseButton1Click:Connect(function()
+    confirmFrame.Visible = false
+    if currentConfirmAction and currentConfirmAction.yes then
+        currentConfirmAction.yes()
+    end
+    currentConfirmAction = nil
+end)
+
+noBtn.MouseButton1Click:Connect(function()
+    confirmFrame.Visible = false
+    if currentConfirmAction and currentConfirmAction.no then
+        currentConfirmAction.no()
+    end
+    currentConfirmAction = nil
+end)
+
+fastRebirthToggle.MouseButton1Click:Connect(function()
+end)
+
+local function resetFastRebirthBtn()
+    fastRebirthToggle.Text = "Fast Rebirth [OFF]"
+    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    isRebirthing = false
+    fastRepRunning = false
+end
+
+local origFastRebirthClick = fastRebirthToggle.MouseButton1Click
+fastRebirthToggle.MouseButton1Click:Connect(function()
+    if fastRebirthToggle.Text:find("%[ON%]") then
+        resetFastRebirthBtn()
+        for _, thread in ipairs(fastThreads) do
+            pcall(function() task.cancel(thread) end)
+        end
+        fastThreads = {}
+    else
+        showConfirm("Вы точно хотите включить Fast Rebirth? Он только для 8 паков!", function()
+            fastRebirthToggle.Text = "Fast Rebirth [ON]"
+            fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+            isRebirthing = true
+            fastRepRunning = true
+            task.spawn(rebirthLoop)
+            task.spawn(fastRepLoop)
+        end, function()
+            resetFastRebirthBtn()
+        end)
+    end
+end)
+
+local function resetAutoRebirthBtn()
+    autoRebirthToggle.Text = "Auto Rebirth [OFF]"
+    autoRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+end
+
+autoRebirthToggle.MouseButton1Click:Connect(function()
+    if autoRebirthToggle.Text:find("%[ON%]") then
+        resetAutoRebirthBtn()
+    else
+        showConfirm("Вы точно хотите сделать ребёрн? Вы потеряете всю силу!", function()
+            autoRebirthToggle.Text = "Auto Rebirth [ON]"
+            autoRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+            task.spawn(function()
+                while autoRebirthToggle.Text:find("%[ON%]") do
+                    local before = rebirthsStat.Value
+                    pcall(function()
+                        ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+                    end)
+                    task.wait(0.5)
+                    if rebirthsStat.Value > before then
+                        task.wait(1)
+                    else
+                        task.wait(2)
+                    end
+                end
+            end)
+        end, function()
+            resetAutoRebirthBtn()
+        end)
     end
 end)
 
@@ -792,7 +853,6 @@ local dropdownOpen = false
 local killAllEnabled = false
 local cameraLockEnabled = false
 local cameraAnchorPart = nil
-local killAllThread = nil
 
 local function savePosition()
     local myChar = player.Character
