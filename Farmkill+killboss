@@ -4,14 +4,230 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
+local muscleEvent = player:WaitForChild("muscleEvent")
+local leaderstats = player:WaitForChild("leaderstats")
+local rebirthsStat = leaderstats:WaitForChild("Rebirths")
+local strengthStat = leaderstats:WaitForChild("Strength")
+local changeSpeedSizeRemote = ReplicatedStorage.rEvents:WaitForChild("changeSpeedSizeRemote")
+
+local rbGui = Instance.new("ScreenGui")
+rbGui.Name = "FastRebirthMenu"
+rbGui.ResetOnSpawn = false
+rbGui.Parent = player.PlayerGui
+
+local rbFrame = Instance.new("Frame")
+rbFrame.Size = UDim2.new(0, 250, 0, 350)
+rbFrame.Position = UDim2.new(0, 10, 0.5, -175)
+rbFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+rbFrame.BorderSizePixel = 2
+rbFrame.BorderColor3 = Color3.fromRGB(50, 200, 50)
+rbFrame.Active = true
+rbFrame.Draggable = true
+rbFrame.Parent = rbGui
+
+local rbTitle = Instance.new("TextLabel")
+rbTitle.Size = UDim2.new(1, 0, 0, 25)
+rbTitle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+rbTitle.Text = "Fast Rebirth"
+rbTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+rbTitle.TextScaled = true
+rbTitle.Font = Enum.Font.GothamBold
+rbTitle.Parent = rbFrame
+
+local rbMinBtn = Instance.new("TextButton")
+rbMinBtn.Size = UDim2.new(0, 25, 0, 25)
+rbMinBtn.Position = UDim2.new(1, -25, 0, 0)
+rbMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+rbMinBtn.Text = "_"
+rbMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rbMinBtn.TextScaled = true
+rbMinBtn.Font = Enum.Font.GothamBold
+rbMinBtn.Parent = rbFrame
+
+local rbContent = Instance.new("Frame")
+rbContent.Size = UDim2.new(1, 0, 1, -25)
+rbContent.Position = UDim2.new(0, 0, 0, 25)
+rbContent.BackgroundTransparency = 1
+rbContent.Parent = rbFrame
+
+local rbMinimized = false
+
+rbMinBtn.MouseButton1Click:Connect(function()
+    rbMinimized = not rbMinimized
+    if rbMinimized then
+        rbFrame.Size = UDim2.new(0, 250, 0, 25)
+        rbContent.Visible = false
+        rbMinBtn.Text = "□"
+    else
+        rbFrame.Size = UDim2.new(0, 250, 0, 350)
+        rbContent.Visible = true
+        rbMinBtn.Text = "_"
+    end
+end)
+
+local rbLabel = Instance.new("TextLabel")
+rbLabel.Size = UDim2.new(0.9, 0, 0, 20)
+rbLabel.Position = UDim2.new(0.05, 0, 0, 5)
+rbLabel.BackgroundTransparency = 1
+rbLabel.Text = "Rebirths: 0 | Strength: 0"
+rbLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+rbLabel.TextScaled = true
+rbLabel.Font = Enum.Font.Gotham
+rbLabel.Parent = rbContent
+
+local function updateRBStats()
+    rbLabel.Text = "Rebirths: " .. rebirthsStat.Value .. " | Strength: " .. math.floor(strengthStat.Value)
+end
+
+strengthStat:GetPropertyChangedSignal("Value"):Connect(updateRBStats)
+rebirthsStat:GetPropertyChangedSignal("Value"):Connect(updateRBStats)
+
+local function managePets(petName)
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
+            end
+        end
+    end
+    task.wait(0.1)
+    for _, pet in pairs(player.petsFolder.Unique:GetChildren()) do
+        if pet.Name == petName then
+            ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+        end
+    end
+end
+
+local isRebirthing = false
+local fastRepRunning = false
+local repsPerBatch = 3
+local batchDelay = 0.01
+local microPause = 0.05
+local repCount = 0
+
+local function doRebirth()
+    local target = 5000 + (rebirthsStat.Value * 2550)
+    while isRebirthing and strengthStat.Value < target do
+        local reps = player.MembershipType == Enum.MembershipType.Premium and 8 or 14
+        for _ = 1, reps do
+            muscleEvent:FireServer("rep")
+            task.wait(0.015)
+        end
+        task.wait(0.05)
+    end
+    if isRebirthing and strengthStat.Value >= target then
+        managePets("Tribal Overlord")
+        task.wait(0.25)
+        local before = rebirthsStat.Value
+        repeat
+            ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+            task.wait(0.05)
+        until rebirthsStat.Value > before or not isRebirthing
+    end
+end
+
+local function rebirthLoop()
+    while isRebirthing do
+        managePets("Swift Samurai")
+        doRebirth()
+        task.wait(0.5)
+    end
+end
+
+local function fastRepLoop()
+    while fastRepRunning do
+        for i = 1, repsPerBatch do
+            muscleEvent:FireServer("rep")
+            repCount = repCount + 1
+        end
+        task.wait(batchDelay)
+        if repCount >= 100 then
+            task.wait(microPause)
+            repCount = 0
+        end
+    end
+end
+
+local function rbButton(y, text, state, onToggle)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
+    btn.Text = text .. (state and " [ON]" or " [OFF]")
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = rbContent
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = text .. (state and " [ON]" or " [OFF]")
+        btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
+        onToggle(state)
+    end)
+    return btn
+end
+
+rbButton(30, "Fast Rebirth", false, function(state)
+    isRebirthing = state
+    if state then task.spawn(rebirthLoop) end
+end)
+
+rbButton(65, "Fast Rep", false, function(state)
+    fastRepRunning = state
+    repCount = 0
+    if state then task.spawn(fastRepLoop) end
+end)
+
+local repsLabel = Instance.new("TextLabel")
+repsLabel.Size = UDim2.new(0.4, 0, 0, 25)
+repsLabel.Position = UDim2.new(0.05, 0, 0, 100)
+repsLabel.BackgroundTransparency = 1
+repsLabel.Text = "Speed:"
+repsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+repsLabel.TextScaled = true
+repsLabel.Font = Enum.Font.Gotham
+repsLabel.Parent = rbContent
+
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size = UDim2.new(0.45, 0, 0, 25)
+modeBtn.Position = UDim2.new(0.5, 0, 0, 100)
+modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+modeBtn.Text = "Normal"
+modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+modeBtn.TextScaled = true
+modeBtn.Font = Enum.Font.Gotham
+modeBtn.Parent = rbContent
+
+local modes = {"Slower", "Normal", "Faster"}
+local modeIndex = 2
+
+modeBtn.MouseButton1Click:Connect(function()
+    modeIndex = modeIndex % #modes + 1
+    local mode = modes[modeIndex]
+    modeBtn.Text = mode
+    if mode == "Slower" then
+        repsPerBatch = 1
+        batchDelay = 0.08
+        microPause = 0.3
+    elseif mode == "Normal" then
+        repsPerBatch = 3
+        batchDelay = 0.01
+        microPause = 0.05
+    elseif mode == "Faster" then
+        repsPerBatch = 15
+        batchDelay = 0.002
+        microPause = 0.01
+    end
+end)
+
 local bossGui = Instance.new("ScreenGui")
 bossGui.Name = "BossKillMenu"
 bossGui.ResetOnSpawn = false
 bossGui.Parent = player.PlayerGui
 
 local bossFrame = Instance.new("Frame")
-bossFrame.Size = UDim2.new(0, 250, 0, 320)
-bossFrame.Position = UDim2.new(0.5, -260, 0.5, -160)
+bossFrame.Size = UDim2.new(0, 250, 0, 230)
+bossFrame.Position = UDim2.new(0.5, -125, 0, 10)
 bossFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 bossFrame.BorderSizePixel = 2
 bossFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
@@ -28,15 +244,15 @@ bossTitle.TextScaled = true
 bossTitle.Font = Enum.Font.GothamBold
 bossTitle.Parent = bossFrame
 
-local bossMinimizeBtn = Instance.new("TextButton")
-bossMinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
-bossMinimizeBtn.Position = UDim2.new(1, -25, 0, 0)
-bossMinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-bossMinimizeBtn.Text = "_"
-bossMinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-bossMinimizeBtn.TextScaled = true
-bossMinimizeBtn.Font = Enum.Font.GothamBold
-bossMinimizeBtn.Parent = bossFrame
+local bossMinBtn = Instance.new("TextButton")
+bossMinBtn.Size = UDim2.new(0, 25, 0, 25)
+bossMinBtn.Position = UDim2.new(1, -25, 0, 0)
+bossMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+bossMinBtn.Text = "_"
+bossMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bossMinBtn.TextScaled = true
+bossMinBtn.Font = Enum.Font.GothamBold
+bossMinBtn.Parent = bossFrame
 
 local bossContent = Instance.new("Frame")
 bossContent.Size = UDim2.new(1, 0, 1, -25)
@@ -46,35 +262,21 @@ bossContent.Parent = bossFrame
 
 local bossMinimized = false
 
-bossMinimizeBtn.MouseButton1Click:Connect(function()
+bossMinBtn.MouseButton1Click:Connect(function()
     bossMinimized = not bossMinimized
     if bossMinimized then
         bossFrame.Size = UDim2.new(0, 250, 0, 25)
         bossContent.Visible = false
-        bossMinimizeBtn.Text = "□"
+        bossMinBtn.Text = "□"
     else
-        bossFrame.Size = UDim2.new(0, 250, 0, 320)
+        bossFrame.Size = UDim2.new(0, 250, 0, 230)
         bossContent.Visible = true
-        bossMinimizeBtn.Text = "_"
+        bossMinBtn.Text = "_"
     end
 end)
 
-local muscleEvent = player:WaitForChild("muscleEvent")
-local changeSpeedSizeRemote = ReplicatedStorage.rEvents:WaitForChild("changeSpeedSizeRemote")
-
 local autoKillBossEnabled = false
-local bossFastPunchEnabled = false
-local size12Enabled = false
-local heightOffset = 25
-
-local BOSS_NAMES = {
-    ["COMMON BOSS"] = true,
-    ["RARE BOSS"] = true,
-    ["EPIC BOSS"] = true,
-    ["LEGENDARY BOSS"] = true,
-    ["MYTHIC BOSS"] = true,
-    ["RAINBOW BOSS"] = true,
-}
+local heightOffset = 55
 
 local function setSize(size)
     pcall(function()
@@ -110,94 +312,67 @@ local function resetAttackTime()
     local punch = char:FindFirstChild("Punch")
     if punch then
         local attackTime = punch:FindFirstChild("attackTime")
-        if attackTime then
-            attackTime.Value = 0
-        end
+        if attackTime then attackTime.Value = 0 end
     end
 end
 
-local function isBoss(model)
-    if not model or not model.Name then return false end
-    return BOSS_NAMES[model.Name] == true
-end
-
-local function findBoss()
+local function findBossPart()
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and isBoss(obj) then
-            local humanoid = obj:FindFirstChildOfClass("Humanoid")
-            local hrp = obj:FindFirstChild("HumanoidRootPart")
-            if humanoid and hrp and humanoid.Health > 0 then
-                return obj, hrp
+        if obj:IsA("BasePart") then
+            if obj.Name == "BossDamageHitbox" or obj.Name == "Boss" then
+                if obj:FindFirstAncestor("BossArena") then
+                    return obj
+                end
             end
         end
     end
-    return nil, nil
-end
-
-local function attackBoss(bossHRP)
-    local myChar = player.Character
-    if not myChar then return end
-    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    local leftHand = myChar:FindFirstChild("LeftHand")
-    local rightHand = myChar:FindFirstChild("RightHand")
-    if not myHRP or not leftHand or not rightHand then return end
-    local abovePos = bossHRP.Position + Vector3.new(0, heightOffset, 0)
-    myHRP.CFrame = CFrame.new(abovePos, bossHRP.Position)
-    equipPunch()
-    resetAttackTime()
-    pcall(function()
-        firetouchinterest(bossHRP, leftHand, 0)
-        firetouchinterest(bossHRP, leftHand, 1)
-        firetouchinterest(bossHRP, rightHand, 0)
-        firetouchinterest(bossHRP, rightHand, 1)
-    end)
-    pcall(function()
-        muscleEvent:FireServer("punch", "leftHand")
-        muscleEvent:FireServer("punch", "rightHand")
-    end)
-    local tool = myChar:FindFirstChild("Punch")
-    if tool then
-        pcall(function() tool:Activate() end)
-    end
-    speedUpAnimations()
+    return nil
 end
 
 local function autoKillBossLoop()
     while autoKillBossEnabled do
         pcall(function()
-            local bossModel, bossHRP = findBoss()
-            if bossModel and bossHRP then
-                attackBoss(bossHRP)
+            local bossPart = findBossPart()
+            if not bossPart then return end
+            local myChar = player.Character
+            if not myChar then return end
+            local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then return end
+            local targetPos = bossPart.Position + Vector3.new(0, heightOffset, 0)
+            myHRP.CFrame = CFrame.new(targetPos, bossPart.Position)
+            equipPunch()
+            resetAttackTime()
+            local leftHand = myChar:FindFirstChild("LeftHand")
+            local rightHand = myChar:FindFirstChild("RightHand")
+            if leftHand and rightHand then
+                pcall(function()
+                    firetouchinterest(bossPart, leftHand, 0)
+                    firetouchinterest(bossPart, leftHand, 1)
+                    firetouchinterest(bossPart, rightHand, 0)
+                    firetouchinterest(bossPart, rightHand, 1)
+                end)
             end
+            pcall(function()
+                muscleEvent:FireServer("punch", "leftHand")
+                muscleEvent:FireServer("punch", "rightHand")
+            end)
+            local tool = myChar:FindFirstChild("Punch")
+            if tool then pcall(function() tool:Activate() end) end
         end)
-        task.wait(0.1)
+        task.wait(0.01)
     end
 end
 
-local function bossFastPunchLoop()
-    while bossFastPunchEnabled do
-        pcall(function()
-            local bossModel, bossHRP = findBoss()
-            if bossHRP then
-                attackBoss(bossHRP)
-            end
-        end)
-        task.wait(0.05)
-    end
-end
-
-local function size12Loop()
-    while size12Enabled do
-        pcall(function()
-            setSize(12)
-        end)
+local function sizeLoopBoss()
+    while autoKillBossEnabled do
+        setSize(12)
         task.wait(0.3)
     end
 end
 
 local bossStatus = Instance.new("TextLabel")
 bossStatus.Size = UDim2.new(0.9, 0, 0, 22)
-bossStatus.Position = UDim2.new(0.05, 0, 0, 5)
+bossStatus.Position = UDim2.new(0.05, 0, 0, 10)
 bossStatus.BackgroundTransparency = 1
 bossStatus.Text = "Status: OFF"
 bossStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -205,67 +380,48 @@ bossStatus.TextScaled = true
 bossStatus.Font = Enum.Font.Gotham
 bossStatus.Parent = bossContent
 
-local function bossButton(y, text, state, onToggle)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.Position = UDim2.new(0.05, 0, 0, y)
-    btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-    btn.Text = text .. (state and " [ON]" or " [OFF]")
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = bossContent
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = text .. (state and " [ON]" or " [OFF]")
-        btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-        onToggle(state)
-    end)
-    return btn
-end
+local bossBtn = Instance.new("TextButton")
+bossBtn.Size = UDim2.new(0.9, 0, 0, 35)
+bossBtn.Position = UDim2.new(0.05, 0, 0, 45)
+bossBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+bossBtn.Text = "Kill Boss [OFF]"
+bossBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bossBtn.TextScaled = true
+bossBtn.Font = Enum.Font.GothamBold
+bossBtn.Parent = bossContent
 
-bossButton(30, "Kill Boss", false, function(state)
-    autoKillBossEnabled = state
-    if state then
+bossBtn.MouseButton1Click:Connect(function()
+    autoKillBossEnabled = not autoKillBossEnabled
+    if autoKillBossEnabled then
+        bossBtn.Text = "Kill Boss [ON]"
+        bossBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
         bossStatus.Text = "Hunting boss..."
         bossStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        setSize(12)
+        task.spawn(sizeLoopBoss)
         task.spawn(autoKillBossLoop)
     else
+        bossBtn.Text = "Kill Boss [OFF]"
+        bossBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
         bossStatus.Text = "Status: OFF"
         bossStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-    end
-end)
-
-bossButton(65, "Boss Fast Punch", false, function(state)
-    bossFastPunchEnabled = state
-    if state then
-        task.spawn(bossFastPunchLoop)
-    end
-end)
-
-bossButton(100, "Size 12", false, function(state)
-    size12Enabled = state
-    if state then
-        setSize(12)
-        task.spawn(size12Loop)
-    else
         setSize(2)
     end
 end)
 
-local bossHeightLabel = Instance.new("TextLabel")
-bossHeightLabel.Size = UDim2.new(0.9, 0, 0, 20)
-bossHeightLabel.Position = UDim2.new(0.05, 0, 0, 145)
-bossHeightLabel.BackgroundTransparency = 1
-bossHeightLabel.Text = "Height: " .. heightOffset
-bossHeightLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-bossHeightLabel.TextScaled = true
-bossHeightLabel.Font = Enum.Font.Gotham
-bossHeightLabel.Parent = bossContent
+local heightLabel = Instance.new("TextLabel")
+heightLabel.Size = UDim2.new(0.9, 0, 0, 20)
+heightLabel.Position = UDim2.new(0.05, 0, 0, 90)
+heightLabel.BackgroundTransparency = 1
+heightLabel.Text = "Height: " .. heightOffset
+heightLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+heightLabel.TextScaled = true
+heightLabel.Font = Enum.Font.Gotham
+heightLabel.Parent = bossContent
 
 local bossSliderBg = Instance.new("Frame")
 bossSliderBg.Size = UDim2.new(0.9, 0, 0, 12)
-bossSliderBg.Position = UDim2.new(0.05, 0, 0, 170)
+bossSliderBg.Position = UDim2.new(0.05, 0, 0, 115)
 bossSliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
 bossSliderBg.BorderSizePixel = 0
 bossSliderBg.Parent = bossContent
@@ -305,7 +461,7 @@ local function updateBossSlider(input)
     heightOffset = newVal
     bossSliderFill.Size = UDim2.new(relX, 0, 1, 0)
     bossSliderKnob.Position = UDim2.new(relX, -7, 0.5, -7)
-    bossHeightLabel.Text = "Height: " .. heightOffset
+    heightLabel.Text = "Height: " .. heightOffset
 end
 
 bossSliderKnob.InputBegan:Connect(function(input)
@@ -340,7 +496,7 @@ killGui.Parent = player.PlayerGui
 
 local killFrame = Instance.new("Frame")
 killFrame.Size = UDim2.new(0, 250, 0, 385)
-killFrame.Position = UDim2.new(0.5, 10, 0.5, -192)
+killFrame.Position = UDim2.new(1, -260, 0.5, -192)
 killFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 killFrame.BorderSizePixel = 2
 killFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
@@ -357,15 +513,15 @@ killTitle.TextScaled = true
 killTitle.Font = Enum.Font.GothamBold
 killTitle.Parent = killFrame
 
-local killMinimizeBtn = Instance.new("TextButton")
-killMinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
-killMinimizeBtn.Position = UDim2.new(1, -25, 0, 0)
-killMinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-killMinimizeBtn.Text = "_"
-killMinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-killMinimizeBtn.TextScaled = true
-killMinimizeBtn.Font = Enum.Font.GothamBold
-killMinimizeBtn.Parent = killFrame
+local killMinBtn = Instance.new("TextButton")
+killMinBtn.Size = UDim2.new(0, 25, 0, 25)
+killMinBtn.Position = UDim2.new(1, -25, 0, 0)
+killMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+killMinBtn.Text = "_"
+killMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+killMinBtn.TextScaled = true
+killMinBtn.Font = Enum.Font.GothamBold
+killMinBtn.Parent = killFrame
 
 local killContent = Instance.new("Frame")
 killContent.Size = UDim2.new(1, 0, 1, -25)
@@ -375,16 +531,16 @@ killContent.Parent = killFrame
 
 local killMinimized = false
 
-killMinimizeBtn.MouseButton1Click:Connect(function()
+killMinBtn.MouseButton1Click:Connect(function()
     killMinimized = not killMinimized
     if killMinimized then
         killFrame.Size = UDim2.new(0, 250, 0, 25)
         killContent.Visible = false
-        killMinimizeBtn.Text = "□"
+        killMinBtn.Text = "□"
     else
         killFrame.Size = UDim2.new(0, 250, 0, 385)
         killContent.Visible = true
-        killMinimizeBtn.Text = "_"
+        killMinBtn.Text = "_"
     end
 end)
 
@@ -406,9 +562,7 @@ local function savePosition()
     local myChar = player.Character
     if not myChar then return end
     local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    if myHRP then
-        anchorCFrame = myHRP.CFrame
-    end
+    if myHRP then anchorCFrame = myHRP.CFrame end
 end
 
 local function returnToAnchor()
@@ -416,9 +570,7 @@ local function returnToAnchor()
     local myChar = player.Character
     if not myChar then return end
     local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    if myHRP then
-        myHRP.CFrame = anchorCFrame
-    end
+    if myHRP then myHRP.CFrame = anchorCFrame end
 end
 
 local function startCameraLock()
@@ -426,10 +578,8 @@ local function startCameraLock()
         cameraAnchorPart:Destroy()
         cameraAnchorPart = nil
     end
-    
     local myChar = player.Character
     if not myChar then return end
-    
     local anchorPart = Instance.new("Part")
     anchorPart.Name = "CameraAnchorPart"
     anchorPart.Anchored = true
@@ -438,10 +588,8 @@ local function startCameraLock()
     anchorPart.Size = Vector3.new(1, 2, 1)
     anchorPart.CFrame = anchorCFrame
     anchorPart.Parent = workspace
-    
     local anchorHumanoid = Instance.new("Humanoid")
     anchorHumanoid.Parent = anchorPart
-    
     camera.CameraSubject = anchorHumanoid
     cameraAnchorPart = anchorPart
 end
@@ -451,13 +599,10 @@ local function stopCameraLock()
         cameraAnchorPart:Destroy()
         cameraAnchorPart = nil
     end
-    
     local myChar = player.Character
     if myChar then
         local myHumanoid = myChar:FindFirstChildOfClass("Humanoid")
-        if myHumanoid then
-            camera.CameraSubject = myHumanoid
-        end
+        if myHumanoid then camera.CameraSubject = myHumanoid end
     end
 end
 
@@ -466,20 +611,6 @@ local function isAlive(targetPlayer)
         and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
         and targetPlayer.Character:FindFirstChild("Humanoid")
         and targetPlayer.Character.Humanoid.Health > 0
-end
-
-local function predictTargetPosition(targetHRP)
-    local velocity = targetHRP.Velocity
-    local speed = velocity.Magnitude
-    if speed < 1 then
-        return targetHRP.CFrame
-    end
-    local prediction = velocity * 0.08
-    if prediction.Magnitude > MAX_LEAD then
-        prediction = prediction.Unit * MAX_LEAD
-    end
-    local predictedPos = targetHRP.Position + prediction
-    return CFrame.new(predictedPos, predictedPos + targetHRP.CFrame.LookVector)
 end
 
 local function attackPlayer(targetPlayer)
@@ -493,7 +624,12 @@ local function attackPlayer(targetPlayer)
     local leftHand = myChar:FindFirstChild("LeftHand")
     local rightHand = myChar:FindFirstChild("RightHand")
     if not targetHRP or not myHRP or not leftHand or not rightHand or not targetHumanoid then return end
-    myHRP.CFrame = predictTargetPosition(targetHRP)
+    local velocity = targetHRP.Velocity
+    local speed = velocity.Magnitude
+    local leadDistance = 0
+    if speed > 1 then leadDistance = math.min(speed * 0.08, MAX_LEAD) end
+    local predictedPos = targetHRP.Position + (velocity.Unit * leadDistance)
+    myHRP.CFrame = CFrame.new(predictedPos, predictedPos + targetHRP.CFrame.LookVector)
     equipPunch()
     resetAttackTime()
     pcall(function()
@@ -507,9 +643,7 @@ local function attackPlayer(targetPlayer)
         muscleEvent:FireServer("punch", "rightHand")
     end)
     local tool = myChar:FindFirstChild("Punch")
-    if tool then
-        pcall(function() tool:Activate() end)
-    end
+    if tool then pcall(function() tool:Activate() end) end
     speedUpAnimations()
 end
 
@@ -523,9 +657,7 @@ local function fastPunchLoop()
             muscleEvent:FireServer("punch", "leftHand")
             muscleEvent:FireServer("punch", "rightHand")
             local tool = char:FindFirstChild("Punch")
-            if tool then
-                tool:Activate()
-            end
+            if tool then tool:Activate() end
             speedUpAnimations()
         end)
         task.wait(0.15)
@@ -562,9 +694,7 @@ local function fastAttackLoop()
                 muscleEvent:FireServer("punch", "rightHand")
             end)
             local tool = myChar:FindFirstChild("Punch")
-            if tool then
-                tool:Activate()
-            end
+            if tool then tool:Activate() end
             speedUpAnimations()
         end)
         task.wait(0.15)
@@ -585,25 +715,25 @@ local function killAllLoop()
                 local leftHand = myChar:FindFirstChild("LeftHand")
                 local rightHand = myChar:FindFirstChild("RightHand")
                 if targetHRP and myHRP and leftHand and rightHand then
-                    myHRP.CFrame = targetHRP.CFrame
-                    equipPunch()
-                    resetAttackTime()
-                    pcall(function()
-                        firetouchinterest(targetHRP, leftHand, 0)
-                        firetouchinterest(targetHRP, leftHand, 1)
-                        firetouchinterest(targetHRP, rightHand, 0)
-                        firetouchinterest(targetHRP, rightHand, 1)
-                    end)
-                    pcall(function()
-                        muscleEvent:FireServer("punch", "leftHand")
-                        muscleEvent:FireServer("punch", "rightHand")
-                    end)
-                    local tool = myChar:FindFirstChild("Punch")
-                    if tool then
-                        pcall(function() tool:Activate() end)
+                    for _ = 1, 3 do
+                        local tHRP = targetChar:FindFirstChild("HumanoidRootPart")
+                        if tHRP and myHRP then myHRP.CFrame = tHRP.CFrame end
+                        equipPunch()
+                        resetAttackTime()
+                        pcall(function()
+                            firetouchinterest(targetHRP, leftHand, 0)
+                            firetouchinterest(targetHRP, leftHand, 1)
+                            firetouchinterest(targetHRP, rightHand, 0)
+                            firetouchinterest(targetHRP, rightHand, 1)
+                        end)
+                        pcall(function()
+                            muscleEvent:FireServer("punch", "leftHand")
+                            muscleEvent:FireServer("punch", "rightHand")
+                        end)
+                        local tool = myChar:FindFirstChild("Punch")
+                        if tool then pcall(function() tool:Activate() end) end
+                        speedUpAnimations()
                     end
-                    speedUpAnimations()
-                    task.wait(0.05)
                 end
             end
         end
@@ -611,7 +741,7 @@ local function killAllLoop()
             returnToAnchor()
             task.wait(0.1)
         end
-        task.wait(0.02)
+        task.wait(0.001)
     end
 end
 
@@ -654,9 +784,7 @@ listPadding.Parent = playerList
 
 local function updatePlayerList()
     for _, child in pairs(scrolling:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
+        if child:IsA("TextButton") then child:Destroy() end
     end
     local count = 0
     for _, p in pairs(Players:GetPlayers()) do
@@ -675,9 +803,7 @@ local function updatePlayerList()
                 selectBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
                 playerList.Visible = false
                 dropdownOpen = false
-                if spectateEnabled then
-                    updateSpectateTarget()
-                end
+                if spectateEnabled then updateSpectateTarget() end
             end)
             count = count + 1
         end
@@ -720,17 +846,13 @@ local function updateSpectateTarget()
     if not spectateEnabled or not selectedPlayer then return end
     if selectedPlayer.Character then
         local humanoid = selectedPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            camera.CameraSubject = humanoid
-        end
+        if humanoid then camera.CameraSubject = humanoid end
     end
     spectateConnection = selectedPlayer.CharacterAdded:Connect(function(newChar)
         task.wait(0.3)
         if spectateEnabled then
             local humanoid = newChar:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                camera.CameraSubject = humanoid
-            end
+            if humanoid then camera.CameraSubject = humanoid end
         end
     end)
 end
@@ -743,9 +865,7 @@ local function stopSpectate()
     local myChar = player.Character
     if myChar then
         local myHumanoid = myChar:FindFirstChildOfClass("Humanoid")
-        if myHumanoid then
-            camera.CameraSubject = myHumanoid
-        end
+        if myHumanoid then camera.CameraSubject = myHumanoid end
     end
 end
 
@@ -767,23 +887,20 @@ local function loopKill()
     while loopKillEnabled do
         if selectedPlayer then
             if waitingRespawn then
-                local elapsed = tick() - respawnStartTime
-                local remaining = RESPAWN_DELAY - elapsed
+                local remaining = RESPAWN_DELAY - (tick() - respawnStartTime)
                 if remaining <= 0 and isAlive(selectedPlayer) then
                     waitingRespawn = false
                     if statusLabel then
                         statusLabel.Text = "Killing: " .. selectedPlayer.Name
                         statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                     end
-                    if respawnTimerLabel then
-                        respawnTimerLabel.Text = ""
-                    end
+                    if respawnTimerLabel then respawnTimerLabel.Text = "" end
                 end
             else
                 if isAlive(selectedPlayer) then
-                    pcall(function()
-                        attackPlayer(selectedPlayer)
-                    end)
+                    for _ = 1, 3 do
+                        pcall(function() attackPlayer(selectedPlayer) end)
+                    end
                 else
                     waitingRespawn = true
                     respawnStartTime = tick()
@@ -795,7 +912,7 @@ local function loopKill()
                 end
             end
         end
-        task.wait(0.01)
+        task.wait(0.001)
     end
 end
 
@@ -912,22 +1029,16 @@ end)
 
 killButton(300, "Fast Punch", false, function(state)
     fastPunchEnabled = state
-    if state then
-        task.spawn(fastPunchLoop)
-    end
+    if state then task.spawn(fastPunchLoop) end
 end)
 
 killButton(335, "Fast Attack", false, function(state)
     fastAttackEnabled = state
-    if state then
-        task.spawn(fastAttackLoop)
-    end
+    if state then task.spawn(fastAttackLoop) end
 end)
 
 game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if bossDragging then
-        updateBossSlider(input)
-    end
+    if bossDragging then updateBossSlider(input) end
 end)
 
 game:GetService("UserInputService").InputEnded:Connect(function(input)
@@ -940,8 +1051,7 @@ task.spawn(function()
     while true do
         task.wait(0.1)
         if waitingRespawn and loopKillEnabled then
-            local elapsed = tick() - respawnStartTime
-            local remaining = RESPAWN_DELAY - elapsed
+            local remaining = RESPAWN_DELAY - (tick() - respawnStartTime)
             if remaining > 0 then
                 respawnTimerLabel.Text = string.format("Respawn in: %.2fs", remaining)
             else
