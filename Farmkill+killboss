@@ -8,6 +8,7 @@ local muscleEvent = player:WaitForChild("muscleEvent")
 local leaderstats = player:WaitForChild("leaderstats")
 local rebirthsStat = leaderstats:WaitForChild("Rebirths")
 local strengthStat = leaderstats:WaitForChild("Strength")
+local durabilityStat = player:WaitForChild("Durability")
 local changeSpeedSizeRemote = ReplicatedStorage.rEvents:WaitForChild("changeSpeedSizeRemote")
 
 local rbGui = Instance.new("ScreenGui")
@@ -16,8 +17,8 @@ rbGui.ResetOnSpawn = false
 rbGui.Parent = player.PlayerGui
 
 local rbFrame = Instance.new("Frame")
-rbFrame.Size = UDim2.new(0, 250, 0, 350)
-rbFrame.Position = UDim2.new(0, 10, 0.5, -175)
+rbFrame.Size = UDim2.new(0, 250, 0, 520)
+rbFrame.Position = UDim2.new(0, 10, 0.5, -260)
 rbFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 rbFrame.BorderSizePixel = 2
 rbFrame.BorderColor3 = Color3.fromRGB(50, 200, 50)
@@ -59,30 +60,133 @@ rbMinBtn.MouseButton1Click:Connect(function()
         rbContent.Visible = false
         rbMinBtn.Text = "□"
     else
-        rbFrame.Size = UDim2.new(0, 250, 0, 350)
+        rbFrame.Size = UDim2.new(0, 250, 0, 520)
         rbContent.Visible = true
         rbMinBtn.Text = "_"
     end
 end)
 
-local rbLabel = Instance.new("TextLabel")
-rbLabel.Size = UDim2.new(0.9, 0, 0, 20)
-rbLabel.Position = UDim2.new(0.05, 0, 0, 5)
-rbLabel.BackgroundTransparency = 1
-rbLabel.Text = "Rebirths: 0 | Strength: 0"
-rbLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-rbLabel.TextScaled = true
-rbLabel.Font = Enum.Font.Gotham
-rbLabel.Parent = rbContent
+local rebirthGained = rebirthsStat.Value
+local strengthGained = strengthStat.Value
+local durabilityGained = durabilityStat.Value
 
-local function updateRBStats()
-    rbLabel.Text = "Rebirths: " .. rebirthsStat.Value .. " | Strength: " .. math.floor(strengthStat.Value)
+local function formatNumber(num)
+    if num >= 1e15 then return string.format("%.2fQ", num/1e15) end
+    if num >= 1e12 then return string.format("%.2fT", num/1e12) end
+    if num >= 1e9 then return string.format("%.2fB", num/1e9) end
+    if num >= 1e6 then return string.format("%.2fM", num/1e6) end
+    if num >= 1e3 then return string.format("%.2fK", num/1e3) end
+    return string.format("%.0f", num)
 end
 
-strengthStat:GetPropertyChangedSignal("Value"):Connect(updateRBStats)
-rebirthsStat:GetPropertyChangedSignal("Value"):Connect(updateRBStats)
+local function createLabel(parent, y, text, color)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.9, 0, 0, 22)
+    label.Position = UDim2.new(0.05, 0, 0, y)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    label.TextScaled = true
+    label.Font = Enum.Font.Gotham
+    label.Parent = parent
+    return label
+end
 
-local function managePets(petName)
+local function createToggle(parent, y, text, callback)
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0.9, 0, 0, 28)
+    toggle.Position = UDim2.new(0.05, 0, 0, y)
+    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    toggle.Text = text .. " [OFF]"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.TextScaled = true
+    toggle.Font = Enum.Font.Gotham
+    toggle.Parent = parent
+    local state = false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.Text = text .. (state and " [ON]" or " [OFF]")
+        toggle.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
+        callback(state)
+    end)
+    return toggle
+end
+
+local function createButton(parent, y, text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 28)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = parent
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createDropdown(parent, y, label, options, callback)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.4, 0, 0, 28)
+    lbl.Position = UDim2.new(0.05, 0, 0, y)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lbl.TextScaled = true
+    lbl.Font = Enum.Font.Gotham
+    lbl.Parent = parent
+    local dd = Instance.new("TextButton")
+    dd.Size = UDim2.new(0.45, 0, 0, 28)
+    dd.Position = UDim2.new(0.5, 0, 0, y)
+    dd.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    dd.Text = options[1]
+    dd.TextColor3 = Color3.fromRGB(255, 255, 255)
+    dd.TextScaled = true
+    dd.Font = Enum.Font.Gotham
+    dd.Parent = parent
+    local selected = 1
+    dd.MouseButton1Click:Connect(function()
+        selected = selected % #options + 1
+        dd.Text = options[selected]
+        callback(options[selected])
+    end)
+    return dd
+end
+
+local y = 5
+
+createLabel(rbContent, y, "STATS", Color3.fromRGB(50, 200, 50))
+y = y + 25
+
+local rebirthLabel = createLabel(rbContent, y, "Rebirths: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
+y = y + 25
+local strengthLabel = createLabel(rbContent, y, "Strength: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
+y = y + 25
+local durabilityLabel = createLabel(rbContent, y, "Durability: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
+y = y + 35
+
+local function updateStats()
+    rebirthLabel.Text = string.format("Rebirths: %s | Gained: %s", formatNumber(rebirthsStat.Value), formatNumber(rebirthsStat.Value - rebirthGained))
+    strengthLabel.Text = string.format("Strength: %s | Gained: %s", formatNumber(strengthStat.Value), formatNumber(strengthStat.Value - strengthGained))
+    durabilityLabel.Text = string.format("Durability: %s | Gained: %s", formatNumber(durabilityStat.Value), formatNumber(durabilityStat.Value - durabilityGained))
+end
+
+local function resetStats()
+    strengthGained = strengthStat.Value
+    durabilityGained = durabilityStat.Value
+    updateStats()
+end
+
+rebirthsStat:GetPropertyChangedSignal("Value"):Connect(function()
+    rebirthLabel.Text = string.format("Rebirths: %s | Gained: %s", formatNumber(rebirthsStat.Value), formatNumber(rebirthsStat.Value - rebirthGained))
+    resetStats()
+end)
+
+strengthStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
+durabilityStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
+
+local function equipFarmSet()
     for _, folder in pairs(player.petsFolder:GetChildren()) do
         if folder:IsA("Folder") then
             for _, pet in pairs(folder:GetChildren()) do
@@ -91,22 +195,69 @@ local function managePets(petName)
         end
     end
     task.wait(0.1)
-    for _, pet in pairs(player.petsFolder.Unique:GetChildren()) do
-        if pet.Name == petName then
-            ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+    local equipped = 0
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Swift Samurai" and equipped < 6 then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                    equipped = equipped + 1
+                    task.wait(0.05)
+                end
+            end
+        end
+    end
+    local bossEquipped = 0
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Rare Boss Pet" and bossEquipped < 2 then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                    bossEquipped = bossEquipped + 1
+                    task.wait(0.05)
+                end
+            end
         end
     end
 end
 
+local function equipOverlord()
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
+            end
+        end
+    end
+    task.wait(0.1)
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                if pet.Name == "Tribal Overlord" then
+                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                end
+            end
+        end
+    end
+end
+
+createButton(rbContent, y, "Equip Farm Set (6 Samurai + 2 Boss)", function()
+    equipFarmSet()
+end)
+y = y + 33
+
+createButton(rbContent, y, "Equip Tribal Overlord", function()
+    equipOverlord()
+end)
+y = y + 33
+
 local isRebirthing = false
 local fastRepRunning = false
-local repsPerBatch = 3
-local batchDelay = 0.01
-local microPause = 0.05
-local repCount = 0
 
 local function doRebirth()
     local target = 5000 + (rebirthsStat.Value * 2550)
+    equipFarmSet()
+    task.wait(0.2)
     while isRebirthing and strengthStat.Value < target do
         local reps = player.MembershipType == Enum.MembershipType.Premium and 8 or 14
         for _ = 1, reps do
@@ -116,7 +267,7 @@ local function doRebirth()
         task.wait(0.05)
     end
     if isRebirthing and strengthStat.Value >= target then
-        managePets("Tribal Overlord")
+        equipOverlord()
         task.wait(0.25)
         local before = rebirthsStat.Value
         repeat
@@ -128,13 +279,146 @@ end
 
 local function rebirthLoop()
     while isRebirthing do
-        managePets("Swift Samurai")
         doRebirth()
         task.wait(0.5)
     end
 end
 
-local function fastRepLoop()
+local fastRebirthToggle = createToggle(rbContent, y, "Fast Rebirth", function(state)
+    isRebirthing = state
+    fastRepRunning = state
+    if state then
+        task.spawn(rebirthLoop)
+        task.spawn(fastRepLoop)
+    end
+end)
+y = y + 33
+
+local confirmGui = Instance.new("ScreenGui")
+confirmGui.Name = "ConfirmDialog"
+confirmGui.ResetOnSpawn = false
+confirmGui.Parent = player.PlayerGui
+
+local confirmFrame = Instance.new("Frame")
+confirmFrame.Size = UDim2.new(0, 300, 0, 150)
+confirmFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+confirmFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+confirmFrame.BorderSizePixel = 2
+confirmFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 10
+confirmFrame.Parent = confirmGui
+
+local confirmTitle = Instance.new("TextLabel")
+confirmTitle.Size = UDim2.new(1, 0, 0, 25)
+confirmTitle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+confirmTitle.Text = "WARNING"
+confirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+confirmTitle.TextScaled = true
+confirmTitle.Font = Enum.Font.GothamBold
+confirmTitle.ZIndex = 11
+confirmTitle.Parent = confirmFrame
+
+local confirmText = Instance.new("TextLabel")
+confirmText.Size = UDim2.new(0.9, 0, 0, 60)
+confirmText.Position = UDim2.new(0.05, 0, 0, 35)
+confirmText.BackgroundTransparency = 1
+confirmText.Text = "Вы точно хотите включить Fast Rebirth? Он только для 8 паков!"
+confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+confirmText.TextScaled = true
+confirmText.TextWrapped = true
+confirmText.Font = Enum.Font.Gotham
+confirmText.ZIndex = 11
+confirmText.Parent = confirmFrame
+
+local yesBtn = Instance.new("TextButton")
+yesBtn.Size = UDim2.new(0.4, 0, 0, 30)
+yesBtn.Position = UDim2.new(0.05, 0, 0, 105)
+yesBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+yesBtn.Text = "Да"
+yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+yesBtn.TextScaled = true
+yesBtn.Font = Enum.Font.GothamBold
+yesBtn.ZIndex = 11
+yesBtn.Parent = confirmFrame
+
+local noBtn = Instance.new("TextButton")
+noBtn.Size = UDim2.new(0.4, 0, 0, 30)
+noBtn.Position = UDim2.new(0.55, 0, 0, 105)
+noBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+noBtn.Text = "Нет"
+noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noBtn.TextScaled = true
+noBtn.Font = Enum.Font.GothamBold
+noBtn.ZIndex = 11
+noBtn.Parent = confirmFrame
+
+local fastRebirthState = false
+
+fastRebirthToggle.MouseButton1Click:Connect(function()
+end)
+
+yesBtn.MouseButton1Click:Connect(function()
+    confirmFrame.Visible = false
+    fastRebirthState = true
+    isRebirthing = true
+    fastRepRunning = true
+    fastRebirthToggle.Text = "Fast Rebirth [ON]"
+    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    task.spawn(rebirthLoop)
+    task.spawn(fastRepLoop)
+end)
+
+noBtn.MouseButton1Click:Connect(function()
+    confirmFrame.Visible = false
+    fastRebirthState = false
+    isRebirthing = false
+    fastRepRunning = false
+    fastRebirthToggle.Text = "Fast Rebirth [OFF]"
+    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+end)
+
+createLabel(rbContent, y, "FAST REP SETTINGS", Color3.fromRGB(50, 200, 50))
+y = y + 25
+
+local repsPerBatch = 3
+local batchDelay = 0.01
+local microPause = 0.05
+local fasterInstances = 1
+
+local function setMode(mode)
+    if mode == "Slower" then
+        repsPerBatch = 1
+        batchDelay = 0.08
+        microPause = 0.3
+        fasterInstances = 1
+    elseif mode == "Normal" then
+        repsPerBatch = 3
+        batchDelay = 0.01
+        microPause = 0.05
+        fasterInstances = 1
+    elseif mode == "Faster" then
+        repsPerBatch = 3
+        batchDelay = 0.01
+        microPause = 0.05
+        fasterInstances = 4
+    elseif mode == "Very Faster" then
+        repsPerBatch = 5
+        batchDelay = 0.005
+        microPause = 0.02
+        fasterInstances = 6
+    end
+end
+
+createDropdown(rbContent, y, "Speed Mode:", {"Slower", "Normal", "Faster", "Very Faster"}, function(selected)
+    setMode(selected)
+end)
+y = y + 33
+
+local repCount = 0
+local fastThreads = {}
+
+local function fastRepWorker()
     while fastRepRunning do
         for i = 1, repsPerBatch do
             muscleEvent:FireServer("rep")
@@ -148,75 +432,27 @@ local function fastRepLoop()
     end
 end
 
-local function rbButton(y, text, state, onToggle)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.Position = UDim2.new(0.05, 0, 0, y)
-    btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-    btn.Text = text .. (state and " [ON]" or " [OFF]")
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = rbContent
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = text .. (state and " [ON]" or " [OFF]")
-        btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-        onToggle(state)
-    end)
-    return btn
+local function fastRepLoop()
+    for _, thread in ipairs(fastThreads) do
+        pcall(function() task.cancel(thread) end)
+    end
+    fastThreads = {}
+    for i = 1, fasterInstances do
+        local thread = task.spawn(fastRepWorker)
+        table.insert(fastThreads, thread)
+    end
 end
 
-rbButton(30, "Fast Rebirth", false, function(state)
-    isRebirthing = state
-    if state then task.spawn(rebirthLoop) end
-end)
-
-rbButton(65, "Fast Rep", false, function(state)
+createToggle(rbContent, y, "Fast Rep", function(state)
     fastRepRunning = state
     repCount = 0
-    if state then task.spawn(fastRepLoop) end
-end)
-
-local repsLabel = Instance.new("TextLabel")
-repsLabel.Size = UDim2.new(0.4, 0, 0, 25)
-repsLabel.Position = UDim2.new(0.05, 0, 0, 100)
-repsLabel.BackgroundTransparency = 1
-repsLabel.Text = "Speed:"
-repsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-repsLabel.TextScaled = true
-repsLabel.Font = Enum.Font.Gotham
-repsLabel.Parent = rbContent
-
-local modeBtn = Instance.new("TextButton")
-modeBtn.Size = UDim2.new(0.45, 0, 0, 25)
-modeBtn.Position = UDim2.new(0.5, 0, 0, 100)
-modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-modeBtn.Text = "Normal"
-modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-modeBtn.TextScaled = true
-modeBtn.Font = Enum.Font.Gotham
-modeBtn.Parent = rbContent
-
-local modes = {"Slower", "Normal", "Faster"}
-local modeIndex = 2
-
-modeBtn.MouseButton1Click:Connect(function()
-    modeIndex = modeIndex % #modes + 1
-    local mode = modes[modeIndex]
-    modeBtn.Text = mode
-    if mode == "Slower" then
-        repsPerBatch = 1
-        batchDelay = 0.08
-        microPause = 0.3
-    elseif mode == "Normal" then
-        repsPerBatch = 3
-        batchDelay = 0.01
-        microPause = 0.05
-    elseif mode == "Faster" then
-        repsPerBatch = 15
-        batchDelay = 0.002
-        microPause = 0.01
+    if state then 
+        fastRepLoop()
+    else
+        for _, thread in ipairs(fastThreads) do
+            pcall(function() task.cancel(thread) end)
+        end
+        fastThreads = {}
     end
 end)
 
@@ -359,7 +595,7 @@ local function autoKillBossLoop()
             local tool = myChar:FindFirstChild("Punch")
             if tool then pcall(function() tool:Activate() end) end
         end)
-        task.wait(0.01)
+        task.wait(0.05)
     end
 end
 
@@ -548,7 +784,6 @@ local anchorCFrame = nil
 local waitingRespawn = false
 local RESPAWN_DELAY = 4.66
 local respawnStartTime = 0
-local MAX_LEAD = 5
 local fastPunchEnabled = false
 local fastAttackEnabled = false
 local spectateEnabled = false
@@ -557,6 +792,7 @@ local dropdownOpen = false
 local killAllEnabled = false
 local cameraLockEnabled = false
 local cameraAnchorPart = nil
+local killAllThread = nil
 
 local function savePosition()
     local myChar = player.Character
@@ -624,12 +860,7 @@ local function attackPlayer(targetPlayer)
     local leftHand = myChar:FindFirstChild("LeftHand")
     local rightHand = myChar:FindFirstChild("RightHand")
     if not targetHRP or not myHRP or not leftHand or not rightHand or not targetHumanoid then return end
-    local velocity = targetHRP.Velocity
-    local speed = velocity.Magnitude
-    local leadDistance = 0
-    if speed > 1 then leadDistance = math.min(speed * 0.08, MAX_LEAD) end
-    local predictedPos = targetHRP.Position + (velocity.Unit * leadDistance)
-    myHRP.CFrame = CFrame.new(predictedPos, predictedPos + targetHRP.CFrame.LookVector)
+    myHRP.CFrame = targetHRP.CFrame
     equipPunch()
     resetAttackTime()
     pcall(function()
@@ -705,21 +936,27 @@ local function killAllLoop()
     while killAllEnabled do
         local targetFound = false
         for _, targetPlayer in pairs(Players:GetPlayers()) do
+            if not killAllEnabled then break end
             if targetPlayer ~= player and isAlive(targetPlayer) then
                 targetFound = true
                 local myChar = player.Character
                 if not myChar then break end
                 local targetChar = targetPlayer.Character
-                local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+                if not targetChar then continue end
                 local myHRP = myChar:FindFirstChild("HumanoidRootPart")
                 local leftHand = myChar:FindFirstChild("LeftHand")
                 local rightHand = myChar:FindFirstChild("RightHand")
-                if targetHRP and myHRP and leftHand and rightHand then
+                if myHRP and leftHand and rightHand then
+                    equipPunch()
+                    task.wait(0.15)
                     for _ = 1, 3 do
-                        local tHRP = targetChar:FindFirstChild("HumanoidRootPart")
-                        if tHRP and myHRP then myHRP.CFrame = tHRP.CFrame end
-                        equipPunch()
+                        if not killAllEnabled then break end
+                        local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+                        if not targetHRP then break end
+                        myHRP.CFrame = targetHRP.CFrame
                         resetAttackTime()
+                        local tool = myChar:FindFirstChild("Punch")
+                        if tool then pcall(function() tool:Activate() end) end
                         pcall(function()
                             firetouchinterest(targetHRP, leftHand, 0)
                             firetouchinterest(targetHRP, leftHand, 1)
@@ -730,19 +967,22 @@ local function killAllLoop()
                             muscleEvent:FireServer("punch", "leftHand")
                             muscleEvent:FireServer("punch", "rightHand")
                         end)
-                        local tool = myChar:FindFirstChild("Punch")
-                        if tool then pcall(function() tool:Activate() end) end
                         speedUpAnimations()
+                        task.wait(0.2)
                     end
                 end
             end
         end
+        if not killAllEnabled then break end
         if not targetFound then
             returnToAnchor()
-            task.wait(0.1)
+            task.wait(0.5)
+        else
+            returnToAnchor()
+            task.wait(0.3)
         end
-        task.wait(0.001)
     end
+    returnToAnchor()
 end
 
 local selectBtn = Instance.new("TextButton")
@@ -912,7 +1152,7 @@ local function loopKill()
                 end
             end
         end
-        task.wait(0.001)
+        task.wait(0.01)
     end
 end
 
