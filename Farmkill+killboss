@@ -11,64 +11,32 @@ local strengthStat = leaderstats:WaitForChild("Strength")
 local durabilityStat = player:WaitForChild("Durability")
 local changeSpeedSizeRemote = ReplicatedStorage.rEvents:WaitForChild("changeSpeedSizeRemote")
 
-local rbGui = Instance.new("ScreenGui")
-rbGui.Name = "FastRebirthMenu"
-rbGui.ResetOnSpawn = false
-rbGui.Parent = player.PlayerGui
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/lkjhg969/ffdsf/refs/heads/main/hgfhj", true))()
 
-local rbFrame = Instance.new("Frame")
-rbFrame.Size = UDim2.new(0, 250, 0, 640)
-rbFrame.Position = UDim2.new(0, 10, 0.5, -320)
-rbFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-rbFrame.BorderSizePixel = 2
-rbFrame.BorderColor3 = Color3.fromRGB(50, 200, 50)
-rbFrame.Active = true
-rbFrame.Draggable = true
-rbFrame.Parent = rbGui
+local window = library:AddWindow("Absolute | Menu", {
+    main_color = Color3.fromRGB(138, 43, 226),
+    min_size = Vector2.new(600, 630),
+    can_resize = false
+})
 
-local rbTitle = Instance.new("TextLabel")
-rbTitle.Size = UDim2.new(1, 0, 0, 25)
-rbTitle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-rbTitle.Text = "Fast Rebirth"
-rbTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-rbTitle.TextScaled = true
-rbTitle.Font = Enum.Font.GothamBold
-rbTitle.Parent = rbFrame
+local blockedFrames = {
+    "strengthFrame",
+    "durabilityFrame",
+    "agilityFrame",
+}
 
-local rbMinBtn = Instance.new("TextButton")
-rbMinBtn.Size = UDim2.new(0, 25, 0, 25)
-rbMinBtn.Position = UDim2.new(1, -25, 0, 0)
-rbMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-rbMinBtn.Text = "_"
-rbMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-rbMinBtn.TextScaled = true
-rbMinBtn.Font = Enum.Font.GothamBold
-rbMinBtn.Parent = rbFrame
+for _, name in ipairs(blockedFrames) do
+    local frame = ReplicatedStorage:FindFirstChild(name)
+    if frame and frame:IsA("GuiObject") then
+        frame.Visible = false
+    end
+end
 
-local rbContent = Instance.new("Frame")
-rbContent.Size = UDim2.new(1, 0, 1, -25)
-rbContent.Position = UDim2.new(0, 0, 0, 25)
-rbContent.BackgroundTransparency = 1
-rbContent.Parent = rbFrame
-
-local rbMinimized = false
-
-rbMinBtn.MouseButton1Click:Connect(function()
-    rbMinimized = not rbMinimized
-    if rbMinimized then
-        rbFrame.Size = UDim2.new(0, 250, 0, 25)
-        rbContent.Visible = false
-        rbMinBtn.Text = "□"
-    else
-        rbFrame.Size = UDim2.new(0, 250, 0, 640)
-        rbContent.Visible = true
-        rbMinBtn.Text = "_"
+ReplicatedStorage.ChildAdded:Connect(function(child)
+    if table.find(blockedFrames, child.Name) and child:IsA("GuiObject") then
+        child.Visible = false
     end
 end)
-
-local rebirthGained = rebirthsStat.Value
-local strengthGained = strengthStat.Value
-local durabilityGained = durabilityStat.Value
 
 local function formatNumber(num)
     if num >= 1e15 then return string.format("%.2fQ", num/1e15) end
@@ -79,94 +47,54 @@ local function formatNumber(num)
     return string.format("%.0f", num)
 end
 
-local function createLabel(parent, y, text, color)
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.9, 0, 0, 22)
-    label.Position = UDim2.new(0.05, 0, 0, y)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
-    label.TextScaled = true
-    label.Font = Enum.Font.Gotham
-    label.Parent = parent
-    return label
+local function equipPunch()
+    local char = player.Character
+    if not char then return end
+    local punch = char:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
+    if punch and punch.Parent ~= char then
+        char.Humanoid:EquipTool(punch)
+    end
 end
 
-local function createToggle(parent, y, text, callback)
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0.9, 0, 0, 28)
-    toggle.Position = UDim2.new(0.05, 0, 0, y)
-    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    toggle.Text = text .. " [OFF]"
-    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggle.TextScaled = true
-    toggle.Font = Enum.Font.Gotham
-    toggle.Parent = parent
-    local state = false
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.Text = text .. (state and " [ON]" or " [OFF]")
-        toggle.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-        callback(state)
-    end)
-    return toggle
+local function speedUpAnimations()
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+            pcall(function()
+                track:AdjustSpeed(3)
+            end)
+        end
+    end
 end
 
-local function createButton(parent, y, text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 28)
-    btn.Position = UDim2.new(0.05, 0, 0, y)
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.Gotham
-    btn.Parent = parent
-    btn.MouseButton1Click:Connect(callback)
-    return btn
+local function resetAttackTime()
+    local char = player.Character
+    if not char then return end
+    local punch = char:FindFirstChild("Punch")
+    if punch then
+        local attackTime = punch:FindFirstChild("attackTime")
+        if attackTime then attackTime.Value = 0 end
+    end
 end
 
-local function createDropdown(parent, y, label, options, callback)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.4, 0, 0, 28)
-    lbl.Position = UDim2.new(0.05, 0, 0, y)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
-    lbl.TextScaled = true
-    lbl.Font = Enum.Font.Gotham
-    lbl.Parent = parent
-    local dd = Instance.new("TextButton")
-    dd.Size = UDim2.new(0.45, 0, 0, 28)
-    dd.Position = UDim2.new(0.5, 0, 0, y)
-    dd.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    dd.Text = options[1]
-    dd.TextColor3 = Color3.fromRGB(255, 255, 255)
-    dd.TextScaled = true
-    dd.Font = Enum.Font.Gotham
-    dd.Parent = parent
-    local selected = 1
-    dd.MouseButton1Click:Connect(function()
-        selected = selected % #options + 1
-        dd.Text = options[selected]
-        callback(options[selected])
-    end)
-    return dd
-end
+local FastRebTab = window:AddTab("Fast Rebirth")
 
-local y = 5
+local rebirthGained = rebirthsStat.Value
+local strengthGained = strengthStat.Value
+local durabilityGained = durabilityStat.Value
 
-createLabel(rbContent, y, "STATS", Color3.fromRGB(50, 200, 50))
-y = y + 25
+FastRebTab:AddLabel("STATS").TextSize = 20
 
-local rebirthLabel = createLabel(rbContent, y, "Rebirths: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
-y = y + 25
-local strengthLabel = createLabel(rbContent, y, "Strength: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
-y = y + 25
-local durabilityLabel = createLabel(rbContent, y, "Durability: 0 | Gained: 0", Color3.fromRGB(255, 255, 255))
-y = y + 25
-local rebirthProgressLabel = createLabel(rbContent, y, "До ребита: считаю...", Color3.fromRGB(255, 200, 100))
-y = y + 30
+local rebirthLabel = FastRebTab:AddLabel("Rebirths: 0 | Gained: 0")
+rebirthLabel.TextSize = 17
+local strengthLabel = FastRebTab:AddLabel("Strength: 0 | Gained: 0")
+strengthLabel.TextSize = 17
+local durabilityLabel = FastRebTab:AddLabel("Durability: 0 | Gained: 0")
+durabilityLabel.TextSize = 17
+local rebirthProgressLabel = FastRebTab:AddLabel("До ребита: считаю...")
+rebirthProgressLabel.TextSize = 17
 
 local function updateStats()
     rebirthLabel.Text = string.format("Rebirths: %s | Gained: %s", formatNumber(rebirthsStat.Value), formatNumber(rebirthsStat.Value - rebirthGained))
@@ -256,15 +184,13 @@ local function equipOverlord()
     end
 end
 
-createButton(rbContent, y, "Equip Farm Set (6 Samurai + 2 Boss)", function()
+FastRebTab:AddButton("Equip Farm Set (6 Samurai + 2 Boss)", function()
     equipFarmSet()
 end)
-y = y + 33
 
-createButton(rbContent, y, "Equip Tribal Overlord", function()
+FastRebTab:AddButton("Equip Tribal Overlord", function()
     equipOverlord()
 end)
-y = y + 33
 
 local isRebirthing = false
 local fastRepRunning = false
@@ -299,50 +225,69 @@ local function rebirthLoop()
     end
 end
 
-local fastRebirthToggle = createToggle(rbContent, y, "Fast Rebirth", function(state)
+FastRebTab:AddSwitch("Fast Rebirth", function(state)
+    isRebirthing = state
+    fastRepRunning = state
+    if state then
+        task.spawn(rebirthLoop)
+        task.spawn(fastRepLoop)
+    end
 end)
-y = y + 33
 
-local autoRebirthToggle = createToggle(rbContent, y, "Auto Rebirth", function(state)
+FastRebTab:AddSwitch("Auto Rebirth", function(state)
+    if state then
+        task.spawn(function()
+            while state do
+                local before = rebirthsStat.Value
+                pcall(function()
+                    ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+                end)
+                task.wait(0.05)
+                if rebirthsStat.Value > before then
+                    task.wait(0.3)
+                else
+                    task.wait(0.5)
+                end
+            end
+        end)
+    end
 end)
-y = y + 33
 
-createLabel(rbContent, y, "FAST REP SETTINGS", Color3.fromRGB(50, 200, 50))
-y = y + 25
+FastRebTab:AddLabel("FAST REP SETTINGS").TextSize = 20
 
 local repsPerBatch = 3
 local batchDelay = 0.01
 local microPause = 0.05
 local fasterInstances = 1
 
-local function setMode(mode)
-    if mode == "Slower" then
+local speedDropdown = FastRebTab:AddDropdown("Speed Mode", function(selected)
+    if selected == "Slower" then
         repsPerBatch = 1
         batchDelay = 0.08
         microPause = 0.3
         fasterInstances = 1
-    elseif mode == "Normal" then
+    elseif selected == "Normal" then
         repsPerBatch = 3
         batchDelay = 0.01
         microPause = 0.05
         fasterInstances = 1
-    elseif mode == "Faster" then
+    elseif selected == "Faster" then
         repsPerBatch = 3
         batchDelay = 0.01
         microPause = 0.05
         fasterInstances = 4
-    elseif mode == "Very Faster" then
+    elseif selected == "Very Faster" then
         repsPerBatch = 5
         batchDelay = 0.005
         microPause = 0.02
         fasterInstances = 6
     end
-end
-
-createDropdown(rbContent, y, "Speed Mode:", {"Slower", "Normal", "Faster", "Very Faster"}, function(selected)
-    setMode(selected)
 end)
-y = y + 33
+
+speedDropdown:Add("Slower")
+speedDropdown:Add("Normal")
+speedDropdown:Add("Faster")
+speedDropdown:Add("Very Faster")
 
 local repCount = 0
 local fastThreads = {}
@@ -372,7 +317,7 @@ local function fastRepLoop()
     end
 end
 
-createToggle(rbContent, y, "Fast Rep", function(state)
+FastRebTab:AddSwitch("Fast Rep", function(state)
     fastRepRunning = state
     repCount = 0
     if state then 
@@ -385,244 +330,10 @@ createToggle(rbContent, y, "Fast Rep", function(state)
     end
 end)
 
-local confirmGui = Instance.new("ScreenGui")
-confirmGui.Name = "ConfirmDialog"
-confirmGui.ResetOnSpawn = false
-confirmGui.Parent = player.PlayerGui
-
-local confirmFrame = Instance.new("Frame")
-confirmFrame.Size = UDim2.new(0, 320, 0, 160)
-confirmFrame.Position = UDim2.new(0.5, -160, 0.5, -80)
-confirmFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-confirmFrame.BorderSizePixel = 2
-confirmFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
-confirmFrame.Visible = false
-confirmFrame.ZIndex = 10
-confirmFrame.Parent = confirmGui
-
-local confirmTitle = Instance.new("TextLabel")
-confirmTitle.Size = UDim2.new(1, 0, 0, 25)
-confirmTitle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-confirmTitle.Text = "WARNING"
-confirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmTitle.TextScaled = true
-confirmTitle.Font = Enum.Font.GothamBold
-confirmTitle.ZIndex = 11
-confirmTitle.Parent = confirmFrame
-
-local confirmText = Instance.new("TextLabel")
-confirmText.Size = UDim2.new(0.9, 0, 0, 70)
-confirmText.Position = UDim2.new(0.05, 0, 0, 35)
-confirmText.BackgroundTransparency = 1
-confirmText.Text = ""
-confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmText.TextScaled = true
-confirmText.TextWrapped = true
-confirmText.Font = Enum.Font.Gotham
-confirmText.ZIndex = 11
-confirmText.Parent = confirmFrame
-
-local yesBtn = Instance.new("TextButton")
-yesBtn.Size = UDim2.new(0.4, 0, 0, 30)
-yesBtn.Position = UDim2.new(0.05, 0, 0, 115)
-yesBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-yesBtn.Text = "Да"
-yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-yesBtn.TextScaled = true
-yesBtn.Font = Enum.Font.GothamBold
-yesBtn.ZIndex = 11
-yesBtn.Parent = confirmFrame
-
-local noBtn = Instance.new("TextButton")
-noBtn.Size = UDim2.new(0.4, 0, 0, 30)
-noBtn.Position = UDim2.new(0.55, 0, 0, 115)
-noBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-noBtn.Text = "Нет"
-noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-noBtn.TextScaled = true
-noBtn.Font = Enum.Font.GothamBold
-noBtn.ZIndex = 11
-noBtn.Parent = confirmFrame
-
-local currentConfirmAction = nil
-
-local function showConfirm(text, onYes, onNo)
-    confirmText.Text = text
-    confirmFrame.Visible = true
-    currentConfirmAction = {yes = onYes, no = onNo}
-end
-
-yesBtn.MouseButton1Click:Connect(function()
-    confirmFrame.Visible = false
-    if currentConfirmAction and currentConfirmAction.yes then
-        currentConfirmAction.yes()
-    end
-    currentConfirmAction = nil
-end)
-
-noBtn.MouseButton1Click:Connect(function()
-    confirmFrame.Visible = false
-    if currentConfirmAction and currentConfirmAction.no then
-        currentConfirmAction.no()
-    end
-    currentConfirmAction = nil
-end)
-
-local function resetFastRebirthBtn()
-    fastRebirthToggle.Text = "Fast Rebirth [OFF]"
-    fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    isRebirthing = false
-    fastRepRunning = false
-end
-
-fastRebirthToggle.MouseButton1Click:Connect(function()
-    if fastRebirthToggle.Text:find("%[ON%]") then
-        resetFastRebirthBtn()
-        for _, thread in ipairs(fastThreads) do
-            pcall(function() task.cancel(thread) end)
-        end
-        fastThreads = {}
-    else
-        showConfirm("Вы точно хотите включить Fast Rebirth? Он только для 8 паков!", function()
-            fastRebirthToggle.Text = "Fast Rebirth [ON]"
-            fastRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-            isRebirthing = true
-            fastRepRunning = true
-            task.spawn(rebirthLoop)
-            task.spawn(fastRepLoop)
-        end, function()
-            resetFastRebirthBtn()
-        end)
-    end
-end)
-
-local function resetAutoRebirthBtn()
-    autoRebirthToggle.Text = "Auto Rebirth [OFF]"
-    autoRebirthToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-end
-
-autoRebirthToggle.MouseButton1Click:Connect(function()
-    if autoRebirthToggle.Text:find("%[ON%]") then
-        resetAutoRebirthBtn()
-    else
-        showConfirm("Вы точно хотите сделать ребёрн? Вы потеряете всю силу!", function()
-            autoRebirthToggle.Text = "Auto Rebirth [ON]"
-            autoRebirthToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-            task.spawn(function()
-                while autoRebirthToggle.Text:find("%[ON%]") do
-                    local before = rebirthsStat.Value
-                    pcall(function()
-                        ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
-                    end)
-                    task.wait(0.05)
-                    if rebirthsStat.Value > before then
-                        task.wait(0.3)
-                    else
-                        task.wait(0.5)
-                    end
-                end
-            end)
-        end, function()
-            resetAutoRebirthBtn()
-        end)
-    end
-end)
-
-local bossGui = Instance.new("ScreenGui")
-bossGui.Name = "BossKillMenu"
-bossGui.ResetOnSpawn = false
-bossGui.Parent = player.PlayerGui
-
-local bossFrame = Instance.new("Frame")
-bossFrame.Size = UDim2.new(0, 250, 0, 230)
-bossFrame.Position = UDim2.new(0.5, -125, 0, 10)
-bossFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-bossFrame.BorderSizePixel = 2
-bossFrame.BorderColor3 = Color3.fromRGB(200, 50, 50)
-bossFrame.Active = true
-bossFrame.Draggable = true
-bossFrame.Parent = bossGui
-
-local bossTitle = Instance.new("TextLabel")
-bossTitle.Size = UDim2.new(1, 0, 0, 25)
-bossTitle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-bossTitle.Text = "Boss Kill"
-bossTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-bossTitle.TextScaled = true
-bossTitle.Font = Enum.Font.GothamBold
-bossTitle.Parent = bossFrame
-
-local bossMinBtn = Instance.new("TextButton")
-bossMinBtn.Size = UDim2.new(0, 25, 0, 25)
-bossMinBtn.Position = UDim2.new(1, -25, 0, 0)
-bossMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-bossMinBtn.Text = "_"
-bossMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-bossMinBtn.TextScaled = true
-bossMinBtn.Font = Enum.Font.GothamBold
-bossMinBtn.Parent = bossFrame
-
-local bossContent = Instance.new("Frame")
-bossContent.Size = UDim2.new(1, 0, 1, -25)
-bossContent.Position = UDim2.new(0, 0, 0, 25)
-bossContent.BackgroundTransparency = 1
-bossContent.Parent = bossFrame
-
-local bossMinimized = false
-
-bossMinBtn.MouseButton1Click:Connect(function()
-    bossMinimized = not bossMinimized
-    if bossMinimized then
-        bossFrame.Size = UDim2.new(0, 250, 0, 25)
-        bossContent.Visible = false
-        bossMinBtn.Text = "□"
-    else
-        bossFrame.Size = UDim2.new(0, 250, 0, 230)
-        bossContent.Visible = true
-        bossMinBtn.Text = "_"
-    end
-end)
+local BossTab = window:AddTab("Boss Kill")
 
 local autoKillBossEnabled = false
 local heightOffset = 55
-
-local function setSize(size)
-    pcall(function()
-        changeSpeedSizeRemote:InvokeServer("changeSize", size)
-    end)
-end
-
-local function equipPunch()
-    local char = player.Character
-    if not char then return end
-    local punch = char:FindFirstChild("Punch") or player.Backpack:FindFirstChild("Punch")
-    if punch and punch.Parent ~= char then
-        char.Humanoid:EquipTool(punch)
-    end
-end
-
-local function speedUpAnimations()
-    local char = player.Character
-    if not char then return end
-    local humanoid = char:FindFirstChild("Humanoid")
-    if humanoid then
-        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-            pcall(function()
-                track:AdjustSpeed(3)
-            end)
-        end
-    end
-end
-
-local function resetAttackTime()
-    local char = player.Character
-    if not char then return end
-    local punch = char:FindFirstChild("Punch")
-    if punch then
-        local attackTime = punch:FindFirstChild("attackTime")
-        if attackTime then attackTime.Value = 0 end
-    end
-end
 
 local function findBossPart()
     for _, obj in pairs(workspace:GetDescendants()) do
@@ -647,7 +358,7 @@ local function autoKillBossLoop()
             local myHRP = myChar:FindFirstChild("HumanoidRootPart")
             if not myHRP then return end
             local targetPos = bossPart.Position + Vector3.new(0, heightOffset, 0)
-            myHRP.CFrame = CFrame.new(targetPos, bossPart.Position)
+            myHRP.CFrame = CFrame.lookAt(targetPos, bossPart.Position)
             equipPunch()
             resetAttackTime()
             local leftHand = myChar:FindFirstChild("LeftHand")
@@ -671,186 +382,31 @@ local function autoKillBossLoop()
     end
 end
 
-local function sizeLoopBoss()
-    while autoKillBossEnabled do
-        setSize(12)
-        task.wait(0.3)
-    end
-end
+local bossStatusLabel = BossTab:AddLabel("Status: OFF")
+bossStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 
-local bossStatus = Instance.new("TextLabel")
-bossStatus.Size = UDim2.new(0.9, 0, 0, 22)
-bossStatus.Position = UDim2.new(0.05, 0, 0, 10)
-bossStatus.BackgroundTransparency = 1
-bossStatus.Text = "Status: OFF"
-bossStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-bossStatus.TextScaled = true
-bossStatus.Font = Enum.Font.Gotham
-bossStatus.Parent = bossContent
-
-local bossBtn = Instance.new("TextButton")
-bossBtn.Size = UDim2.new(0.9, 0, 0, 35)
-bossBtn.Position = UDim2.new(0.05, 0, 0, 45)
-bossBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-bossBtn.Text = "Kill Boss [OFF]"
-bossBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-bossBtn.TextScaled = true
-bossBtn.Font = Enum.Font.GothamBold
-bossBtn.Parent = bossContent
-
-bossBtn.MouseButton1Click:Connect(function()
-    autoKillBossEnabled = not autoKillBossEnabled
-    if autoKillBossEnabled then
-        bossBtn.Text = "Kill Boss [ON]"
-        bossBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        bossStatus.Text = "Hunting boss..."
-        bossStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-        setSize(12)
-        task.spawn(sizeLoopBoss)
+BossTab:AddSwitch("Kill Boss", function(state)
+    autoKillBossEnabled = state
+    if state then
+        bossStatusLabel.Text = "Status: Hunting boss..."
+        bossStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         task.spawn(autoKillBossLoop)
     else
-        bossBtn.Text = "Kill Boss [OFF]"
-        bossBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-        bossStatus.Text = "Status: OFF"
-        bossStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-        setSize(2)
+        bossStatusLabel.Text = "Status: OFF"
+        bossStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
 
-local heightLabel = Instance.new("TextLabel")
-heightLabel.Size = UDim2.new(0.9, 0, 0, 20)
-heightLabel.Position = UDim2.new(0.05, 0, 0, 90)
-heightLabel.BackgroundTransparency = 1
-heightLabel.Text = "Height: " .. heightOffset
-heightLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-heightLabel.TextScaled = true
-heightLabel.Font = Enum.Font.Gotham
-heightLabel.Parent = bossContent
-
-local bossSliderBg = Instance.new("Frame")
-bossSliderBg.Size = UDim2.new(0.9, 0, 0, 12)
-bossSliderBg.Position = UDim2.new(0.05, 0, 0, 115)
-bossSliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-bossSliderBg.BorderSizePixel = 0
-bossSliderBg.Parent = bossContent
-
-local bossSliderFill = Instance.new("Frame")
-bossSliderFill.Size = UDim2.new((heightOffset - 1) / 99, 0, 1, 0)
-bossSliderFill.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-bossSliderFill.BorderSizePixel = 0
-bossSliderFill.Parent = bossSliderBg
-
-local bossSliderKnob = Instance.new("TextButton")
-bossSliderKnob.Size = UDim2.new(0, 14, 0, 14)
-bossSliderKnob.Position = UDim2.new((heightOffset - 1) / 99, -7, 0.5, -7)
-bossSliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-bossSliderKnob.Text = ""
-bossSliderKnob.AutoButtonColor = false
-bossSliderKnob.BorderSizePixel = 0
-bossSliderKnob.Parent = bossSliderBg
-
-local bossCornerBg = Instance.new("UICorner")
-bossCornerBg.CornerRadius = UDim.new(1, 0)
-bossCornerBg.Parent = bossSliderBg
-
-local bossCornerFill = Instance.new("UICorner")
-bossCornerFill.CornerRadius = UDim.new(1, 0)
-bossCornerFill.Parent = bossSliderFill
-
-local bossCornerKnob = Instance.new("UICorner")
-bossCornerKnob.CornerRadius = UDim.new(1, 0)
-bossCornerKnob.Parent = bossSliderKnob
-
-local bossDragging = false
-
-local function updateBossSlider(input)
-    local relX = math.clamp((input.Position.X - bossSliderBg.AbsolutePosition.X) / bossSliderBg.AbsoluteSize.X, 0, 1)
-    local newVal = math.floor(1 + relX * 99)
-    heightOffset = newVal
-    bossSliderFill.Size = UDim2.new(relX, 0, 1, 0)
-    bossSliderKnob.Position = UDim2.new(relX, -7, 0.5, -7)
-    heightLabel.Text = "Height: " .. heightOffset
-end
-
-bossSliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        bossDragging = true
+BossTab:AddTextBox("Height (1-100)", function(text)
+    local num = tonumber(text)
+    if num and num >= 1 and num <= 100 then
+        heightOffset = num
     end
-end)
+end, {
+    placeholder = "55"
+})
 
-bossSliderKnob.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        bossDragging = false
-    end
-end)
-
-bossSliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        bossDragging = true
-        updateBossSlider(input)
-    end
-end)
-
-bossSliderBg.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        bossDragging = false
-    end
-end)
-
-local killGui = Instance.new("ScreenGui")
-killGui.Name = "LoopKillMenu"
-killGui.ResetOnSpawn = false
-killGui.Parent = player.PlayerGui
-
-local killFrame = Instance.new("Frame")
-killFrame.Size = UDim2.new(0, 250, 0, 440)
-killFrame.Position = UDim2.new(1, -260, 0.5, -220)
-killFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-killFrame.BorderSizePixel = 2
-killFrame.BorderColor3 = Color3.fromRGB(138, 43, 226)
-killFrame.Active = true
-killFrame.Draggable = true
-killFrame.Parent = killGui
-
-local killTitle = Instance.new("TextLabel")
-killTitle.Size = UDim2.new(1, 0, 0, 25)
-killTitle.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-killTitle.Text = "Loop Kill"
-killTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-killTitle.TextScaled = true
-killTitle.Font = Enum.Font.GothamBold
-killTitle.Parent = killFrame
-
-local killMinBtn = Instance.new("TextButton")
-killMinBtn.Size = UDim2.new(0, 25, 0, 25)
-killMinBtn.Position = UDim2.new(1, -25, 0, 0)
-killMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-killMinBtn.Text = "_"
-killMinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-killMinBtn.TextScaled = true
-killMinBtn.Font = Enum.Font.GothamBold
-killMinBtn.Parent = killFrame
-
-local killContent = Instance.new("Frame")
-killContent.Size = UDim2.new(1, 0, 1, -25)
-killContent.Position = UDim2.new(0, 0, 0, 25)
-killContent.BackgroundTransparency = 1
-killContent.Parent = killFrame
-
-local killMinimized = false
-
-killMinBtn.MouseButton1Click:Connect(function()
-    killMinimized = not killMinimized
-    if killMinimized then
-        killFrame.Size = UDim2.new(0, 250, 0, 25)
-        killContent.Visible = false
-        killMinBtn.Text = "□"
-    else
-        killFrame.Size = UDim2.new(0, 250, 0, 440)
-        killContent.Visible = true
-        killMinBtn.Text = "_"
-    end
-end)
+local KillTab = window:AddTab("Loop Kill")
 
 local anchorCFrame = nil
 local waitingRespawn = false
@@ -860,7 +416,6 @@ local fastPunchEnabled = false
 local fastAttackEnabled = false
 local spectateEnabled = false
 local selectedPlayer = nil
-local dropdownOpen = false
 local killAllEnabled = false
 local cameraLockEnabled = false
 local cameraAnchorPart = nil
@@ -933,10 +488,11 @@ local function attackPlayer(targetPlayer)
     local rightHand = myChar:FindFirstChild("RightHand")
     if not targetHRP or not myHRP or not leftHand or not rightHand or not targetHumanoid then return end
     
-    local targetCFrame = targetHRP.CFrame
-    local backOffset = CFrame.new(0, 0, distanceOffset)
-    local behindPos = targetCFrame * backOffset
-    myHRP.CFrame = CFrame.new(behindPos.Position, targetHRP.Position)
+    local targetPos = targetHRP.Position
+    local targetLook = targetHRP.CFrame.LookVector
+    local behindPos = targetPos - targetLook * distanceOffset
+    local abovePos = behindPos + Vector3.new(0, 1, 0)
+    myHRP.CFrame = CFrame.lookAt(abovePos, targetPos)
     
     equipPunch()
     resetAttackTime()
@@ -1030,10 +586,11 @@ local function killAllLoop()
                         if not killAllEnabled then break end
                         local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
                         if not targetHRP then break end
-                        local targetCFrame = targetHRP.CFrame
-                        local backOffset = CFrame.new(0, 0, distanceOffset)
-                        local behindPos = targetCFrame * backOffset
-                        myHRP.CFrame = CFrame.new(behindPos.Position, targetHRP.Position)
+                        local targetPos = targetHRP.Position
+                        local targetLook = targetHRP.CFrame.LookVector
+                        local behindPos = targetPos - targetLook * distanceOffset
+                        local abovePos = behindPos + Vector3.new(0, 1, 0)
+                        myHRP.CFrame = CFrame.lookAt(abovePos, targetPos)
                         resetAttackTime()
                         local tool = myChar:FindFirstChild("Punch")
                         if tool then pcall(function() tool:Activate() end) end
@@ -1065,95 +622,53 @@ local function killAllLoop()
     returnToAnchor()
 end
 
-local selectBtn = Instance.new("TextButton")
-selectBtn.Size = UDim2.new(0.9, 0, 0, 30)
-selectBtn.Position = UDim2.new(0.05, 0, 0, 10)
-selectBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-selectBtn.Text = "Select Player  ▼"
-selectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-selectBtn.TextScaled = true
-selectBtn.Font = Enum.Font.GothamBold
-selectBtn.Parent = killContent
-
-local playerList = Instance.new("Frame")
-playerList.Size = UDim2.new(0.9, 0, 0, 100)
-playerList.Position = UDim2.new(0.05, 0, 0, 42)
-playerList.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-playerList.BorderSizePixel = 1
-playerList.BorderColor3 = Color3.fromRGB(138, 43, 226)
-playerList.Visible = false
-playerList.Parent = killContent
-
-local scrolling = Instance.new("ScrollingFrame")
-scrolling.Size = UDim2.new(1, 0, 1, 0)
-scrolling.BackgroundTransparency = 1
-scrolling.BorderSizePixel = 0
-scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrolling.ScrollBarThickness = 5
-scrolling.Parent = playerList
-
-local scrollLayout = Instance.new("UIListLayout")
-scrollLayout.Padding = UDim.new(0, 2)
-scrollLayout.Parent = scrolling
-
-local listPadding = Instance.new("UIPadding")
-listPadding.PaddingTop = UDim.new(0, 4)
-listPadding.PaddingLeft = UDim.new(0, 4)
-listPadding.PaddingRight = UDim.new(0, 4)
-listPadding.Parent = playerList
+local playerList = {}
 
 local function updatePlayerList()
-    for _, child in pairs(scrolling:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    local count = 0
+    playerList = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -5, 0, 25)
-            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-            btn.Text = p.DisplayName .. " (@" .. p.Name .. ")"
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextScaled = true
-            btn.Font = Enum.Font.Gotham
-            btn.Parent = scrolling
-            btn.MouseButton1Click:Connect(function()
-                selectedPlayer = p
-                selectBtn.Text = p.DisplayName .. "  ▼"
-                selectBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-                playerList.Visible = false
-                dropdownOpen = false
-                if spectateEnabled then updateSpectateTarget() end
-            end)
-            count = count + 1
+            table.insert(playerList, p.DisplayName .. " (@" .. p.Name .. ")")
         end
     end
-    scrolling.CanvasSize = UDim2.new(0, 0, 0, count * 27)
 end
 
-selectBtn.MouseButton1Click:Connect(function()
-    dropdownOpen = not dropdownOpen
-    playerList.Visible = dropdownOpen
-    if dropdownOpen then
-        updatePlayerList()
-        selectBtn.Text = selectBtn.Text:gsub("▼", "▲")
-    else
-        selectBtn.Text = selectBtn.Text:gsub("▲", "▼")
+local selectDropdown = KillTab:AddDropdown("Select Player", function(text)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            local optionText = p.DisplayName .. " (@" .. p.Name .. ")"
+            if text == optionText then
+                selectedPlayer = p
+                if spectateEnabled then updateSpectateTarget() end
+                break
+            end
+        end
     end
 end)
 
-Players.PlayerAdded:Connect(function()
+updatePlayerList()
+for _, name in ipairs(playerList) do
+    selectDropdown:Add(name)
+end
+
+Players.PlayerAdded:Connect(function(p)
     task.wait(0.5)
-    if dropdownOpen then updatePlayerList() end
+    updatePlayerList()
+    selectDropdown:Clear()
+    for _, name in ipairs(playerList) do
+        selectDropdown:Add(name)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(p)
     if selectedPlayer == p then
         selectedPlayer = nil
-        selectBtn.Text = "Select Player  ▼"
-        selectBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     end
-    if dropdownOpen then updatePlayerList() end
+    updatePlayerList()
+    selectDropdown:Clear()
+    for _, name in ipairs(playerList) do
+        selectDropdown:Add(name)
+    end
 end)
 
 local spectateConnection = nil
@@ -1190,8 +705,9 @@ local function stopSpectate()
 end
 
 local loopKillEnabled = false
-local statusLabel
-local respawnTimerLabel
+local statusLabel = KillTab:AddLabel("Status: OFF")
+statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+local respawnTimerLabel = KillTab:AddLabel("")
 
 local function watchRespawn()
     if not selectedPlayer then return end
@@ -1210,11 +726,9 @@ local function loopKill()
                 local remaining = RESPAWN_DELAY - (tick() - respawnStartTime)
                 if remaining <= 0 and isAlive(selectedPlayer) then
                     waitingRespawn = false
-                    if statusLabel then
-                        statusLabel.Text = "Killing: " .. selectedPlayer.Name
-                        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-                    end
-                    if respawnTimerLabel then respawnTimerLabel.Text = "" end
+                    statusLabel.Text = "Status: Killing: " .. selectedPlayer.Name
+                    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    respawnTimerLabel.Text = ""
                 end
             else
                 if isAlive(selectedPlayer) then
@@ -1225,10 +739,8 @@ local function loopKill()
                     waitingRespawn = true
                     respawnStartTime = tick()
                     returnToAnchor()
-                    if statusLabel then
-                        statusLabel.Text = "Wait respawn..."
-                        statusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-                    end
+                    statusLabel.Text = "Status: Wait respawn..."
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
                 end
             end
         end
@@ -1236,46 +748,7 @@ local function loopKill()
     end
 end
 
-statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
-statusLabel.Position = UDim2.new(0.05, 0, 0, 150)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: OFF"
-statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-statusLabel.TextScaled = true
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.Parent = killContent
-
-respawnTimerLabel = Instance.new("TextLabel")
-respawnTimerLabel.Size = UDim2.new(0.9, 0, 0, 22)
-respawnTimerLabel.Position = UDim2.new(0.05, 0, 0, 170)
-respawnTimerLabel.BackgroundTransparency = 1
-respawnTimerLabel.Text = ""
-respawnTimerLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-respawnTimerLabel.TextScaled = true
-respawnTimerLabel.Font = Enum.Font.GothamBold
-respawnTimerLabel.Parent = killContent
-
-local function killButton(y, text, state, onToggle)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.Position = UDim2.new(0.05, 0, 0, y)
-    btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-    btn.Text = text .. (state and " [ON]" or " [OFF]")
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = killContent
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = text .. (state and " [ON]" or " [OFF]")
-        btn.BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 80)
-        onToggle(state)
-    end)
-    return btn
-end
-
-killButton(195, "Loop Kill", false, function(state)
+KillTab:AddSwitch("Loop Kill", function(state)
     if not selectedPlayer then
         statusLabel.Text = "Select player first!"
         statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -1287,7 +760,7 @@ killButton(195, "Loop Kill", false, function(state)
         watchRespawn()
         waitingRespawn = false
         respawnStartTime = 0
-        statusLabel.Text = "Killing: " .. selectedPlayer.Name
+        statusLabel.Text = "Status: Killing: " .. selectedPlayer.Name
         statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         task.spawn(loopKill)
     else
@@ -1300,13 +773,13 @@ killButton(195, "Loop Kill", false, function(state)
     end
 end)
 
-killButton(230, "Kill All", false, function(state)
+KillTab:AddSwitch("Kill All", function(state)
     killAllEnabled = state
     if state then
         savePosition()
         cameraLockEnabled = true
         startCameraLock()
-        statusLabel.Text = "Killing ALL..."
+        statusLabel.Text = "Status: Killing ALL..."
         statusLabel.TextColor3 = Color3.fromRGB(255, 150, 50)
         task.spawn(killAllLoop)
     else
@@ -1319,135 +792,38 @@ killButton(230, "Kill All", false, function(state)
     end
 end)
 
-local spectateBtn = Instance.new("TextButton")
-spectateBtn.Size = UDim2.new(0.9, 0, 0, 30)
-spectateBtn.Position = UDim2.new(0.05, 0, 0, 265)
-spectateBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-spectateBtn.Text = "Spectate [OFF]"
-spectateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-spectateBtn.TextScaled = true
-spectateBtn.Font = Enum.Font.GothamBold
-spectateBtn.Parent = killContent
-
-spectateBtn.MouseButton1Click:Connect(function()
+KillTab:AddSwitch("Spectate", function(state)
     if not selectedPlayer then
         statusLabel.Text = "Select player first!"
         statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         return
     end
-    spectateEnabled = not spectateEnabled
-    if spectateEnabled then
-        spectateBtn.Text = "Spectate [ON]"
-        spectateBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    spectateEnabled = state
+    if state then
         updateSpectateTarget()
     else
-        spectateBtn.Text = "Spectate [OFF]"
-        spectateBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
         stopSpectate()
     end
 end)
 
-killButton(300, "Fast Punch", false, function(state)
+KillTab:AddSwitch("Fast Punch", function(state)
     fastPunchEnabled = state
     if state then task.spawn(fastPunchLoop) end
 end)
 
-killButton(335, "Fast Attack", false, function(state)
+KillTab:AddSwitch("Fast Attack", function(state)
     fastAttackEnabled = state
     if state then task.spawn(fastAttackLoop) end
 end)
 
-local distLabel = Instance.new("TextLabel")
-distLabel.Size = UDim2.new(0.9, 0, 0, 20)
-distLabel.Position = UDim2.new(0.05, 0, 0, 370)
-distLabel.BackgroundTransparency = 1
-distLabel.Text = "Distance: 0.50"
-distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-distLabel.TextScaled = true
-distLabel.Font = Enum.Font.Gotham
-distLabel.Parent = killContent
-
-local distSliderBg = Instance.new("Frame")
-distSliderBg.Size = UDim2.new(0.9, 0, 0, 12)
-distSliderBg.Position = UDim2.new(0.05, 0, 0, 395)
-distSliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-distSliderBg.BorderSizePixel = 0
-distSliderBg.Parent = killContent
-
-local distSliderFill = Instance.new("Frame")
-distSliderFill.Size = UDim2.new(0.5 / 3, 0, 1, 0)
-distSliderFill.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-distSliderFill.BorderSizePixel = 0
-distSliderFill.Parent = distSliderBg
-
-local distSliderKnob = Instance.new("TextButton")
-distSliderKnob.Size = UDim2.new(0, 14, 0, 14)
-distSliderKnob.Position = UDim2.new(0.5 / 3, -7, 0.5, -7)
-distSliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-distSliderKnob.Text = ""
-distSliderKnob.AutoButtonColor = false
-distSliderKnob.BorderSizePixel = 0
-distSliderKnob.Parent = distSliderBg
-
-local distCornerBg = Instance.new("UICorner")
-distCornerBg.CornerRadius = UDim.new(1, 0)
-distCornerBg.Parent = distSliderBg
-
-local distCornerFill = Instance.new("UICorner")
-distCornerFill.CornerRadius = UDim.new(1, 0)
-distCornerFill.Parent = distSliderFill
-
-local distCornerKnob = Instance.new("UICorner")
-distCornerKnob.CornerRadius = UDim.new(1, 0)
-distCornerKnob.Parent = distSliderKnob
-
-local distDragging = false
-
-local function updateDistSlider(input)
-    local relX = math.clamp((input.Position.X - distSliderBg.AbsolutePosition.X) / distSliderBg.AbsoluteSize.X, 0, 1)
-    local newVal = math.floor(relX * 300) / 100
-    distanceOffset = newVal
-    distSliderFill.Size = UDim2.new(relX, 0, 1, 0)
-    distSliderKnob.Position = UDim2.new(relX, -7, 0.5, -7)
-    distLabel.Text = "Distance: " .. string.format("%.2f", distanceOffset)
-end
-
-distSliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        distDragging = true
+KillTab:AddTextBox("Distance (0-3)", function(text)
+    local num = tonumber(text)
+    if num and num >= 0 and num <= 3 then
+        distanceOffset = num
     end
-end)
-
-distSliderKnob.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        distDragging = false
-    end
-end)
-
-distSliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        distDragging = true
-        updateDistSlider(input)
-    end
-end)
-
-distSliderBg.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        distDragging = false
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if bossDragging then updateBossSlider(input) end
-    if distDragging then updateDistSlider(input) end
-end)
-
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        bossDragging = false
-        distDragging = false
-    end
-end)
+end, {
+    placeholder = "0.5"
+})
 
 task.spawn(function()
     while true do
@@ -1463,9 +839,8 @@ task.spawn(function()
     end
 end)
 
-task.spawn(function()
-    while true do
-        task.wait(3)
-        if dropdownOpen then updatePlayerList() end
-    end
-end)
+local infoTab = window:AddTab("Info")
+infoTab:AddLabel("Absolute Menu").TextSize = 20
+local wLabel = infoTab:AddLabel("VERSION 3.0.0")
+wLabel.TextSize = 30
+wLabel.Font = Enum.Font.Arcade
