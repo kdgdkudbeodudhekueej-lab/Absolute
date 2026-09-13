@@ -100,10 +100,10 @@ local function updateStats()
     rebirthLabel.Text = string.format("Rebirths: %s | Gained: %s", formatNumber(rebirthsStat.Value), formatNumber(rebirthsStat.Value - rebirthGained))
     strengthLabel.Text = string.format("Strength: %s | Gained: %s", formatNumber(strengthStat.Value), formatNumber(strengthStat.Value - strengthGained))
     durabilityLabel.Text = string.format("Durability: %s | Gained: %s", formatNumber(durabilityStat.Value), formatNumber(durabilityStat.Value - durabilityGained))
-    
+
     local target = 5000 + (rebirthsStat.Value * 2550)
     local needed = target - strengthStat.Value
-    
+
     if needed <= 0 then
         rebirthProgressLabel.Text = "До ребита: ГОТОВ!"
         rebirthProgressLabel.TextColor3 = Color3.fromRGB(50, 200, 50)
@@ -349,18 +349,67 @@ local function findBossPart()
 end
 
 local function autoKillBossLoop()
+    local bodyVel = nil
+    local bodyGyro = nil
+
     while autoKillBossEnabled do
         pcall(function()
             local bossPart = findBossPart()
-            if not bossPart then return end
+            
+            if not bossPart then
+                if bodyVel then bodyVel:Destroy() bodyVel = nil end
+                if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+                return
+            end
+
             local myChar = player.Character
             if not myChar then return end
             local myHRP = myChar:FindFirstChild("HumanoidRootPart")
             if not myHRP then return end
+
+            if not bodyVel or not bodyVel.Parent then
+                bodyVel = Instance.new("BodyVelocity")
+                bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                bodyVel.P = 5000
+                bodyVel.Parent = myHRP
+            end
+
+            if not bodyGyro or not bodyGyro.Parent then
+                bodyGyro = Instance.new("BodyGyro")
+                bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+                bodyGyro.P = 3000
+                bodyGyro.D = 500
+                bodyGyro.Parent = myHRP
+            end
+
             local targetPos = bossPart.Position + Vector3.new(0, heightOffset, 0)
-            myHRP.CFrame = CFrame.lookAt(targetPos, bossPart.Position)
+            local direction = targetPos - myHRP.Position
+            local distance = direction.Magnitude
+
+            if distance > 1 then
+                local speed
+                if distance > 100 then
+                    speed = 500
+                elseif distance > 50 then
+                    speed = 300
+                elseif distance > 20 then
+                    speed = 200
+                else
+                    speed = math.min(distance * 10, 150)
+                end
+                bodyVel.Velocity = direction.Unit * speed
+            else
+                bodyVel.Velocity = Vector3.new(0, 0, 0)
+            end
+
+            local lookDir = bossPart.Position - myHRP.Position
+            if lookDir.Magnitude > 0.1 then
+                bodyGyro.CFrame = CFrame.lookAt(myHRP.Position, bossPart.Position)
+            end
+
             equipPunch()
             resetAttackTime()
+
             local leftHand = myChar:FindFirstChild("LeftHand")
             local rightHand = myChar:FindFirstChild("RightHand")
             if leftHand and rightHand then
@@ -371,15 +420,20 @@ local function autoKillBossLoop()
                     firetouchinterest(bossPart, rightHand, 1)
                 end)
             end
+
             pcall(function()
                 muscleEvent:FireServer("punch", "leftHand")
                 muscleEvent:FireServer("punch", "rightHand")
             end)
+
             local tool = myChar:FindFirstChild("Punch")
             if tool then pcall(function() tool:Activate() end) end
         end)
         task.wait(0.05)
     end
+
+    if bodyVel then bodyVel:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
 end
 
 local bossStatusLabel = BossTab:AddLabel("Status: OFF")
@@ -487,13 +541,13 @@ local function attackPlayer(targetPlayer)
     local leftHand = myChar:FindFirstChild("LeftHand")
     local rightHand = myChar:FindFirstChild("RightHand")
     if not targetHRP or not myHRP or not leftHand or not rightHand or not targetHumanoid then return end
-    
+
     local targetPos = targetHRP.Position
     local targetLook = targetHRP.CFrame.LookVector
     local behindPos = targetPos - targetLook * distanceOffset
     local abovePos = behindPos + Vector3.new(0, 1, 0)
     myHRP.CFrame = CFrame.lookAt(abovePos, targetPos)
-    
+
     equipPunch()
     resetAttackTime()
     pcall(function()
@@ -841,6 +895,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.0.0")
+local wLabel = infoTab:AddLabel("VERSION 3.1.0")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
