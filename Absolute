@@ -778,6 +778,7 @@ function StartMainScript(titleText)
     local bodyPosition = nil
     local bodyGyro = nil
     local ragdollActive = false
+    local antiGrabMode = "Ragdoll"
 
     local function createBodyPositions(hrp)
         if bodyPosition then bodyPosition:Destroy() bodyPosition = nil end
@@ -831,25 +832,40 @@ function StartMainScript(titleText)
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         hrp.AssemblyAngularVelocity = Vector3.zero
                         pcall(function() struggleEvent:FireServer(LocalPlayer) end)
-                        if not ragdollActive then
-                            ragdollActive = true
-                            pcall(function() ragdollRemote:FireServer(hrp, 0.01) end)
-                            task.delay(0.01, function()
-                                if ragdollActive then
-                                    ragdollActive = false
-                                    if hum then
-                                        hum.PlatformStand = false
-                                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                        if antiGrabMode == "Ragdoll" then
+                            if not ragdollActive then
+                                ragdollActive = true
+                                pcall(function() ragdollRemote:FireServer(hrp, 0.01) end)
+                                task.delay(0.01, function()
+                                    if ragdollActive then
+                                        ragdollActive = false
+                                        if hum then
+                                            hum.PlatformStand = false
+                                            hum:ChangeState(Enum.HumanoidStateType.Running)
+                                        end
                                     end
-                                end
-                            end)
-                        end
-                        if hum then
-                            hum.Sit = false
-                            hum.PlatformStand = false
-                            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                            hum:ChangeState(Enum.HumanoidStateType.Running)
-                            hum.AutoRotate = true
+                                end)
+                            end
+                            if hum then
+                                hum.Sit = false
+                                hum.PlatformStand = false
+                                hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                                hum:ChangeState(Enum.HumanoidStateType.Running)
+                                hum.AutoRotate = true
+                            end
+                        else
+                            if hum then
+                                hum.Sit = false
+                                hum.PlatformStand = false
+                                hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                                hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+                                hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+                                hum:ChangeState(Enum.HumanoidStateType.Running)
+                                hum.AutoRotate = true
+                                hum.WalkSpeed = 0
+                                hum.JumpPower = 0
+                                hum.JumpHeight = 0
+                            end
                         end
                         local head = char:FindFirstChild("Head")
                         if head then
@@ -886,6 +902,10 @@ function StartMainScript(titleText)
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
                     hum.PlatformStand = false
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                    hum.JumpHeight = 7.2
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
                     hum:ChangeState(Enum.HumanoidStateType.Running)
                 end
             end
@@ -897,6 +917,17 @@ function StartMainScript(titleText)
         if antiGrabTask then task.cancel(antiGrabTask) antiGrabTask = nil end
         removeBodyPositions()
         ragdollActive = false
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+                hum.JumpHeight = 7.2
+                hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+            end
+        end
     end
 
     local blobmanKickActive = false
@@ -1716,8 +1747,7 @@ function StartMainScript(titleText)
     local smoothFactor = 0.15
 
     local function CreateESP(part)
-        if not part or not part.Parent then return end
-        
+        if not part or not part.Parent then return end        
         local box = Instance.new("BoxHandleAdornment")
         box.Size = part.Size
         box.AlwaysOnTop = true
@@ -1866,6 +1896,19 @@ function StartMainScript(titleText)
             if Value < -5 then Value = -5 end
             if Value > 8 then Value = 8 end
             offsetZ = Value
+        end
+    })
+
+    AntiGrabBlock:AddDropdown("Anti Grab Mode", {
+        Text = "Anti Grab Mode",
+        Values = {"Anti Grab Ragdoll", "Anti Grab No Ragdoll"},
+        Default = "Anti Grab Ragdoll",
+        Callback = function(Value)
+            if Value == "Anti Grab Ragdoll" then
+                antiGrabMode = "Ragdoll"
+            else
+                antiGrabMode = "NoRagdoll"
+            end
         end
     })
 
