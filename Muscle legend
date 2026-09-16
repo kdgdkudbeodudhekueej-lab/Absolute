@@ -333,7 +333,7 @@ end)
 local BossTab = window:AddTab("Boss Kill")
 
 local autoKillBossEnabled = false
-local heightOffset = 55
+local heightOffset = 65
 
 local function findBossPart()
     for _, obj in pairs(workspace:GetDescendants()) do
@@ -351,61 +351,56 @@ end
 local function autoKillBossLoop()
     local bodyVel = nil
     local bodyGyro = nil
+    local antiGrav = nil
 
     while autoKillBossEnabled do
         pcall(function()
             local bossPart = findBossPart()
-            
-            if not bossPart then
+            local myChar = player.Character
+
+            if not bossPart or not myChar then
                 if bodyVel then bodyVel:Destroy() bodyVel = nil end
                 if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+                if antiGrav then antiGrav:Destroy() antiGrav = nil end
                 return
             end
 
-            local myChar = player.Character
-            if not myChar then return end
             local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-            if not myHRP then return end
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            if not myHRP or not myHum then return end
+
+            myHum.PlatformStand = true
+
+            if not antiGrav or not antiGrav.Parent then
+                antiGrav = Instance.new("BodyForce")
+                antiGrav.Name = "BossAntiGrav"
+                antiGrav.Parent = myHRP
+            end
+            antiGrav.Force = Vector3.new(0, workspace.Gravity * myHRP:GetMass(), 0)
 
             if not bodyVel or not bodyVel.Parent then
                 bodyVel = Instance.new("BodyVelocity")
-                bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-                bodyVel.P = 5000
+                bodyVel.Name = "BossBodyVel"
+                bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bodyVel.P = 1250
                 bodyVel.Parent = myHRP
             end
 
             if not bodyGyro or not bodyGyro.Parent then
                 bodyGyro = Instance.new("BodyGyro")
-                bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-                bodyGyro.P = 3000
+                bodyGyro.Name = "BossBodyGyro"
+                bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bodyGyro.P = 30000
                 bodyGyro.D = 500
                 bodyGyro.Parent = myHRP
             end
 
             local targetPos = bossPart.Position + Vector3.new(0, heightOffset, 0)
-            local direction = targetPos - myHRP.Position
-            local distance = direction.Magnitude
 
-            if distance > 1 then
-                local speed
-                if distance > 100 then
-                    speed = 500
-                elseif distance > 50 then
-                    speed = 300
-                elseif distance > 20 then
-                    speed = 200
-                else
-                    speed = math.min(distance * 10, 150)
-                end
-                bodyVel.Velocity = direction.Unit * speed
-            else
-                bodyVel.Velocity = Vector3.new(0, 0, 0)
-            end
+            myHRP.CFrame = CFrame.new(targetPos, targetPos - Vector3.new(0, 10, 0))
+            bodyVel.Velocity = Vector3.new(0, 0, 0)
 
-            local lookDir = bossPart.Position - myHRP.Position
-            if lookDir.Magnitude > 0.1 then
-                bodyGyro.CFrame = CFrame.lookAt(myHRP.Position, bossPart.Position)
-            end
+            bodyGyro.CFrame = CFrame.lookAt(myHRP.Position, myHRP.Position - Vector3.new(0, 10, 0))
 
             equipPunch()
             resetAttackTime()
@@ -434,6 +429,12 @@ local function autoKillBossLoop()
 
     if bodyVel then bodyVel:Destroy() end
     if bodyGyro then bodyGyro:Destroy() end
+    if antiGrav then antiGrav:Destroy() end
+    local myChar = player.Character
+    if myChar then
+        local myHum = myChar:FindFirstChildOfClass("Humanoid")
+        if myHum then myHum.PlatformStand = false end
+    end
 end
 
 local bossStatusLabel = BossTab:AddLabel("Status: OFF")
@@ -442,7 +443,7 @@ bossStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 BossTab:AddSwitch("Kill Boss", function(state)
     autoKillBossEnabled = state
     if state then
-        bossStatusLabel.Text = "Status: Hunting boss..."
+        bossStatusLabel.Text = "Status: ON"
         bossStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         task.spawn(autoKillBossLoop)
     else
@@ -457,7 +458,7 @@ BossTab:AddTextBox("Height (1-100)", function(text)
         heightOffset = num
     end
 end, {
-    placeholder = "55"
+    placeholder = "65"
 })
 
 local KillTab = window:AddTab("Loop Kill")
@@ -895,6 +896,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.1.0")
+local wLabel = infoTab:AddLabel("VERSION 3.2.3")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
