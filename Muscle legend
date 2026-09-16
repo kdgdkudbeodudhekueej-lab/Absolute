@@ -461,6 +461,62 @@ end, {
     placeholder = "65"
 })
 
+local RockTab = window:AddTab("Auto Rock")
+
+local rockData = {
+    ["Tiny Rock"] = 0,
+    ["Punching Rock"] = 1000,
+    ["Golden Rock"] = 5000,
+    ["Frost Rock"] = 150000,
+    ["Mythical Rock"] = 400000,
+    ["Eternal Rock"] = 750000,
+    ["Legend Rock"] = 1000000,
+    ["Muscle King Rock"] = 5000000,
+    ["Jungle Rock"] = 10000000,
+    ["Industrial Jungle Rock"] = 25000000
+}
+
+local selectedRock = nil
+
+local rockDropdown = RockTab:AddDropdown("Select Rock", function(selection)
+    selectedRock = selection
+end)
+
+for rockName in pairs(rockData) do
+    rockDropdown:Add(rockName)
+end
+
+RockTab:AddSwitch("Auto Rock", function(enabled)
+    getgenv().RockFarmRunning = enabled
+
+    if enabled and selectedRock then
+        task.spawn(function()
+            local requiredDurability = rockData[selectedRock]
+            local plr = game:GetService("Players").LocalPlayer
+
+            while getgenv().RockFarmRunning do
+                task.wait()
+                if plr.Durability.Value >= requiredDurability then
+                    for _, v in pairs(workspace.machinesFolder:GetDescendants()) do
+                        if v.Name == "neededDurability" and v.Value == requiredDurability and
+                            plr.Character:FindFirstChild("LeftHand") and
+                            plr.Character:FindFirstChild("RightHand") then
+
+                            local rock = v.Parent:FindFirstChild("Rock")
+                            if rock then
+                                firetouchinterest(rock, plr.Character.RightHand, 0)
+                                firetouchinterest(rock, plr.Character.RightHand, 1)
+                                firetouchinterest(rock, plr.Character.LeftHand, 0)
+                                firetouchinterest(rock, plr.Character.LeftHand, 1)
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
 local KillTab = window:AddTab("Loop Kill")
 
 local anchorCFrame = nil
@@ -468,7 +524,8 @@ local waitingRespawn = false
 local RESPAWN_DELAY = 4.66
 local respawnStartTime = 0
 local fastPunchEnabled = false
-local fastAttackEnabled = false
+local fpDelay = 0.1
+local fpAnimSpeed = 3
 local spectateEnabled = false
 local selectedPlayer = nil
 local killAllEnabled = false
@@ -569,56 +626,61 @@ end
 local function fastPunchLoop()
     while fastPunchEnabled do
         pcall(function()
-            local char = player.Character
-            if not char then return end
-            equipPunch()
-            resetAttackTime()
-            muscleEvent:FireServer("punch", "leftHand")
-            muscleEvent:FireServer("punch", "rightHand")
-            local tool = char:FindFirstChild("Punch")
-            if tool then tool:Activate() end
-            speedUpAnimations()
-        end)
-        task.wait(0.15)
-    end
-end
-
-local function fastAttackLoop()
-    while fastAttackEnabled do
-        pcall(function()
             local myChar = player.Character
             if not myChar then return end
-            local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-            local leftHand = myChar:FindFirstChild("LeftHand")
-            local rightHand = myChar:FindFirstChild("RightHand")
-            if not myHRP or not leftHand or not rightHand then return end
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            if not myHum or myHum.Health <= 0 then return end
+
             equipPunch()
             resetAttackTime()
-            for _, targetPlayer in pairs(Players:GetPlayers()) do
-                if targetPlayer ~= player and isAlive(targetPlayer) then
-                    local targetChar = targetPlayer.Character
-                    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-                    if targetHRP then
-                        pcall(function()
-                            firetouchinterest(targetHRP, leftHand, 0)
-                            firetouchinterest(targetHRP, leftHand, 1)
-                            firetouchinterest(targetHRP, rightHand, 0)
-                            firetouchinterest(targetHRP, rightHand, 1)
-                        end)
-                    end
-                end
+
+            local leftHand = myChar:FindFirstChild("LeftHand")
+            local rightHand = myChar:FindFirstChild("RightHand")
+            if leftHand and rightHand then
+                pcall(function()
+                    firetouchinterest(rightHand, leftHand, 0)
+                    firetouchinterest(rightHand, leftHand, 1)
+                end)
             end
+
             pcall(function()
                 muscleEvent:FireServer("punch", "leftHand")
                 muscleEvent:FireServer("punch", "rightHand")
             end)
+
             local tool = myChar:FindFirstChild("Punch")
-            if tool then tool:Activate() end
-            speedUpAnimations()
+            if tool then pcall(function() tool:Activate() end) end
+
+            if myHum then
+                for _, track in pairs(myHum:GetPlayingAnimationTracks()) do
+                    pcall(function() track:AdjustSpeed(fpAnimSpeed) end)
+                end
+            end
         end)
-        task.wait(0.15)
+        task.wait(fpDelay)
     end
 end
+
+local fpSpeedDropdown = KillTab:AddDropdown("Fast Punch Speed", function(selected)
+    if selected == "Slow" then
+        fpDelay = 0.2
+        fpAnimSpeed = 2
+    elseif selected == "Normal" then
+        fpDelay = 0.1
+        fpAnimSpeed = 3
+    elseif selected == "Fast" then
+        fpDelay = 0.05
+        fpAnimSpeed = 5
+    elseif selected == "Faster" then
+        fpDelay = 0.01
+        fpAnimSpeed = 10
+    end
+end)
+
+fpSpeedDropdown:Add("Slow")
+fpSpeedDropdown:Add("Normal")
+fpSpeedDropdown:Add("Fast")
+fpSpeedDropdown:Add("Faster")
 
 local function killAllLoop()
     while killAllEnabled do
@@ -866,11 +928,6 @@ KillTab:AddSwitch("Fast Punch", function(state)
     if state then task.spawn(fastPunchLoop) end
 end)
 
-KillTab:AddSwitch("Fast Attack", function(state)
-    fastAttackEnabled = state
-    if state then task.spawn(fastAttackLoop) end
-end)
-
 KillTab:AddTextBox("Distance (0-3)", function(text)
     local num = tonumber(text)
     if num and num >= 0 and num <= 3 then
@@ -896,6 +953,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.2.3")
+local wLabel = infoTab:AddLabel("VERSION 3.3.5")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
