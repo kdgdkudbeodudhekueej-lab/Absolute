@@ -79,6 +79,94 @@ local function resetAttackTime()
     end
 end
 
+local function showConfirm(title, text, onConfirm)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ConfirmPopup"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game.CoreGui
+
+    local overlay = Instance.new("Frame")
+    overlay.Size = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.BackgroundTransparency = 0.5
+    overlay.BorderSizePixel = 0
+    overlay.Parent = screenGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 400, 0, 180)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -90)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = overlay
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -20, 0, 30)
+    titleLabel.Position = UDim2.new(0, 10, 0, 10)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    titleLabel.TextSize = 20
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = frame
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -20, 0, 80)
+    textLabel.Position = UDim2.new(0, 10, 0, 45)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 15
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextWrapped = true
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.TextYAlignment = Enum.TextYAlignment.Top
+    textLabel.Parent = frame
+
+    local yesBtn = Instance.new("TextButton")
+    yesBtn.Size = UDim2.new(0, 150, 0, 40)
+    yesBtn.Position = UDim2.new(0, 30, 1, -55)
+    yesBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    yesBtn.Text = "YES"
+    yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    yesBtn.TextSize = 16
+    yesBtn.Font = Enum.Font.GothamBold
+    yesBtn.BorderSizePixel = 0
+    yesBtn.Parent = frame
+
+    local yesCorner = Instance.new("UICorner")
+    yesCorner.CornerRadius = UDim.new(0, 6)
+    yesCorner.Parent = yesBtn
+
+    local noBtn = Instance.new("TextButton")
+    noBtn.Size = UDim2.new(0, 150, 0, 40)
+    noBtn.Position = UDim2.new(1, -180, 1, -55)
+    noBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+    noBtn.Text = "NO"
+    noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noBtn.TextSize = 16
+    noBtn.Font = Enum.Font.GothamBold
+    noBtn.BorderSizePixel = 0
+    noBtn.Parent = frame
+
+    local noCorner = Instance.new("UICorner")
+    noCorner.CornerRadius = UDim.new(0, 6)
+    noCorner.Parent = noBtn
+
+    yesBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        if onConfirm then onConfirm() end
+    end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+end
+
 local FastRebTab = window:AddTab("Fast Rebirth")
 
 local rebirthGained = rebirthsStat.Value
@@ -225,31 +313,71 @@ local function rebirthLoop()
     end
 end
 
+local isFastRebirthEnabled = false
+
 FastRebTab:AddSwitch("Fast Rebirth", function(state)
-    isRebirthing = state
-    fastRepRunning = state
-    if state then
-        task.spawn(rebirthLoop)
-        task.spawn(fastRepLoop)
+    if state and not isFastRebirthEnabled then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Warning";
+            Text = "Fast Rebirth just for 7 packs!!";
+            Duration = 5;
+        })
+        showConfirm(
+            "Warning",
+            "Are you sure to enable Fast Rebirth?",
+            function()
+                isFastRebirthEnabled = true
+                isRebirthing = true
+                fastRepRunning = true
+                task.spawn(rebirthLoop)
+                task.spawn(fastRepLoop)
+            end
+        )
+        return
+    end
+    
+    if not state then
+        isFastRebirthEnabled = false
+        isRebirthing = false
+        fastRepRunning = false
     end
 end)
 
+local isAutoRebirthEnabled = false
+
 FastRebTab:AddSwitch("Auto Rebirth", function(state)
-    if state then
-        task.spawn(function()
-            while state do
-                local before = rebirthsStat.Value
-                pcall(function()
-                    ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+    if state and not isAutoRebirthEnabled then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Warning";
+            Text = "You will lose all your strength, are you sure you want to enable Auto Rebirth?";
+            Duration = 5;
+        })
+        showConfirm(
+            "Warning",
+            "You will lose all your strength. Are you sure to enable Auto Rebirth?",
+            function()
+                isAutoRebirthEnabled = true
+                task.spawn(function()
+                    while isAutoRebirthEnabled do
+                        local before = rebirthsStat.Value
+                        pcall(function()
+                            ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
+                        end)
+                        task.wait(0.05)
+                        if rebirthsStat.Value > before then
+                            task.wait(0.3)
+                        else
+                            task.wait(0.5)
+                        end
+                    end
                 end)
-                task.wait(0.05)
-                if rebirthsStat.Value > before then
-                    task.wait(0.3)
-                else
-                    task.wait(0.5)
-                end
             end
-        end)
+        )
+        return
+    end
+    
+    if not state then
+        isAutoRebirthEnabled = false
     end
 end)
 
@@ -953,6 +1081,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.3.5")
+local wLabel = infoTab:AddLabel("VERSION 3.3.7")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
