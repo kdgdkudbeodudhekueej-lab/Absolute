@@ -79,7 +79,7 @@ local function resetAttackTime()
     end
 end
 
-local function showConfirm(title, text, onConfirm)
+local function showConfirm(title, text, onConfirm, onCancel)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "ConfirmPopup"
     screenGui.ResetOnSpawn = false
@@ -93,8 +93,8 @@ local function showConfirm(title, text, onConfirm)
     overlay.Parent = screenGui
 
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 400, 0, 180)
-    frame.Position = UDim2.new(0.5, -200, 0.5, -90)
+    frame.Size = UDim2.new(0, 400, 0, 200)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -100)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     frame.BorderSizePixel = 0
     frame.Parent = overlay
@@ -115,7 +115,7 @@ local function showConfirm(title, text, onConfirm)
     titleLabel.Parent = frame
 
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -20, 0, 80)
+    textLabel.Size = UDim2.new(1, -20, 0, 100)
     textLabel.Position = UDim2.new(0, 10, 0, 45)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = text
@@ -164,6 +164,7 @@ local function showConfirm(title, text, onConfirm)
 
     noBtn.MouseButton1Click:Connect(function()
         screenGui:Destroy()
+        if onCancel then onCancel() end
     end)
 end
 
@@ -217,67 +218,196 @@ durabilityStat:GetPropertyChangedSignal("Value"):Connect(updateStats)
 
 updateStats()
 
+local PetTab = window:AddTab("Pet Settings")
+
+local selectedFarmPets = {}
+local selectedRebirthPets = {}
+
+local allPets = {
+    {name = "Swift Samurai", boost = "15% rep speed"},
+    {name = "Rare Boss Pet", boost = "10% rep speed"},
+    {name = "Omega Overlord", boost = "20% rep speed"},
+    {name = "Tribal Overlord", boost = "x2 Rebirth"},
+    {name = "Titanium Hydra", boost = "x2 Rebirth"}
+}
+
+local function equipPetSet(petList)
+    for _, folder in pairs(player.petsFolder:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, pet in pairs(folder:GetChildren()) do
+                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
+            end
+        end
+    end
+    task.wait(0.1)
+
+    local totalEquipped = 0
+    for _, entry in ipairs(petList) do
+        if totalEquipped >= 8 then break end
+        local petName = entry.name
+        local wanted = entry.count
+        local equipped = 0
+
+        for _, folder in pairs(player.petsFolder:GetChildren()) do
+            if folder:IsA("Folder") and totalEquipped < 8 then
+                for _, pet in pairs(folder:GetChildren()) do
+                    if pet.Name == petName and equipped < wanted and totalEquipped < 8 then
+                        ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
+                        equipped = equipped + 1
+                        totalEquipped = totalEquipped + 1
+                        task.wait(0.05)
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function equipFarmSet()
-    for _, folder in pairs(player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in pairs(folder:GetChildren()) do
-                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
-            end
-        end
-    end
-    task.wait(0.1)
-    local equipped = 0
-    for _, folder in pairs(player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in pairs(folder:GetChildren()) do
-                if pet.Name == "Swift Samurai" and equipped < 6 then
-                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
-                    equipped = equipped + 1
-                    task.wait(0.05)
-                end
-            end
-        end
-    end
-    local bossEquipped = 0
-    for _, folder in pairs(player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in pairs(folder:GetChildren()) do
-                if pet.Name == "Rare Boss Pet" and bossEquipped < 2 then
-                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
-                    bossEquipped = bossEquipped + 1
-                    task.wait(0.05)
-                end
-            end
-        end
+    if #selectedFarmPets > 0 then
+        equipPetSet(selectedFarmPets)
+    else
+        equipPetSet({
+            {name = "Rare Boss Pet", count = 5},
+            {name = "Omega Overlord", count = 2},
+            {name = "Swift Samurai", count = 1}
+        })
     end
 end
 
-local function equipOverlord()
-    for _, folder in pairs(player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in pairs(folder:GetChildren()) do
-                ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
-            end
-        end
-    end
-    task.wait(0.1)
-    for _, folder in pairs(player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in pairs(folder:GetChildren()) do
-                if pet.Name == "Tribal Overlord" then
-                    ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
-                end
-            end
-        end
+local function equipRebirthSet()
+    if #selectedRebirthPets > 0 then
+        equipPetSet(selectedRebirthPets)
+    else
+        equipPetSet({
+            {name = "Titanium Hydra", count = 2},
+            {name = "Tribal Overlord", count = 1}
+        })
     end
 end
 
-FastRebTab:AddButton("Equip Farm Set (6 Samurai + 2 Boss)", function()
-    equipFarmSet()
+PetTab:AddLabel("FARM PETS (while grinding)").TextSize = 18
+
+local currentFarmPet = allPets[1].name
+local currentFarmCount = 1
+
+local farmPetDropdown = PetTab:AddDropdown("Choose Farm Pet", function(selected)
+    local name = selected:match("^([^—]+)") or selected
+    currentFarmPet = name:gsub("%s+$", "")
 end)
 
-FastRebTab:AddButton("Equip Tribal Overlord", function()
-    equipOverlord()
+for _, petInfo in ipairs(allPets) do
+    local displayText = petInfo.name
+    if petInfo.boost ~= "" then
+        displayText = petInfo.name .. " — " .. petInfo.boost
+    end
+    farmPetDropdown:Add(displayText)
+end
+
+local farmCountDropdown = PetTab:AddDropdown("Choose Count", function(selected)
+    currentFarmCount = tonumber(selected) or 1
+end)
+
+for i = 1, 8 do
+    farmCountDropdown:Add(tostring(i))
+end
+
+PetTab:AddButton("Add Farm Pet to Set", function()
+    table.insert(selectedFarmPets, {name = currentFarmPet, count = currentFarmCount})
+end)
+
+local farmPetListLabel = PetTab:AddLabel("Farm Pets: (none)")
+farmPetListLabel.TextSize = 14
+
+PetTab:AddButton("Remove Last Farm Pet", function()
+    if #selectedFarmPets > 0 then
+        table.remove(selectedFarmPets)
+    end
+end)
+
+PetTab:AddButton("Clear Farm Pets", function()
+    selectedFarmPets = {}
+end)
+
+PetTab:AddButton("Equip Farm Pets Now", function()
+    if #selectedFarmPets > 0 then
+        equipPetSet(selectedFarmPets)
+    end
+end)
+
+PetTab:AddLabel("REBIRTH PETS (before rebirth)").TextSize = 18
+
+local currentRebirthPet = allPets[1].name
+local currentRebirthCount = 1
+
+local rebirthPetDropdown = PetTab:AddDropdown("Choose Rebirth Pet", function(selected)
+    local name = selected:match("^([^—]+)") or selected
+    currentRebirthPet = name:gsub("%s+$", "")
+end)
+
+for _, petInfo in ipairs(allPets) do
+    local displayText = petInfo.name
+    if petInfo.boost ~= "" then
+        displayText = petInfo.name .. " — " .. petInfo.boost
+    end
+    rebirthPetDropdown:Add(displayText)
+end
+
+local rebirthCountDropdown = PetTab:AddDropdown("Choose Count", function(selected)
+    currentRebirthCount = tonumber(selected) or 1
+end)
+
+for i = 1, 8 do
+    rebirthCountDropdown:Add(tostring(i))
+end
+
+PetTab:AddButton("Add Rebirth Pet to Set", function()
+    table.insert(selectedRebirthPets, {name = currentRebirthPet, count = currentRebirthCount})
+end)
+
+local rebirthPetListLabel = PetTab:AddLabel("Rebirth Pets: (none)")
+rebirthPetListLabel.TextSize = 14
+
+PetTab:AddButton("Remove Last Rebirth Pet", function()
+    if #selectedRebirthPets > 0 then
+        table.remove(selectedRebirthPets)
+    end
+end)
+
+PetTab:AddButton("Clear Rebirth Pets", function()
+    selectedRebirthPets = {}
+end)
+
+PetTab:AddButton("Equip Rebirth Pets Now", function()
+    if #selectedRebirthPets > 0 then
+        equipPetSet(selectedRebirthPets)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+
+        if #selectedFarmPets == 0 then
+            farmPetListLabel.Text = "Farm Pets: (none)"
+        else
+            local parts = {}
+            for _, entry in ipairs(selectedFarmPets) do
+                table.insert(parts, entry.name .. " x" .. entry.count)
+            end
+            farmPetListLabel.Text = "Farm Pets: " .. table.concat(parts, ", ")
+        end
+
+        if #selectedRebirthPets == 0 then
+            rebirthPetListLabel.Text = "Rebirth Pets: (none)"
+        else
+            local parts = {}
+            for _, entry in ipairs(selectedRebirthPets) do
+                table.insert(parts, entry.name .. " x" .. entry.count)
+            end
+            rebirthPetListLabel.Text = "Rebirth Pets: " .. table.concat(parts, ", ")
+        end
+    end
 end)
 
 local isRebirthing = false
@@ -296,7 +426,7 @@ local function doRebirth()
         task.wait(0.05)
     end
     if isRebirthing and strengthStat.Value >= target then
-        equipOverlord()
+        equipRebirthSet()
         task.wait(0.25)
         local before = rebirthsStat.Value
         repeat
@@ -314,23 +444,22 @@ local function rebirthLoop()
 end
 
 local isFastRebirthEnabled = false
+local fastRebirthSwitch
 
-FastRebTab:AddSwitch("Fast Rebirth", function(state)
+fastRebirthSwitch = FastRebTab:AddSwitch("Fast Rebirth", function(state)
     if state and not isFastRebirthEnabled then
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Warning";
-            Text = "Fast Rebirth just for 7 packs!!";
-            Duration = 5;
-        })
         showConfirm(
             "Warning",
-            "Are you sure to enable Fast Rebirth?",
+            "Fast Rebirth just for 7 packs!!",
             function()
                 isFastRebirthEnabled = true
                 isRebirthing = true
                 fastRepRunning = true
                 task.spawn(rebirthLoop)
                 task.spawn(fastRepLoop)
+            end,
+            function()
+                fastRebirthSwitch:Set(false)
             end
         )
         return
@@ -344,17 +473,13 @@ FastRebTab:AddSwitch("Fast Rebirth", function(state)
 end)
 
 local isAutoRebirthEnabled = false
+local autoRebirthSwitch
 
-FastRebTab:AddSwitch("Auto Rebirth", function(state)
+autoRebirthSwitch = FastRebTab:AddSwitch("Auto Rebirth", function(state)
     if state and not isAutoRebirthEnabled then
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Warning";
-            Text = "You will lose all your strength, are you sure you want to enable Auto Rebirth?";
-            Duration = 5;
-        })
         showConfirm(
             "Warning",
-            "You will lose all your strength. Are you sure to enable Auto Rebirth?",
+            "You will lose all your strength, are you sure you want to enable Auto Rebirth?",
             function()
                 isAutoRebirthEnabled = true
                 task.spawn(function()
@@ -371,6 +496,9 @@ FastRebTab:AddSwitch("Auto Rebirth", function(state)
                         end
                     end
                 end)
+            end,
+            function()
+                autoRebirthSwitch:Set(false)
             end
         )
         return
@@ -1081,6 +1209,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.3.7")
+local wLabel = infoTab:AddLabel("VERSION 3.4.3")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
