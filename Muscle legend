@@ -452,7 +452,8 @@ local allPets = {
     {name = "Rare Boss Pet", boost = "10% rep speed"},
     {name = "Omega Overlord", boost = "20% rep speed"},
     {name = "Tribal Overlord", boost = "x2 Rebirth"},
-    {name = "Titanium Hydra", boost = "x2 Rebirth"}
+    {name = "Titanium Hydra", boost = "x2 Rebirth"},
+    {name = "Inferno Drake", boost = "40% rep speed"}
 }
 
 local function equipPetSet(petList)
@@ -504,6 +505,7 @@ local function equipRebirthSet()
         equipPetSet(selectedRebirthPets)
     else
         equipPetSet({
+            {name = "Inferno Drake", count = 3},
             {name = "Titanium Hydra", count = 2},
             {name = "Tribal Overlord", count = 1}
         })
