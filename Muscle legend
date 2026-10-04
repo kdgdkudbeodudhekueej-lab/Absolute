@@ -453,7 +453,8 @@ local allPets = {
     {name = "Omega Overlord", boost = "20% rep speed"},
     {name = "Tribal Overlord", boost = "x2 Rebirth"},
     {name = "Titanium Hydra", boost = "x2 Rebirth"},
-    {name = "Inferno Drake", boost = "40% rep speed"}
+    {name = "Inferno Drake", boost = "40% rep speed"},
+    {name = "Mythic Boss Pet", boost = "20% Strength + 10% rep speed"}
 }
 
 local function equipPetSet(petList)
@@ -507,7 +508,8 @@ local function equipRebirthSet()
         equipPetSet({
             {name = "Inferno Drake", count = 3},
             {name = "Titanium Hydra", count = 2},
-            {name = "Tribal Overlord", count = 1}
+            {name = "Tribal Overlord", count = 1},
+            {name = "Mythic Boss Pet", count = 2}
         })
     end
 end
@@ -1449,6 +1451,6 @@ end)
 
 local infoTab = window:AddTab("Info")
 infoTab:AddLabel("Absolute Menu").TextSize = 20
-local wLabel = infoTab:AddLabel("VERSION 3.4.3")
+local wLabel = infoTab:AddLabel("VERSION 3.4.4")
 wLabel.TextSize = 30
 wLabel.Font = Enum.Font.Arcade
